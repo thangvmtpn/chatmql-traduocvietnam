@@ -1,0 +1,16 @@
+.input-overview-card {
+  transition: all 0.2s ease;
+}
+
+.input-overview-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.input-overview-card .material-symbols-outlined {
+  font-size: 32px;
+  font-weight: 700;
+  font-variation-settings:
+    "FILL" 1,
+    "wght" 400;
+}

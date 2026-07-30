@@ -1,0 +1,225 @@
+/* ============================================
+   BẢNG THUẬT NGỮ PAGE
+   ============================================ */
+
+.thuat-ngu-page {
+  padding: 0;
+  background: #fff;
+  min-height: 100vh;
+}
+
+/* Header */
+.thuat-ngu-header {
+  padding: 20px 32px 0;
+}
+
+.thuat-ngu-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 18px;
+}
+
+.breadcrumb-icon {
+  font-size: 16px !important;
+  color: #9ca3af;
+}
+
+.breadcrumb-current {
+  color: #374151;
+  font-weight: 500;
+}
+
+.thuat-ngu-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.thuat-ngu-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e40af;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+/* Search */
+.thuat-ngu-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.thuat-ngu-search .search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 18px !important;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.thuat-ngu-search input {
+  width: 240px;
+  padding: 8px 14px 8px 40px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #374151;
+  background: #fff;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.thuat-ngu-search input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.thuat-ngu-search input::placeholder {
+  color: #9ca3af;
+}
+
+/* Table */
+.thuat-ngu-table-wrapper {
+  overflow-x: auto;
+}
+
+.thuat-ngu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* Table Header */
+.thuat-ngu-table thead tr {
+  background: #f3f4f6;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.thuat-ngu-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+/* Column widths */
+.thuat-ngu-table .col-stt {
+  width: 60px;
+  text-align: center;
+}
+
+.thuat-ngu-table .col-viettat {
+  width: 140px;
+}
+
+.thuat-ngu-table .col-giainghi {
+  width: auto;
+}
+
+.thuat-ngu-table .col-muctieu {
+  width: 240px;
+}
+
+.thuat-ngu-table .col-luuy {
+  width: 200px;
+}
+
+/* Table Body */
+.thuat-ngu-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s;
+}
+
+.thuat-ngu-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.thuat-ngu-table tbody td {
+  padding: 16px 16px;
+  color: #374151;
+  vertical-align: top;
+  line-height: 1.6;
+}
+
+/* STT cell */
+.thuat-ngu-table tbody .col-stt {
+  text-align: center;
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* Term badge */
+.term-badge {
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Formula badge */
+.formula-badge {
+  display: inline-block;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.empty-row {
+  text-align: center;
+  padding: 60px 16px !important;
+  color: #9ca3af;
+}
+
+.empty-row .material-symbols-outlined {
+  font-size: 40px !important;
+  display: block;
+  margin: 0 auto 12px;
+  color: #d1d5db;
+}
+
+.empty-row p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .thuat-ngu-header {
+    padding: 16px;
+  }
+
+  .thuat-ngu-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .thuat-ngu-search input {
+    width: 100%;
+  }
+
+  .thuat-ngu-search {
+    width: 100%;
+  }
+
+  .thuat-ngu-table .col-muctieu,
+  .thuat-ngu-table .col-luuy {
+    display: none;
+  }
+}

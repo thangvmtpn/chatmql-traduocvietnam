@@ -1,0 +1,111 @@
+.account-hub-page {
+  padding: 32px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.account-hub-forbidden {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 16px;
+  color: #6b7280;
+}
+.account-hub-forbidden .material-symbols-outlined {
+  font-size: 64px;
+  color: #d1d5db;
+}
+.account-hub-forbidden h2 { color: #374151; margin: 0; }
+.account-hub-forbidden p { margin: 0; font-size: 14px; }
+
+.account-hub-header {
+  margin-bottom: 36px;
+}
+.account-hub-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.account-hub-icon {
+  font-size: 44px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-radius: 14px;
+  padding: 10px;
+}
+.account-hub-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+.account-hub-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.account-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.account-hub-card {
+  cursor: pointer;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+}
+.account-hub-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.account-hub-card-inner {
+  padding: 32px 28px;
+  color: #fff;
+  position: relative;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.account-hub-card-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  width: fit-content;
+  letter-spacing: 0.5px;
+}
+.account-hub-card-icon {
+  font-size: 42px;
+  opacity: 0.92;
+  margin-top: 4px;
+}
+.account-hub-card-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+.account-hub-card-desc {
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0;
+  line-height: 1.5;
+}
+.account-hub-card-arrow {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0.75;
+}
+.account-hub-card-arrow .material-symbols-outlined {
+  font-size: 24px;
+}

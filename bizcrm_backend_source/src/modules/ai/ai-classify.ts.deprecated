@@ -1,0 +1,110 @@
+/**
+ * ai-classify.ts — AI-powered lifecycle stage classification.
+ * Used by the `ai_classify` automation action to analyze conversation
+ * transcripts and suggest lifecycle stage updates.
+ */
+import { getProviderConfig } from './provider-registry.js'
+import { generateWithGemini } from './providers/gemini.js'
+import { generateWithOpenai } from './providers/openai.js'
+import { generateWithAnthropic } from './providers/anthropic.js'
+import { logger } from '../../shared/logger.js'
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export interface ClassifyInput {
+  transcript: string
+  currentStage: string
+  contactName: string
+  apiKey: string
+  provider: string
+}
+
+export interface ClassifyResult {
+  suggestedStage: string
+  confidence: number
+  reason: string
+}
+
+// ─── Lifecycle stages (must match frontend + lifecycle-service) ──────
+
+const VALID_STAGES = [
+  'subscriber', 'lead', 'mql', 'sql', 'opportunity', 'customer', 'evangelist',
+]
+
+// ─── System prompt ──────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are a CRM lifecycle classifier. Analyze the conversation transcript and classify the contact's lifecycle stage.
+
+Available stages (ordered by progression):
+- subscriber: Just subscribed, no real interaction yet
+- lead: Showed initial interest, asked questions
+- mql: Marketing Qualified Lead — engaged with content, asked about products/services
+- sql: Sales Qualified Lead — expressed buying intent, discussed pricing, timeline
+- opportunity: Active deal — negotiating terms, requested proposal/quote
+- customer: Purchased/converted
+- evangelist: Happy customer, referring others
+
+Rules:
+1. Never downgrade a contact (if current stage is higher, keep it).
+2. Only suggest a stage change if there is clear evidence in the conversation.
+3. Confidence should be 0.0-1.0 (0.7+ means high confidence).
+4. Respond in JSON only: {"stage":"<stage>","confidence":<0-1>,"reason":"<brief reason>"}
+5. If unsure, return the current stage with low confidence.`
+
+// ─── Main function ──────────────────────────────────────────────────
+
+export async function classifyContactLifecycle(input: ClassifyInput): Promise<ClassifyResult> {
+  const userPrompt = `Contact: ${input.contactName}
+Current stage: ${input.currentStage}
+
+Recent conversation:
+${input.transcript.slice(0, 3000)}
+
+Classify this contact's lifecycle stage based on the conversation above.`
+
+  try {
+    const config = getProviderConfig(input.provider)
+    const baseUrl = config?.baseUrl || ''
+    const model = config?.models?.[0]?.value || 'gemini-2.0-flash'
+
+    let raw: { text: string }
+
+    if (input.provider === 'gemini') {
+      raw = await generateWithGemini(baseUrl, input.apiKey, model, SYSTEM_PROMPT, userPrompt, {
+        jsonMode: true, maxTokens: 300,
+      })
+    } else if (input.provider === 'anthropic') {
+      raw = await generateWithAnthropic(baseUrl, input.apiKey, model, SYSTEM_PROMPT, userPrompt, {
+        maxTokens: 300,
+      })
+    } else {
+      raw = await generateWithOpenai(baseUrl, input.apiKey, model, SYSTEM_PROMPT, userPrompt, {
+        jsonMode: true, maxTokens: 300,
+      })
+    }
+
+    // Parse AI response
+    const parsed = JSON.parse(raw.text)
+    const suggestedStage = String(parsed.stage || input.currentStage).toLowerCase()
+    const confidence = Math.min(1, Math.max(0, Number(parsed.confidence) || 0))
+    const reason = String(parsed.reason || 'No reason provided')
+
+    // Validate stage
+    if (!VALID_STAGES.includes(suggestedStage)) {
+      logger.warn({ suggestedStage }, '[ai-classify] Invalid stage suggested, keeping current')
+      return { suggestedStage: input.currentStage, confidence: 0, reason: 'Invalid stage' }
+    }
+
+    // Enforce no-downgrade rule
+    const currentIdx = VALID_STAGES.indexOf(input.currentStage)
+    const suggestedIdx = VALID_STAGES.indexOf(suggestedStage)
+    if (suggestedIdx < currentIdx) {
+      return { suggestedStage: input.currentStage, confidence: 0, reason: 'Would downgrade — blocked' }
+    }
+
+    return { suggestedStage, confidence, reason }
+  } catch (err: any) {
+    logger.error({ err: err.message }, '[ai-classify] LLM call failed')
+    return { suggestedStage: input.currentStage, confidence: 0, reason: `Error: ${err.message}` }
+  }
+}

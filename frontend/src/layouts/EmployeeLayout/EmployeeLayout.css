@@ -1,0 +1,217 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+
+.employee-layout {
+  min-height: 100vh;
+  background: #f5f7fa;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Roboto",
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header - Green theme for employee */
+.employee-header {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.employee-header .header-content {
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.employee-header .header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.employee-header .logo {
+  font-size: 32px;
+  font-weight: 900;
+  color: #10b981;
+  margin: 0;
+  letter-spacing: 3px;
+}
+
+.employee-header .title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.employee-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.employee-header .date-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+}
+
+.employee-header .date-display .material-symbols-outlined {
+  font-size: 18px;
+  color: #6b7280;
+}
+
+.employee-header .user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.employee-header .user-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: #111827;
+}
+
+.employee-header .user-status {
+  font-size: 11px;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.employee-header .notification-btn {
+  background: #10b981;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.employee-header .notification-btn:hover {
+  background: #059669;
+}
+
+.employee-header .notification-btn .material-symbols-outlined {
+  color: white;
+  font-size: 20px;
+}
+
+/* Container */
+.employee-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* Main Content */
+.employee-layout .main-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #f5f7fa;
+  min-width: 0;
+}
+
+/* Content Cards */
+.employee-layout .content-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.employee-layout .content-card-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.employee-layout .content-card-header .material-symbols-outlined {
+  font-size: 22px;
+}
+
+.employee-layout .content-card-header h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.employee-layout .content-card-body {
+  padding: 16px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.empty-icon {
+  font-size: 64px !important;
+  color: #d1d5db;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.empty-state h4 {
+  color: #9ca3af;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.empty-state p {
+  color: #9ca3af;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  user-select: none;
+}
+
+/* Responsive */
+@media (max-width: 1280px) {
+  .employee-container {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .employee-layout .main-content {
+    padding: 12px;
+  }
+}

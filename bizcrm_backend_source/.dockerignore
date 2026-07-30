@@ -1,0 +1,11 @@
+# Don't bake local-only / host artifacts into the image.
+# Runtime env comes from docker compose (NOT a baked .env).
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+*.log
+coverage
+.DS_Store

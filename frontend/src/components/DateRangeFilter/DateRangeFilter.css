@@ -1,0 +1,147 @@
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  background: #f9fafb;
+  border-color: #1e40af;
+  color: #1e40af;
+}
+
+.filter-btn.active {
+  background: #1e40af;
+  border-color: #1e40af;
+  color: white;
+}
+
+.filter-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.custom-date-inputs {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.date-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-input-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.date-input-group input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #111827;
+  background: white;
+  cursor: pointer;
+}
+
+.date-input-group input[type="date"]:focus {
+  outline: none;
+  border-color: #1e40af;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+.apply-btn,
+.reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.apply-btn {
+  background: #10b981;
+  color: white;
+}
+
+.apply-btn:hover {
+  background: #059669;
+}
+
+.reset-btn {
+  background: #6b7280;
+  color: white;
+}
+
+.reset-btn:hover {
+  background: #4b5563;
+}
+
+.apply-btn .material-symbols-outlined,
+.reset-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.orders-filters .date-range-filter {
+  margin-bottom: 0;
+}
+.orders-filters .filters-row {
+  align-items: flex-start;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filter-buttons {
+    flex-direction: column;
+  }
+
+  .filter-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .custom-date-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-input-group input[type="date"] {
+    width: 100%;
+  }
+
+  .apply-btn,
+  .reset-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

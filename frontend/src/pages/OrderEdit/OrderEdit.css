@@ -1,0 +1,255 @@
+.order-edit-page {
+  padding: 24px;
+}
+
+.order-edit-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.order-edit-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.order-edit-header .back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: transparent;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.order-edit-header .back-btn:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.order-edit-header .save-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.order-edit-header .save-btn:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.order-edit-header .save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.order-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.edit-block {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e7eb;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.edit-block:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.edit-block.full-width {
+  grid-column: 1 / -1;
+}
+
+.edit-block h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-top: 0;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.form-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 12px;
+}
+
+.form-group-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3b82f6;
+  margin-bottom: 6px;
+}
+
+.form-group-row .form-label {
+  margin-bottom: 0;
+  flex: 0 0 120px;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background-color: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group-row .form-input, .form-group-row .form-select {
+  flex: 1;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-input:disabled, .form-select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.total-money {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+@media (max-width: 1024px) {
+  .order-edit-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .order-edit-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-group-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .form-group-row .form-label {
+    margin-bottom: 6px;
+  }
+  .form-group-row .form-input, .form-group-row .form-select, .form-group-row .searchable-dropdown {
+    width: 100%;
+  }
+}
+
+.searchable-dropdown .dropdown-item:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Read-only Products Table */
+.products-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.products-table thead {
+  background: #eef2ff;
+}
+
+.products-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.products-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s;
+}
+
+.products-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.products-table tbody tr.gift-row {
+  background-color: #fef3c7;
+}
+
+.products-table tbody tr.gift-row:hover {
+  background-color: #fde68a;
+}
+
+.products-table tbody td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.product-code {
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.product-name {
+  font-weight: 500;
+}
+
+.product-qty {
+  text-align: center;
+  font-weight: 600;
+}
+
+.product-total {
+  font-weight: 600;
+  color: #dc2626;
+}

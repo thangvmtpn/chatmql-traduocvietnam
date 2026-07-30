@@ -1,0 +1,83 @@
+{
+    "Id": "725543a4-6bf1-4fa1-b434-da1e799889f2",
+    "Attempt": 1,
+    "Notifications": [
+        {
+            "Action": "invoice.update.500591555",
+            "Data": [
+                {
+                    "__type": "KiotViet.OmniChannelCore.Api.Shared.Model.WebhookInvoiceUpdateRes, KiotViet.OmniChannelCore.Api.Shared",
+                    "Id": 198706071,
+                    "Code": "HD014598",
+                    "PurchaseDate": "2025-06-26T11:04:18.1770000+07:00",
+                    "BranchId": 287170,
+                    "BranchName": "Chi nhánh trung tâm",
+                    "SoldById": 476686,
+                    "SoldByName": "Hoài Chang - 0325173345",
+                    "CustomerId": 27662653,
+                    "CustomerCode": "KH001249",
+                    "CustomerName": "Anh Lê Văn Công",
+                    "Total": 585000,
+                    "TotalPayment": 0,
+                    "Discount": 20000,
+                    "Status": 3,
+                    "StatusValue": "Processing",
+                    "UsingCod": true,
+                    "ModifiedDate": "2025-06-27T14:28:14.6000000+07:00",
+                    "InvoiceDelivery": {
+                        "InvoiceId": 198706071,
+                        "DeliveryCode": "84858917818865",
+                        "ServiceType": "0",
+                        "Status": 3,
+                        "Price": 18000,
+                        "Receiver": "Anh Lê Văn Công",
+                        "ContactNumber": "0876657979",
+                        "Address": "113 phố Bắc Sơn",
+                        "LocationId": 265,
+                        "LocationName": "Hà Nội - Huyện Chương Mỹ",
+                        "Weight": 500,
+                        "Length": 10,
+                        "Width": 10,
+                        "Height": 10,
+                        "UsingPriceCod": true,
+                        "PartnerDeliveryId": 217354,
+                        "PartnerDelivery": {
+                            "Code": "BESTFW",
+                            "Name": "BESTFW"
+                        }
+                    },
+                    "InvoiceDetails": [
+                        {
+                            "ProductId": 43498106,
+                            "ProductCode": "FX/TP-CC06-100/KR",
+                            "ProductName": "Trà xanh đinh nõn thượng hạng - Vạn Hỷ trà - Túi Kraft 100g",
+                            "Quantity": 5,
+                            "Price": 117000,
+                            "Discount": 0
+                        },
+                        {
+                            "ProductId": 44986572,
+                            "ProductCode": "QT-FREESHIP",
+                            "ProductName": "KM1 - (Quà tặng) Hỗ Trợ Vận Chuyển",
+                            "Quantity": 1,
+                            "Price": 20000,
+                            "Discount": 0
+                        }
+                    ],
+                    "Payments": [],
+                    "SaleChannelId": 332871,
+                    "SaleChannel": {
+                        "Img": "far fa-handshake",
+                        "RetailerId": 500591555,
+                        "Position": 20,
+                        "IsActive": true,
+                        "CreatedBy": 378380,
+                        "CreatedDate": "2024-10-22T17:37:11.5370000+07:00",
+                        "Id": 332871,
+                        "Name": "CSKH"
+                    }
+                }
+            ]
+        }
+    ]
+}

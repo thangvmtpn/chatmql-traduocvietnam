@@ -1,0 +1,506 @@
+/* Invoice List Page Layout */
+.invoice-list-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f3f4f6;
+}
+
+.invoice-list-main {
+  flex: 1;
+  padding: 24px;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Header */
+.invoice-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.invoice-list-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.invoice-list-header h1 .material-symbols-outlined {
+  font-size: 26px;
+  color: #3b82f6;
+}
+
+/* Filters */
+.invoice-list-filters {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.invoice-list-filters .custom-date-inputs {
+  margin-top: 10px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-row-selects {
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.filter-select {
+  height: 38px;
+  padding: 0 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1f2937;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  min-width: 180px;
+  transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.reset-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 14px;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.reset-filter-btn:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.reset-filter-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* Search code input */
+.search-code-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 210px;
+}
+
+.search-code-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 18px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.search-code-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 32px 0 34px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1f2937;
+  background: white;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-code-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-code-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: color 0.15s;
+}
+
+.search-code-clear:hover {
+  color: #ef4444;
+}
+
+.search-code-clear .material-symbols-outlined {
+  font-size: 16px;
+}
+
+
+/* Results */
+.invoice-list-results {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+  overflow: hidden;
+}
+
+.invoice-list-count {
+  padding: 14px;
+  font-size: 13.5px;
+  color: #6b7280;
+}
+
+.invoice-list-count strong {
+  color: #1f2937;
+}
+
+/* States */
+.invoice-list-loading,
+.invoice-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 12px;
+  color: #6b7280;
+}
+
+.invoice-list-loading .material-symbols-outlined,
+.invoice-list-empty .material-symbols-outlined {
+  font-size: 52px;
+  color: #d1d5db;
+}
+
+.invoice-list-loading .material-symbols-outlined {
+  color: #3b82f6;
+}
+
+.invoice-list-loading p,
+.invoice-list-empty p {
+  font-size: 15px;
+  margin: 0;
+}
+
+/* Table Wrapper */
+.invoice-list-table-wrapper {
+  overflow-x: auto;
+}
+
+/* Table */
+.invoice-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 780px;
+}
+
+.invoice-list-table thead tr {
+  background: #f9fafb;
+}
+
+.invoice-list-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.invoice-list-table td {
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.invoice-list-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.invoice-list-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* Invoice code */
+.invoice-code-cell {
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+/* Amount */
+.amount-cell {
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+/* Fee cell */
+.fee-cell {
+  white-space: nowrap;
+}
+
+.fee-pp-cash {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.fee-cc-cash {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+/* Status badge */
+.invoice-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+}
+
+/* View button */
+.invoice-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: white;
+  color: #3b82f6;
+  border: 1.5px solid #3b82f6;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.invoice-view-btn:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.invoice-view-btn .material-symbols-outlined {
+  font-size: 15px;
+}
+
+/* Pagination */
+.invoice-list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.pagination-info {
+  font-size: 13.5px;
+  color: #6b7280;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+  display: inline-block;
+}
+
+/* ── Bulk actions bar ──────────────────────────────────────────────────────── */
+.invoice-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 10px;
+  animation: fadeIn 0.18s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.invoice-bulk-count {
+  font-size: 13.5px;
+  color: #1e40af;
+  white-space: nowrap;
+}
+
+.invoice-bulk-count strong {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+/* Print button */
+.invoice-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.invoice-print-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.invoice-print-btn:active {
+  transform: translateY(0);
+}
+
+.invoice-print-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* Deselect button */
+.invoice-deselect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  padding: 0;
+}
+
+.invoice-deselect-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.invoice-deselect-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* ── Checkbox column ───────────────────────────────────────────────────────── */
+.invoice-th-check,
+.invoice-td-check {
+  width: 42px;
+  min-width: 42px;
+  text-align: center;
+  padding-left: 10px !important;
+  padding-right: 4px !important;
+}
+
+.invoice-row-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+/* ── Selected row highlight ────────────────────────────────────────────────── */
+.invoice-list-table tbody tr.invoice-row-selected {
+  background: #eff6ff !important;
+}
+
+.invoice-list-table tbody tr.invoice-row-selected td {
+  border-bottom-color: #bfdbfe;
+}
+

@@ -1,0 +1,150 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: url("/bgr.jpg");
+  background-size: cover;
+  background-position: top center;
+  padding: 20px;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 48px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 460px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo {
+  font-size: 40px;
+  font-weight: 900;
+  color: #074f3e;
+  margin: 0 0 4px 0;
+  letter-spacing: 2px;
+}
+
+.login-subtitle {
+  font-size: 16px;
+  margin: 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.input-wrapper:focus-within {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.input-wrapper.error {
+  border-color: #ef4444;
+}
+
+.input-wrapper .material-symbols-outlined {
+  color: #9ca3af;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.input-wrapper input {
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 15px;
+  color: #111827;
+  background: transparent;
+}
+
+.input-wrapper input::placeholder {
+  color: #9ca3af;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 13px;
+  padding-left: 4px;
+}
+
+.login-button {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.login-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+.login-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.login-button .material-symbols-outlined {
+  font-size: 20px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 32px 24px;
+  }
+
+  .login-logo {
+    font-size: 28px;
+  }
+}

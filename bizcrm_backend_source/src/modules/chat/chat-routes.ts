@@ -1,0 +1,475 @@
+/**
+ * chat-routes.ts — REST API for conversations and messages.
+ * Ported from ZaloCRM with adaptations for BizCRM.
+ */
+import type { FastifyInstance } from 'fastify'
+import { authMiddleware } from '../auth/auth-middleware.js'
+import { prisma } from '../../shared/prisma-client.js'
+import { emitPinToggle, emitReaction, emitAiModeChanged, emitConvDeleted } from '../realtime/socket-gateway.js'
+import { getPoolEntry } from '../zalo/zalo-pool.js'
+import { chatMessageRoutes } from './chat-message-routes.js'
+import { chatGroupRoutes } from './chat-group-routes.js'
+import { enrichContactFromZalo } from './message-handler.js'
+import { requireZaloAccess, resolveManagerAccountIds } from '../zalo/zalo-access-middleware.js'
+import { forwardReactionToZalo, isSupportedEmoji } from '../zalo/zalo-reactions.js'
+import multipart from '@fastify/multipart'
+import { logger } from '../../shared/logger.js'
+import { deriveActorKind, type ActorKindValue } from '../../shared/constants.js'
+
+type QueryParams = Record<string, string>
+
+// ── Quote helpers (ported from ZaloCRM) ───────────────────────────────────────
+
+/** Map BizCRM contentType → Zalo internal msgType for quote references */
+function mapReplyMsgType(contentType: string): string {
+  if (contentType === 'text') return 'webchat'
+  if (contentType === 'image') return 'chat.photo'
+  if (contentType === 'file') return 'share.file'
+  if (contentType === 'video') return 'chat.video.msg'
+  if (contentType === 'voice') return 'chat.voice'
+  if (contentType === 'sticker') return 'chat.sticker'
+  if (contentType === 'gif') return 'chat.gif'
+  if (contentType === 'link') return 'chat.link'
+  if (contentType === 'location') return 'chat.location.new'
+  return contentType
+}
+
+/** Build a SendMessageQuote compatible with zca-js sendMessage API */
+export function buildReplyQuote(message: {
+  externalMsgId: string | null
+  senderUid: string | null
+  content: string | null
+  contentType: string
+  sentAt: Date
+}) {
+  if (!message.externalMsgId || !message.senderUid) return null
+  return {
+    content: message.content ?? '',
+    msgType: mapReplyMsgType(message.contentType),
+    propertyExt: {},
+    uidFrom: message.senderUid,
+    msgId: message.externalMsgId,
+    cliMsgId: message.externalMsgId,
+    ts: String(message.sentAt.getTime()),
+    ttl: 0,
+  }
+}
+
+/**
+ * Convert the DB-shaped `quote` JSON into the `reply` shape the frontend renders.
+ * Apply at every place a message is returned to the client (HTTP response + socket emit)
+ * so the quote box appears live, not just after a /messages refetch on reload.
+ */
+export function transformMessageForFrontend<T extends { quote?: unknown }>(message: T): Omit<T, 'quote'> & {
+  reply: { msgId: string; cliMsgId?: string; content: string; msgType: string; uidFrom: string; ts: string } | null
+  actorKind: ActorKindValue
+} {
+  const { quote, ...rest } = message
+  // Derived role of this item (khách / hệ thống / AI / nhân viên / ZNS) — single
+  // source of truth so the chat UI can group & filter without scattered checks.
+  const actorKind = deriveActorKind(message as Record<string, unknown>)
+  const q = quote as Record<string, unknown> | null | undefined
+  if (!q || typeof q !== 'object') return { ...rest, reply: null, actorKind }
+  return {
+    ...rest,
+    actorKind,
+    reply: {
+      msgId: (q.msgId as string) || (q.cliMsgId as string) || '',
+      cliMsgId: (q.cliMsgId as string) || undefined,
+      content: (q.content as string) || '',
+      msgType: (q.msgType as string) || 'text',
+      uidFrom: (q.uidFrom as string) || '',
+      ts: (q.ts as string) || '',
+    },
+  }
+}
+
+export async function chatRoutes(app: FastifyInstance): Promise<void> {
+  app.addHook('preHandler', authMiddleware)
+
+  // Register multipart for file uploads (5MB limit)
+  await app.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  })
+
+  // ── Conversation filter counts ──────────────────────────────────────
+  app.get('/api/v1/conversations/counts', async (request) => {
+    const user = request.user as { orgId: string; id: string; role: string }
+    const { accountId = '', tab = '' } = request.query as QueryParams
+
+    const baseWhere: any = { orgId: user.orgId }
+    if (accountId) baseWhere.channelAccountId = accountId
+    if (tab) baseWhere.tab = tab
+
+    // Members can only see conversations from accessible Zalo accounts
+    if (user.role === 'member') {
+      const accessibleAccounts = await prisma.channelAccountAccess.findMany({
+        where: { userId: user.id },
+        select: { channelAccountId: true },
+      })
+      const ids = accessibleAccounts.map(a => a.channelAccountId)
+      if (accountId && ids.includes(accountId)) {
+        baseWhere.channelAccountId = accountId
+      } else if (ids.length > 0) {
+        baseWhere.channelAccountId = { in: ids }
+      }
+    }
+
+    // Manager: scope to own + subordinates' accounts
+    if (user.role === 'manager') {
+      const accessibleIds = await resolveManagerAccountIds(user.id)
+      const idArray = Array.from(accessibleIds)
+      if (accountId && accessibleIds.has(accountId)) {
+        baseWhere.channelAccountId = accountId
+      } else if (idArray.length > 0) {
+        baseWhere.channelAccountId = { in: idArray }
+      } else {
+        baseWhere.channelAccountId = '__none__' // no accounts → no results
+      }
+    }
+
+    const [unread, unreplied, total] = await Promise.all([
+      prisma.conversation.count({ where: { ...baseWhere, unreadCount: { gt: 0 } } }),
+      prisma.conversation.count({ where: { ...baseWhere, isReplied: false } }),
+      prisma.conversation.count({ where: baseWhere }),
+    ])
+
+    return { unread, unreplied, total }
+  })
+
+  // ── List conversations (paginated, filterable) ──────────────────────
+  app.get('/api/v1/conversations', async (request) => {
+    const user = request.user as { orgId: string; id: string; role: string }
+    const {
+      page = '1',
+      limit = '50',
+      search = '',
+      contactId = '',
+      accountId = '',
+      unread = '',
+      unreplied = '',
+      from = '',
+      to = '',
+      tab = '',
+    } = request.query as QueryParams
+
+    const where: any = { orgId: user.orgId }
+    if (contactId) where.contactId = contactId
+    if (tab) where.tab = tab
+    if (accountId) where.channelAccountId = accountId
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { contact: { OR: [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search } },
+        ] } },
+      ]
+    }
+
+    // Advanced filters
+    if (unread === 'true') where.unreadCount = { gt: 0 }
+    if (unreplied === 'true') where.isReplied = false
+    if (from || to) {
+      where.lastMessageAt = {}
+      if (from) { const d = new Date(from); if (!isNaN(d.getTime())) where.lastMessageAt.gte = d }
+      if (to) { const d = new Date(to); if (!isNaN(d.getTime())) where.lastMessageAt.lte = d }
+      if (Object.keys(where.lastMessageAt).length === 0) delete where.lastMessageAt
+    }
+
+    // Member RBAC
+    if (user.role === 'member') {
+      const accessibleAccounts = await prisma.channelAccountAccess.findMany({
+        where: { userId: user.id },
+        select: { channelAccountId: true },
+      })
+      const ids = accessibleAccounts.map(a => a.channelAccountId)
+      if (accountId && ids.includes(accountId)) {
+        where.channelAccountId = accountId
+      } else if (ids.length > 0) {
+        where.channelAccountId = { in: ids }
+      }
+    }
+
+    // Manager RBAC: scope to own + subordinates' accounts
+    if (user.role === 'manager') {
+      const accessibleIds = await resolveManagerAccountIds(user.id)
+      const idArray = Array.from(accessibleIds)
+      if (accountId && accessibleIds.has(accountId)) {
+        where.channelAccountId = accountId
+      } else if (idArray.length > 0) {
+        where.channelAccountId = { in: idArray }
+      } else {
+        where.channelAccountId = '__none__'
+      }
+    }
+
+    const pageNum = Math.max(1, parseInt(page))
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit)))
+
+    const [conversations, total] = await Promise.all([
+      prisma.conversation.findMany({
+        where,
+        include: {
+          contact: { select: {
+            id: true, fullName: true, phone: true, email: true, avatarUrl: true, zaloUid: true,
+            tags: true, leadScore: true, lifecycleStage: true, companyId: true,
+            company: { select: { id: true, name: true } },
+            // Customer 360 persistent AI fields — read by ContactAiSummary component
+            aiSummary: true, aiSentimentLabel: true, aiSentimentConfidence: true, aiSentimentReason: true,
+            aiIntent: true, aiPainPoints: true, aiCompetitors: true, aiSignals: true,
+            aiAnalyzedAt: true, aiConversationId: true,
+          } },
+          channelAccount: { select: { id: true, displayName: true, externalUid: true, platform: true } },
+          pins: { select: { id: true } },
+          messages: {
+            take: 1,
+            orderBy: { sentAt: 'desc' },
+            select: {
+              id: true, content: true, contentType: true,
+              senderType: true, senderName: true, sentAt: true, isDeleted: true,
+            },
+          },
+        },
+        orderBy: { lastMessageAt: 'desc' },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+      }),
+      prisma.conversation.count({ where }),
+    ])
+
+    return {
+      conversations: conversations.map(c => ({
+        ...c,
+        contact: c.contact ? { ...c.contact, status: c.contact.lifecycleStage } : c.contact,
+        isPinned: c.pins.length > 0,
+      })),
+      total,
+      page: pageNum,
+      limit: limitNum,
+    }
+  })
+
+  // ── Get single conversation ─────────────────────────────────────────
+  app.get<{ Params: { id: string } }>('/api/v1/conversations/:id', { preHandler: requireZaloAccess() }, async (request, reply) => {
+    const user = request.user as { orgId: string }
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id, orgId: user.orgId },
+      include: {
+        contact: { include: { company: { select: { id: true, name: true, industry: true, taxCode: true } } } },
+        channelAccount: { select: { id: true, displayName: true, externalUid: true, status: true, platform: true } },
+        pins: { select: { id: true } },
+      },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Not found' })
+    return { ...conv, isPinned: conv.pins.length > 0 }
+  })
+
+  // ── Delete a conversation (owner/admin only) ────────────────────────
+  // Removes the conversation and all its messages/reactions/pins/AI suggestions
+  // via DB-level ON DELETE CASCADE. Audit-logged. This only deletes the local
+  // CRM record — it does NOT touch the thread on Zalo.
+  app.delete<{ Params: { id: string } }>('/api/v1/conversations/:id', async (request, reply) => {
+    const user = request.user as { orgId: string; id: string; role: string }
+
+    if (!['owner', 'admin'].includes(user.role)) {
+      return reply.status(403).send({ error: 'Chỉ chủ sở hữu hoặc quản trị viên mới được xóa hội thoại' })
+    }
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id, orgId: user.orgId },
+      select: { id: true, displayName: true, contactId: true },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    await prisma.conversation.delete({ where: { id: conv.id } })
+
+    // Audit log — fire-and-forget
+    prisma.activityLog.create({
+      data: {
+        orgId: user.orgId,
+        userId: user.id,
+        action: 'conversation.deleted',
+        entityType: 'Conversation',
+        entityId: conv.id,
+        details: { displayName: conv.displayName, contactId: conv.contactId, by: user.id },
+      },
+    }).catch(err => logger.error({ err }, '[chat] activityLog create failed'))
+
+    // Notify every open client so the conversation disappears from their list
+    try {
+      emitConvDeleted(user.orgId, conv.id)
+    } catch { /* socket not ready */ }
+
+    return { success: true }
+  })
+
+  // ── List messages for a conversation ────────────────────────────────
+  app.get<{ Params: { id: string } }>('/api/v1/conversations/:id/messages', { preHandler: requireZaloAccess() }, async (request, reply) => {
+    const user = request.user as { orgId: string }
+    const { page = '1', limit = '50' } = request.query as QueryParams
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id, orgId: user.orgId },
+      select: { id: true },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    const pageNum = Math.max(1, parseInt(page))
+    const limitNum = Math.min(200, parseInt(limit))
+
+    const [rawMessages, total] = await Promise.all([
+      prisma.message.findMany({
+        where: { conversationId: request.params.id },
+        orderBy: { sentAt: 'desc' },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        select: {
+          id: true, externalMsgId: true, senderUid: true, senderName: true,
+          content: true, contentType: true, senderType: true, sentAt: true,
+          isDeleted: true, quote: true, attachments: true,
+          aiGenerated: true, aiReplyRunId: true, responseSource: true,
+          repliedBy: { select: { fullName: true } }, // staff who sent (manual/ai_suggest)
+          reactions: { select: { emoji: true, reactorId: true } },
+          znsLog: { select: { status: true, deliveredAt: true } }, // ZNS delivery lifecycle
+        },
+      }),
+      prisma.message.count({ where: { conversationId: request.params.id } }),
+    ])
+
+    const messages = rawMessages.map(transformMessageForFrontend)
+    return { messages: messages.reverse(), total, page: pageNum, limit: limitNum }
+  })
+
+  // ── AI mode toggle ──────────────────────────────────────────────
+  const VALID_AI_MODES = new Set(['manual', 'suggest', 'auto'])
+
+  app.patch<{
+    Params: { id: string }
+    Body: { aiMode: string }
+  }>('/api/v1/conversations/:id/ai-mode', async (request, reply) => {
+    const user = request.user as { orgId: string; id: string }
+    const { aiMode } = request.body
+
+    if (!aiMode || !VALID_AI_MODES.has(aiMode)) {
+      return reply.status(400).send({
+        error: 'Invalid aiMode. Must be one of: manual, suggest, auto',
+      })
+    }
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id, orgId: user.orgId },
+      select: { id: true, orgId: true, aiMode: true },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    const prevMode = conv.aiMode
+    const reason = `set by staff ${user.id}`
+
+    const updated = await prisma.conversation.update({
+      where: { id: conv.id },
+      data: { aiMode, aiModeReason: reason },
+      select: { id: true, aiMode: true, aiModeReason: true },
+    })
+
+    // Audit log — fire-and-forget
+    prisma.activityLog.create({
+      data: {
+        orgId: user.orgId,
+        userId: user.id,
+        action: 'conversation.ai_mode_changed',
+        entityType: 'Conversation',
+        entityId: conv.id,
+        details: { from: prevMode, to: aiMode, by: user.id },
+      },
+    }).catch(err => logger.error({ err }, '[chat] activityLog create failed'))
+
+    // Emit realtime event
+    try {
+      emitAiModeChanged(user.orgId, conv.id, {
+        convId: conv.id,
+        aiMode,
+        aiModeReason: reason,
+        by: user.id,
+      })
+    } catch { /* socket not ready */ }
+
+    return { convId: updated.id, aiMode: updated.aiMode, aiModeReason: updated.aiModeReason }
+  })
+
+  // ── AI pause toggle ─────────────────────────────────────────────
+  // PATCH /api/v1/conversations/:id/ai-pause
+  // Body: { minutes?: number } (default 60; minutes <= 0 clears pause)
+  //       { until?: string }   (ISO datetime — alternative to minutes)
+  // Any org member can call this.
+  app.patch<{
+    Params: { id: string }
+    Body: { minutes?: number; until?: string }
+  }>('/api/v1/conversations/:id/ai-pause', async (request, reply) => {
+    const user = request.user as { orgId: string; id: string }
+    const { minutes, until } = request.body ?? {}
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id, orgId: user.orgId },
+      select: { id: true, orgId: true },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    let aiPausedUntil: Date | null = null
+
+    if (until) {
+      const parsed = new Date(until)
+      if (isNaN(parsed.getTime())) {
+        return reply.status(400).send({ error: 'Invalid `until` datetime' })
+      }
+      aiPausedUntil = parsed
+    } else if (minutes === undefined || minutes === null || minutes <= 0) {
+      // Clear pause
+      aiPausedUntil = null
+    } else {
+      const DEFAULT_PAUSE_MINUTES = 60
+      const pauseMinutes = Math.min(minutes || DEFAULT_PAUSE_MINUTES, 1440) // cap at 24h
+      aiPausedUntil = new Date(Date.now() + pauseMinutes * 60 * 1000)
+    }
+
+    const updated = await prisma.conversation.update({
+      where: { id: conv.id },
+      data: { aiPausedUntil },
+      select: { id: true, aiPausedUntil: true, aiMode: true },
+    })
+
+    // Audit log — fire-and-forget
+    prisma.activityLog.create({
+      data: {
+        orgId: user.orgId,
+        userId: user.id,
+        action: 'conversation.ai_paused',
+        entityType: 'Conversation',
+        entityId: conv.id,
+        details: { aiPausedUntil: aiPausedUntil?.toISOString() ?? null, by: user.id },
+      },
+    }).catch(err => logger.error({ err }, '[chat] activityLog create failed'))
+
+    // Emit realtime event
+    try {
+      emitAiModeChanged(user.orgId, conv.id, {
+        convId: conv.id,
+        aiMode: updated.aiMode ?? 'manual',
+        aiModeReason: aiPausedUntil ? `paused_until:${aiPausedUntil.toISOString()}` : 'unpaused',
+        by: user.id,
+      })
+    } catch { /* socket not ready */ }
+
+    return {
+      convId: updated.id,
+      aiPausedUntil: updated.aiPausedUntil,
+    }
+  })
+
+  // ── Message routes (send text/image/file, shared media) ─────────
+  await app.register(chatMessageRoutes)
+
+  // ── Group routes (group-info, add-member, friends) ──────────────
+  await app.register(chatGroupRoutes)
+}
+

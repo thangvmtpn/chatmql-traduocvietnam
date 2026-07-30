@@ -1,0 +1,30 @@
+.daily-target-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+}
+
+.daily-target-main {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  width: 100%;
+}
+
+/* Scrollbar Styling */
+.daily-target-main::-webkit-scrollbar {
+  width: 8px;
+}
+
+.daily-target-main::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.daily-target-main::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.daily-target-main::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

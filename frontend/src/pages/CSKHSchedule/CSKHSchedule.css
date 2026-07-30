@@ -1,0 +1,1218 @@
+.cskh-schedule {
+  padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
+}
+
+.cskh-schedule .cskh-header {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.cskh-schedule .cskh-header h1 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* ============================
+   GUIDE SECTION
+   ============================ */
+.cskh-schedule .cskh-guide-section {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f5f9ff 100%);
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .guide-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #065f46;
+  margin-bottom: 8px;
+}
+
+.cskh-schedule .guide-title .material-symbols-outlined {
+  font-size: 18px;
+  color: #059669;
+}
+
+.cskh-schedule .guide-content {
+  font-size: 13px;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cskh-schedule .guide-link-btn {
+  background: none;
+  border: none;
+  color: #0891b2;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  transition: color 0.2s ease;
+}
+
+.cskh-schedule .guide-link-btn:hover {
+  color: #0e7490;
+  text-decoration: none;
+}
+
+.cskh-schedule .guide-link-btn:active {
+  color: #164e63;
+}
+
+/* ============================
+   DATE RANGE FILTER
+   ============================ */
+.cskh-schedule .date-range-filter {
+  gap: 16px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.cskh-schedule .tra-cuu-lich-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 15px;
+  color: #2563eb;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .tra-cuu-lich-label .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cskh-schedule .date-range-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cskh-schedule .date-range-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cskh-schedule .date-range-item label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .date-range-separator {
+  font-size: 18px;
+  color: #9ca3af;
+  margin-top: 16px;
+}
+
+/* ============================
+   SCHEDULE OVERVIEW TABLE
+   ============================ */
+.cskh-schedule .schedule-overview-table {
+  overflow-x: auto;
+}
+
+.cskh-schedule .schedule-overview-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .schedule-overview-table th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cskh-schedule .schedule-overview-table .overview-col-total {
+  background: #2563eb;
+  width: 25%;
+}
+
+.cskh-schedule .schedule-overview-table .overview-col-config {
+  background: #2563eb;
+}
+
+.cskh-schedule .schedule-overview-table .overview-sub-header th {
+  background: #2563eb;
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+  padding: 8px 16px;
+}
+
+.cskh-schedule .overview-count-row td {
+  padding: 20px 16px;
+  text-align: center;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+}
+
+.cskh-schedule .overview-action-row td {
+  padding: 12px 16px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  background: white;
+}
+
+.cskh-schedule .overview-btn {
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+}
+
+.cskh-schedule .overview-col-ket-qua {
+  background: #065f46;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  text-align: center;
+  padding: 10px 16px;
+  line-height: 1.5;
+  border-left: 2px solid #047857;
+}
+
+.cskh-schedule .btn-ket-qua.active {
+  background: #065f46;
+  color: #fff;
+  border-color: #065f46;
+}
+.cskh-schedule .btn-ket-qua.active:hover {
+  background: #047857;
+}
+
+/* ============================
+   INLINE DETAIL SECTION
+   ============================ */
+.cskh-schedule .inline-detail-section {
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.cskh-schedule .inline-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1e40af;
+  color: white;
+  padding: 12px 18px;
+  gap: 12px;
+}
+
+.cskh-schedule .inline-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .inline-detail-title .material-symbols-outlined {
+  font-size: 20px;
+  color: #93c5fd;
+}
+
+.cskh-schedule .inline-detail-close {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+.cskh-schedule .inline-detail-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.cskh-schedule .inline-detail-close .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* ============================
+   DETAIL PAGE HEADER
+   ============================ */
+.cskh-schedule .detail-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.cskh-schedule .back-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: white;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+.cskh-schedule .back-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.cskh-schedule .back-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.cskh-schedule .detail-page-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+.cskh-schedule .detail-page-title .material-symbols-outlined {
+  font-size: 20px;
+  color: #2563eb;
+}
+
+/* ============================
+   DETAIL SEARCH BAR
+   ============================ */
+.cskh-schedule .detail-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.cskh-schedule .detail-search-bar input {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .btn-search,
+.cskh-schedule .btn-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+.cskh-schedule .btn-search {
+  background: #2563eb;
+  color: white;
+}
+.cskh-schedule .btn-search:hover {
+  background: #1d4ed8;
+}
+.cskh-schedule .btn-clear {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+.cskh-schedule .btn-clear:hover {
+  background: #e5e7eb;
+}
+.cskh-schedule .btn-search .material-symbols-outlined,
+.cskh-schedule .btn-clear .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* ============================
+   CONTENT AREA & TABLE
+   ============================ */
+.cskh-schedule .cskh-content {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.cskh-schedule .cskh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .cskh-table thead {
+  background: #f9fafb;
+}
+
+.cskh-schedule .cskh-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+.cskh-schedule .cskh-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+}
+
+.cskh-schedule .cskh-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.cskh-schedule .cskh-table tbody tr.clickable-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cskh-schedule .cskh-table tbody tr.clickable-row:hover {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.cskh-schedule .customer-code {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.cskh-schedule .schedule-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.cskh-schedule .schedule-time.overdue {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.cskh-schedule .schedule-time.today {
+  color: #0891b2;
+  font-weight: 600;
+}
+
+.cskh-schedule .schedule-time.upcoming {
+  color: #059669;
+}
+
+.cskh-schedule .customer-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.cskh-schedule .customer-status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cskh-schedule .customer-status.inactive {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.cskh-schedule .pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 20px 0;
+}
+
+.cskh-schedule .pagination button {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cskh-schedule .pagination button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.cskh-schedule .pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cskh-schedule .pagination-info {
+  color: #6b7280;
+  font-size: 14px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .loading-container,
+.cskh-schedule .error-container,
+.cskh-schedule .empty-container {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* ============================
+   SALES RESULT TABLE
+   ============================ */
+.cskh-schedule .sales-result-section {
+  margin-top: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d1fae5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+
+.cskh-schedule .sales-result-title-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #065f46;
+  color: white;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .sales-result-title-bar .material-symbols-outlined {
+  font-size: 20px;
+  color: #6ee7b7;
+}
+
+.cskh-schedule .sales-result-date-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.cskh-schedule .sales-result-date-badge .material-symbols-outlined {
+  font-size: 14px;
+  color: #a7f3d0;
+}
+
+.cskh-schedule .sales-result-table-wrap {
+  overflow-x: auto;
+}
+
+.cskh-schedule .sales-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  background: white;
+}
+
+.cskh-schedule .sales-result-table thead tr {
+  background: #059669;
+  color: white;
+}
+
+.cskh-schedule .sales-result-table th {
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.cskh-schedule .sales-result-table th .col-note {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.cskh-schedule .sales-result-table td {
+  padding: 16px;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cskh-schedule .sales-result-table tbody tr:hover {
+  background: #f0fdf4;
+}
+
+.cskh-schedule .val-primary {
+  font-weight: 600;
+  color: #065f46;
+}
+
+.cskh-schedule .val-default {
+  font-weight: 600;
+  color: #374151;
+}
+
+.cskh-schedule .val-money {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cskh-schedule .val-rate {
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.cskh-schedule .rate-good {
+  background: #d1fae5;
+  color: #065f46;
+}
+.cskh-schedule .rate-mid {
+  background: #fef3c7;
+  color: #92400e;
+}
+.cskh-schedule .rate-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cskh-schedule .sales-result-loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* ============================
+   MODAL
+   ============================ */
+
+.cskh-schedule .cskh-header {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+/* Schedule Type Tabs */
+.cskh-schedule .schedule-type-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.cskh-schedule .schedule-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #f3f4f6;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .schedule-tab:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.cskh-schedule .schedule-tab.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.cskh-schedule .schedule-tab .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.cskh-schedule .cskh-header h1 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .cskh-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.cskh-schedule .stat-card {
+  background: #2563eb;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.cskh-schedule .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cskh-schedule .stat-card.overdue {
+  background: #dc2626;
+  color: #fff;
+}
+
+.cskh-schedule .stat-card.today {
+  background: #0891b2;
+  color: #fff;
+}
+
+.cskh-schedule .stat-card.upcoming {
+  background: #059669;
+  color: #fff;
+}
+
+.cskh-schedule .stat-card.active {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
+}
+
+.cskh-schedule .stat-label {
+  font-size: 15px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .stat-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: #fff;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.cskh-schedule .cskh-content {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.cskh-schedule .cskh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .cskh-table thead {
+  background: #f9fafb;
+}
+
+.cskh-schedule .cskh-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+.cskh-schedule .cskh-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+}
+
+.cskh-schedule .cskh-table tbody tr:hover {
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.cskh-schedule .cskh-table tbody tr.clickable-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cskh-schedule .cskh-table tbody tr.clickable-row:hover {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.cskh-schedule .customer-name {
+  color: #1f2937;
+}
+
+.cskh-schedule .customer-code {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.cskh-schedule .schedule-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.cskh-schedule .schedule-time.overdue {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.cskh-schedule .schedule-time.today {
+  color: #0891b2;
+  font-weight: 600;
+}
+
+.cskh-schedule .schedule-time.upcoming {
+  color: #059669;
+}
+
+.cskh-schedule .customer-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.cskh-schedule .customer-status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cskh-schedule .customer-status.inactive {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.cskh-schedule .pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 20px 0;
+}
+
+.cskh-schedule .pagination button {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cskh-schedule .pagination button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.cskh-schedule .pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cskh-schedule .pagination-info {
+  color: #6b7280;
+  font-size: 14px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .loading-container,
+.cskh-schedule .error-container,
+.cskh-schedule .empty-container {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .loading-container .material-symbols-outlined,
+.cskh-schedule .error-container .material-symbols-outlined,
+.cskh-schedule .empty-container .material-symbols-outlined {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.cskh-schedule .error-container {
+  color: #dc2626;
+}
+
+.cskh-schedule .empty-container p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+/* Modal styles */
+.cskh-schedule .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.cskh-schedule .modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+.cskh-schedule .detail-row .modal-content {
+  max-width: 900px;
+}
+
+.cskh-schedule .modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cskh-schedule .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.cskh-schedule .modal-close:hover {
+  color: #1f2937;
+}
+
+.cskh-schedule .modal-body {
+  padding: 24px;
+}
+
+.cskh-schedule .contact-schedule h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .schedule-item {
+  display: flex;
+  gap: 12px;
+}
+
+.cskh-schedule .datepicker-input {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  transition: border-color 0.2s;
+}
+
+.cskh-schedule .datepicker-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.cskh-schedule .btn-submit-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.cskh-schedule .btn-submit-note:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.cskh-schedule .btn-submit-note:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cskh-schedule .btn-submit-note .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* ============================
+   ĐÃ CẤU HÌNH — Lịch BH tương lai
+   ============================ */
+.cskh-schedule .overview-count.da-cau-hinh {
+  color: #0f766e;
+  background: #f0fdfa;
+}
+
+.cskh-schedule .btn-da-cau-hinh {
+  color: #0f766e;
+  border-color: #0f766e;
+}
+
+.cskh-schedule .btn-da-cau-hinh:hover {
+  background: #0f766e;
+  color: white;
+}
