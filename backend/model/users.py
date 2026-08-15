@@ -22,6 +22,10 @@ async def get_user_with_department(username: str):
     """
     Lấy thông tin user kèm theo tên phòng ban từ bảng departments
     """
+    try:
+        conn.rollback()
+    except Exception:
+        pass
     with conn.cursor() as cur:
         cur.execute("""
             SELECT 

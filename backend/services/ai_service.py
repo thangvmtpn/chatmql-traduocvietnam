@@ -8,7 +8,14 @@ from fastembed import TextEmbedding
 
 load_dotenv()
 
-embedding_model = TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+_embedding_model = None
+
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+    return _embedding_model
+
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -72,7 +79,7 @@ def get_relevant_context(optimized_query: str, top_k=7):
     if not os.path.exists(INDEX_FILE) or not os.path.exists(CHUNKS_FILE):
         return None
         
-    query_embedding = list(embedding_model.embed([optimized_query]))[0]
+    query_embedding = list(get_embedding_model().embed([optimized_query]))[0]
     query_vector = np.array([query_embedding], dtype=np.float32)
     
     faiss.normalize_L2(query_vector)

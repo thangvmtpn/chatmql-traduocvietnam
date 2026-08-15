@@ -242,6 +242,7 @@ export async function handleIncomingMessage(
           autoReplyEnabled: aiReplyCfg.autoReplyEnabled,
           defaultAiMode: aiReplyCfg.defaultAiMode,
           convAiMode: conversation.aiMode ?? null,
+          schedule: aiReplyCfg.schedule,
         })
 
         const isPaused = !!(conversation.aiPausedUntil)

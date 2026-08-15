@@ -217,25 +217,29 @@ export async function retrieveRelevantScenarios(
 ): Promise<ScenarioSnippet[]> {
   const trimmed = query.trim()
   if (!trimmed) return []
-  const vec = await embedText(orgId, trimmed)
-  if (!vec) return []
-  const literal = toVectorLiteral(vec)
-  const rows = await prisma.$queryRaw<ScenarioSemanticRow[]>(
-    Prisma.sql`
-      SELECT id, name, content, (1 - (embedding <=> ${literal}::vector)) AS score
-      FROM ai_scenarios
-      WHERE org_id = ${orgId}
-        AND enabled = true
-        AND load_mode = 'auto'
-        AND embedding IS NOT NULL
-      ORDER BY embedding <=> ${literal}::vector
-      LIMIT ${topK}
-    `,
-  )
-  return rows
-    .filter((r) => Number(r.score) >= minScore)
-    .map((r) => ({
-      id: r.id, name: r.name, content: r.content, loadMode: 'auto' as const,
-      score: Math.round(Number(r.score) * 1000) / 1000,
-    }))
+  try {
+    const vec = await embedText(orgId, trimmed)
+    if (!vec) return []
+    const literal = toVectorLiteral(vec)
+    const rows = await prisma.$queryRaw<ScenarioSemanticRow[]>(
+      Prisma.sql`
+        SELECT id, name, content, (1 - (embedding <=> ${literal}::vector)) AS score
+        FROM ai_scenarios
+        WHERE org_id = ${orgId}
+          AND enabled = true
+          AND load_mode = 'auto'
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> ${literal}::vector
+        LIMIT ${topK}
+      `,
+    )
+    return rows
+      .filter((r) => Number(r.score) >= minScore)
+      .map((r) => ({
+        id: r.id, name: r.name, content: r.content, loadMode: 'auto' as const,
+        score: Math.round(Number(r.score) * 1000) / 1000,
+      }))
+  } catch (err) {
+    return []
+  }
 }

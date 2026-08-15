@@ -14,7 +14,15 @@ import {
   analyzeConversation,
   getAvailableProviders,
 } from './ai-service.js'
-import { saveProviderApiKey, deleteProviderApiKey, verifyProviderApiKey, applyDefaultModeToAllConversations } from './ai-config-service.js'
+import {
+  saveProviderApiKey,
+  deleteProviderApiKey,
+  verifyProviderApiKey,
+  applyDefaultModeToAllConversations,
+  getAiScheduleConfig,
+  saveAiScheduleConfig,
+  isAfterHours,
+} from './ai-config-service.js'
 import { getToolsConfig, applyToolsPatch } from './tools-config-service.js'
 import { listPendingActions, confirmAction, rejectAction, type PendingActionStatus } from './pending-action-service.js'
 import {
@@ -198,6 +206,51 @@ export async function aiRoutes(app: FastifyInstance): Promise<void> {
     } catch (err: any) {
       app.log.error({ err }, '[ai] apply-default-mode failed')
       return sendError(reply, err, 'Failed to apply default mode')
+    }
+  })
+
+  // ── AI Auto-reply Schedule (Business hours vs After hours) ────────────────
+  app.get('/api/v1/ai/schedule', async (request, reply) => {
+    try {
+      const user = request.user as { orgId: string }
+      const schedule = await getAiScheduleConfig(user.orgId)
+      const afterHours = isAfterHours(new Date(), schedule.timezone, schedule.startHour, schedule.endHour)
+      return {
+        schedule,
+        isAfterHours: afterHours,
+        currentServerTime: new Date().toISOString(),
+      }
+    } catch (err: any) {
+      app.log.error({ err }, '[ai] schedule fetch failed')
+      return sendError(reply, err, 'Failed to fetch AI schedule config')
+    }
+  })
+
+  app.put<{
+    Body: {
+      enabled?: boolean
+      startHour?: number
+      endHour?: number
+      daytimeMode?: 'suggest' | 'manual'
+      nighttimeMode?: 'auto' | 'suggest'
+      timezone?: string
+    }
+  }>('/api/v1/ai/schedule', async (request, reply) => {
+    try {
+      const user = request.user as { role: string; orgId: string }
+      if (!['owner', 'admin'].includes(user.role)) {
+        return reply.status(403).send({ error: 'Chỉ admin/owner được chỉnh lịch AI' })
+      }
+      const updated = await saveAiScheduleConfig(user.orgId, request.body ?? {})
+      const schedule = await getAiScheduleConfig(user.orgId)
+      const afterHours = isAfterHours(new Date(), schedule.timezone, schedule.startHour, schedule.endHour)
+      return {
+        schedule,
+        isAfterHours: afterHours,
+      }
+    } catch (err: any) {
+      app.log.error({ err }, '[ai] schedule update failed')
+      return sendError(reply, err, 'Failed to update AI schedule config')
     }
   })
 

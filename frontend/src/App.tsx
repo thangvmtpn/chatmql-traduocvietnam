@@ -44,7 +44,8 @@ import GamificationDetailPage from "@/pages/Gamification/Individual/Gamification
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  const user = useAuthStore((state) => state.user);
+  return isAuthenticated && user ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 function App() {

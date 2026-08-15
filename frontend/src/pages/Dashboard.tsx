@@ -1,3 +1,4 @@
+import { Navigate } from "react-router-dom";
 import { User } from "@/stores/useAuthStore";
 import { isAdminRole, isEmployeeRole } from "@/types/roles";
 import AdminLayout from "@/layouts/AdminLayout/AdminLayout";
@@ -11,7 +12,7 @@ interface DashboardProps {
 
 function Dashboard({ user }: DashboardProps) {
   if (!user) {
-    return <div>Loading...</div>;
+    return <Navigate to="/login" replace />;
   }
 
   // Phân quyền layout theo role_id và chức vụ

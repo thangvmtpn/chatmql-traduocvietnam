@@ -276,52 +276,56 @@ export async function retrieveKbSemantic(
   const literal = toVectorLiteral(vec)
   const minScore = opts?.minScore ?? DEFAULT_RAG_MIN_SCORE
 
-  // Guardrail: restrict to allowed knowledge categories (empty = no limit).
-  // Compare as text (category_id::text) so we bind plain string params — avoids
-  // Prisma's array/uuid-cast pitfalls (operator does not exist: text = uuid).
-  const catFilter = opts?.categoryIds && opts.categoryIds.length > 0
-    ? Prisma.sql`AND category_id::text IN (${Prisma.join(opts.categoryIds)})`
-    : Prisma.empty
-  const fmtFilter = opts?.format ? Prisma.sql`AND format = ${opts.format}` : Prisma.empty
+  try {
+    // Guardrail: restrict to allowed knowledge categories (empty = no limit).
+    // Compare as text (category_id::text) so we bind plain string params — avoids
+    // Prisma's array/uuid-cast pitfalls (operator does not exist: text = uuid).
+    const catFilter = opts?.categoryIds && opts.categoryIds.length > 0
+      ? Prisma.sql`AND category_id::text IN (${Prisma.join(opts.categoryIds)})`
+      : Prisma.empty
+    const fmtFilter = opts?.format ? Prisma.sql`AND format = ${opts.format}` : Prisma.empty
 
-  // orgId is parameterized; literal is derived from float array only — no user input.
-  // score = cosine similarity (1 - distance); used to drop off-topic hits.
-  const rows = await prisma.$queryRaw<SemanticRow[]>(
-    Prisma.sql`
-      SELECT id, title, content, type, (1 - (embedding <=> ${literal}::vector)) AS score
-      FROM knowledge_entries
-      WHERE org_id = ${orgId}
-        AND status = 'active'
-        AND embedding IS NOT NULL
-        ${catFilter}
-        ${fmtFilter}
-      ORDER BY embedding <=> ${literal}::vector
-      LIMIT ${topK}
-    `,
-  )
+    // orgId is parameterized; literal is derived from float array only — no user input.
+    // score = cosine similarity (1 - distance); used to drop off-topic hits.
+    const rows = await prisma.$queryRaw<SemanticRow[]>(
+      Prisma.sql`
+        SELECT id, title, content, type, (1 - (embedding <=> ${literal}::vector)) AS score
+        FROM knowledge_entries
+        WHERE org_id = ${orgId}
+          AND status = 'active'
+          AND embedding IS NOT NULL
+          ${catFilter}
+          ${fmtFilter}
+        ORDER BY embedding <=> ${literal}::vector
+        LIMIT ${topK}
+      `,
+    )
 
-  // Keep only relevant hits — below threshold = off-topic noise, drop it.
-  const strong = rows.filter((r) => Number(r.score) >= minScore)
-  const out: KbSnippet[] = strong.map((r) => ({
-    id: r.id,
-    title: deriveKbLabel(r.title, r.content),
-    content: r.content.length > MAX_SNIPPET_CHARS ? r.content.slice(0, MAX_SNIPPET_CHARS) + '…' : r.content,
-    type: r.type,
-    score: Math.round(Number(r.score) * 1000) / 1000,
-  }))
+    // Keep only relevant hits — below threshold = off-topic noise, drop it.
+    const strong = rows.filter((r) => Number(r.score) >= minScore)
+    const out: KbSnippet[] = strong.map((r) => ({
+      id: r.id,
+      title: deriveKbLabel(r.title, r.content),
+      content: r.content.length > MAX_SNIPPET_CHARS ? r.content.slice(0, MAX_SNIPPET_CHARS) + '…' : r.content,
+      type: r.type,
+      score: Math.round(Number(r.score) * 1000) / 1000,
+    }))
 
-  // Hybrid backfill: top up with keyword matches (exact-term recall) when the
-  // relevant semantic set is thin. Keyword requires token overlap, so it cannot
-  // reintroduce the cross-topic noise the threshold just removed.
-  if (out.length < topK) {
-    const seen = new Set(out.map((r) => r.id))
-    for (const kw of await keywordFallback(orgId, trimmed, topK)) {
-      if (out.length >= topK) break
-      if (!seen.has(kw.id)) { out.push({ ...kw, score: null }); seen.add(kw.id) }
+    // Hybrid backfill: top up with keyword matches (exact-term recall) when the
+    // relevant semantic set is thin. Keyword requires token overlap, so it cannot
+    // reintroduce the cross-topic noise the threshold just removed.
+    if (out.length < topK) {
+      const seen = new Set(out.map((r) => r.id))
+      for (const kw of await keywordFallback(orgId, trimmed, topK)) {
+        if (out.length >= topK) break
+        if (!seen.has(kw.id)) { out.push({ ...kw, score: null }); seen.add(kw.id) }
+      }
     }
-  }
 
-  return out
+    return out
+  } catch (err) {
+    return keywordFallback(orgId, trimmed, topK)
+  }
 }
 
 // ── Per-entry embed (single source of truth for the KB embed text) ──────────────

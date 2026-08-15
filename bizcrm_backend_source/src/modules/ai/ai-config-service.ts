@@ -147,6 +147,8 @@ export async function getAiConfig(orgId: string) {
   const hasAnthropicKey = fromDb('ai_anthropic_api_key')
   const hasGeminiKey = fromDb('ai_gemini_api_key')
 
+  const schedule = await getAiScheduleConfig(orgId)
+
   return {
     ...aiConfig,
     hasOpenaiKey,
@@ -154,6 +156,8 @@ export async function getAiConfig(orgId: string) {
     hasAnthropicKey,
     hasGeminiKey,
     availableProviders,
+    schedule,
+    isAfterHours: isAfterHours(new Date(), schedule.timezone, schedule.startHour, schedule.endHour),
   }
 }
 
@@ -283,11 +287,90 @@ export async function updateAiConfig(
   })
 }
 
+export type ScheduleConfig = {
+  enabled: boolean
+  startHour: number
+  endHour: number
+  daytimeMode: 'suggest' | 'manual'
+  nighttimeMode: 'auto' | 'suggest'
+  timezone: string
+}
+
+export const DEFAULT_SCHEDULE_CONFIG: ScheduleConfig = {
+  enabled: true,
+  startHour: 18,
+  endHour: 8,
+  daytimeMode: 'suggest',
+  nighttimeMode: 'auto',
+  timezone: 'Asia/Ho_Chi_Minh',
+}
+
+/**
+ * Check if the given date/time falls in the after-hours window (e.g. 18:00 -> 08:00 next day).
+ */
+export function isAfterHours(
+  date: Date = new Date(),
+  timezone: string = 'Asia/Ho_Chi_Minh',
+  startHour: number = 18,
+  endHour: number = 8,
+): boolean {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    })
+    const parts = formatter.formatToParts(date)
+    const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0', 10)
+    const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0', 10)
+    const timeInMinutes = hour * 60 + minute
+
+    const startMinutes = startHour * 60
+    const endMinutes = endHour * 60
+
+    if (startMinutes > endMinutes) {
+      // Overnight window: e.g. 18:00 (1080m) to 08:00 (480m) next day
+      return timeInMinutes >= startMinutes || timeInMinutes < endMinutes
+    } else {
+      return timeInMinutes >= startMinutes && timeInMinutes < endMinutes
+    }
+  } catch {
+    const utcHours = date.getUTCHours() + 7
+    const vnHour = utcHours >= 24 ? utcHours - 24 : utcHours
+    return vnHour >= 18 || vnHour < 8
+  }
+}
+
+export async function getAiScheduleConfig(orgId: string): Promise<ScheduleConfig> {
+  const setting = await prisma.appSetting.findFirst({
+    where: { orgId, settingKey: 'ai_auto_reply_schedule' },
+  })
+  if (!setting?.valuePlain) return DEFAULT_SCHEDULE_CONFIG
+  try {
+    const parsed = JSON.parse(setting.valuePlain)
+    return { ...DEFAULT_SCHEDULE_CONFIG, ...parsed }
+  } catch {
+    return DEFAULT_SCHEDULE_CONFIG
+  }
+}
+
+export async function saveAiScheduleConfig(orgId: string, cfg: Partial<ScheduleConfig>) {
+  const current = await getAiScheduleConfig(orgId)
+  const updated = { ...current, ...cfg }
+  return prisma.appSetting.upsert({
+    where: { orgId_settingKey: { orgId, settingKey: 'ai_auto_reply_schedule' } },
+    update: { valuePlain: JSON.stringify(updated) },
+    create: { orgId, settingKey: 'ai_auto_reply_schedule', valuePlain: JSON.stringify(updated) },
+  })
+}
+
 export type AiReplyConfig = {
   defaultAiMode: string
   autoReplyEnabled: boolean
   debounceSeconds: number
   prefilterKeywords: string | null
+  schedule: ScheduleConfig
   // M3 fields
   ragTopK: number
   embeddingProvider: string | null
@@ -315,11 +398,13 @@ export async function getAiReplyConfig(orgId: string): Promise<AiReplyConfig> {
       },
     })
   }
+  const schedule = await getAiScheduleConfig(orgId)
   return {
     defaultAiMode: cfg.defaultAiMode,
     autoReplyEnabled: cfg.autoReplyEnabled,
     debounceSeconds: cfg.debounceSeconds,
     prefilterKeywords: cfg.prefilterKeywords ?? null,
+    schedule,
     ragTopK: cfg.ragTopK,
     embeddingProvider: cfg.embeddingProvider ?? null,
     embeddingModel: cfg.embeddingModel ?? null,
@@ -333,15 +418,38 @@ export async function getAiReplyConfig(orgId: string): Promise<AiReplyConfig> {
 /**
  * Resolve effective AI mode for a conversation.
  * - If org master switch is off → 'manual' always
- * - Otherwise: convAiMode (per-conversation override) ?? org defaultAiMode
+ * - If conversation mode is explicitly 'manual' → 'manual'
+ * - If schedule is enabled:
+ *     - After hours (e.g. after 18h) → nighttimeMode ('auto')
+ *     - Daytime (e.g. 08:00 - 18:00) → daytimeMode ('suggest')
+ * - Otherwise: convAiMode ?? defaultAiMode
  */
 export function resolveConversationMode(input: {
   orgId: string
   autoReplyEnabled: boolean
   defaultAiMode: string
   convAiMode?: string | null
+  schedule?: ScheduleConfig
+  currentTime?: Date
 }): string {
   if (!input.autoReplyEnabled) return 'manual'
+
+  if (input.convAiMode === 'manual') return 'manual'
+
+  if (input.schedule?.enabled) {
+    const afterHours = isAfterHours(
+      input.currentTime,
+      input.schedule.timezone || 'Asia/Ho_Chi_Minh',
+      input.schedule.startHour ?? 18,
+      input.schedule.endHour ?? 8,
+    )
+    if (afterHours) {
+      return input.convAiMode ?? input.schedule.nighttimeMode ?? 'auto'
+    } else {
+      return input.schedule.daytimeMode ?? 'suggest'
+    }
+  }
+
   return input.convAiMode ?? input.defaultAiMode
 }
 

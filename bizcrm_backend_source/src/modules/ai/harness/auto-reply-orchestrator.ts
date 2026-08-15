@@ -74,6 +74,7 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
       autoReplyEnabled: aiCfg.autoReplyEnabled,
       defaultAiMode: aiCfg.defaultAiMode,
       convAiMode: conv.aiMode,
+      schedule: aiCfg.schedule,
     })
 
     if (effectiveMode === 'manual') {

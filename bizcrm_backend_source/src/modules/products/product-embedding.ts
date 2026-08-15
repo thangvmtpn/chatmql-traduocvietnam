@@ -97,73 +97,105 @@ export async function retrieveProductSemantic(
   // parameter with a ::uuid cast (Postgres can't infer its type).
   // categoryIds (guardrail allow-list, empty = no limit) takes precedence over
   // the single categoryId filter.
-  const catFilter = opts.categoryIds && opts.categoryIds.length > 0
-    ? Prisma.sql`AND category_id::text IN (${Prisma.join(opts.categoryIds)})`
-    : opts.categoryId
-      ? Prisma.sql`AND category_id = ${opts.categoryId}::uuid`
-      : Prisma.empty
+  try {
+    const catFilter = opts.categoryIds && opts.categoryIds.length > 0
+      ? Prisma.sql`AND category_id::text IN (${Prisma.join(opts.categoryIds)})`
+      : opts.categoryId
+        ? Prisma.sql`AND category_id = ${opts.categoryId}::uuid`
+        : Prisma.empty
 
-  const rows = await prisma.$queryRaw<Array<{ id: string; name: string; description: string | null; price: Prisma.Decimal | null; price_max: Prisma.Decimal | null; price_type: string; currency: string; category_id: string | null; score: number }>>(
-    Prisma.sql`
-      SELECT id, name, description, price, price_max, price_type, currency, category_id,
-             (1 - (embedding <=> ${literal}::vector)) AS score
-      FROM products
-      WHERE org_id = ${orgId}
-        AND status = 'active'
-        AND embedding IS NOT NULL
-        ${catFilter}
-      ORDER BY embedding <=> ${literal}::vector
-      LIMIT ${topK}
-    `,
-  )
-  const out: ProductSemanticRow[] = rows
-    .filter((r) => Number(r.score) >= minScore)
-    .map((r) => ({
-      id: r.id, name: r.name, description: r.description,
-      price: r.price != null ? Number(r.price) : null,
-      priceMax: r.price_max != null ? Number(r.price_max) : null,
-      priceType: r.price_type, currency: r.currency, categoryId: r.category_id,
-      score: Math.round(Number(r.score) * 1000) / 1000,
-    }))
+    const rows = await prisma.$queryRaw<Array<{ id: string; name: string; description: string | null; price: Prisma.Decimal | null; price_max: Prisma.Decimal | null; price_type: string; currency: string; category_id: string | null; score: number }>>(
+      Prisma.sql`
+        SELECT id, name, description, price, price_max, price_type, currency, category_id,
+               (1 - (embedding <=> ${literal}::vector)) AS score
+        FROM products
+        WHERE org_id = ${orgId}
+          AND status = 'active'
+          AND embedding IS NOT NULL
+          ${catFilter}
+        ORDER BY embedding <=> ${literal}::vector
+        LIMIT ${topK}
+      `,
+    )
+    const out: ProductSemanticRow[] = rows
+      .filter((r) => Number(r.score) >= minScore)
+      .map((r) => ({
+        id: r.id, name: r.name, description: r.description,
+        price: r.price != null ? Number(r.price) : null,
+        priceMax: r.price_max != null ? Number(r.price_max) : null,
+        priceType: r.price_type, currency: r.currency, categoryId: r.category_id,
+        score: Math.round(Number(r.score) * 1000) / 1000,
+      }))
 
-  // Hybrid backfill: exact name/code/keyword matches the embedding ranked too low.
-  if (out.length < topK) {
-    const seen = new Set(out.map((r) => r.id))
-    for (const kw of await retrieveProductKeyword(orgId, trimmed, topK, opts.categoryIds)) {
-      if (out.length >= topK) break
-      if (!seen.has(kw.id)) { out.push(kw); seen.add(kw.id) }
+    // Hybrid backfill: exact name/code/keyword matches the embedding ranked too low.
+    if (out.length < topK) {
+      const seen = new Set(out.map((r) => r.id))
+      for (const kw of await retrieveProductKeyword(orgId, trimmed, topK, opts.categoryIds)) {
+        if (out.length >= topK) break
+        if (!seen.has(kw.id)) { out.push(kw); seen.add(kw.id) }
+      }
     }
+    return out
+  } catch (err) {
+    return retrieveProductKeyword(orgId, trimmed, topK, opts.categoryIds)
   }
-  return out
 }
 
-/** Keyword product search (name/code/keywords token overlap). score=null. */
+/** Keyword product search (name/code/keywords/description token overlap). score=null. */
 async function retrieveProductKeyword(
   orgId: string, query: string, topK: number, categoryIds?: string[],
 ): Promise<ProductSemanticRow[]> {
-  const tokens = query.trim().split(/\s+/).slice(0, 6).filter((t) => t.length >= 2)
+  const clean = query.trim().toLowerCase()
+  if (!clean) return []
+
+  const tokens = clean
+    .split(/[\s,.;:!?+-_/]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2)
+    .slice(0, 10)
+
   if (tokens.length === 0) return []
-  const conditions = tokens.map((t) => ({
-    OR: [
-      { name: { contains: t, mode: 'insensitive' as const } },
-      { keywords: { contains: t, mode: 'insensitive' as const } },
-      { code: { contains: t, mode: 'insensitive' as const } },
-    ],
-  }))
+
+  // Pull active candidates for this org / category filter
   const rows = await prisma.product.findMany({
     where: {
-      orgId, status: 'active',
+      orgId,
+      status: 'active',
       ...(categoryIds?.length ? { categoryId: { in: categoryIds } } : {}),
-      AND: conditions,
+      OR: tokens.map((t) => ({
+        OR: [
+          { name: { contains: t, mode: 'insensitive' as const } },
+          { description: { contains: t, mode: 'insensitive' as const } },
+          { keywords: { contains: t, mode: 'insensitive' as const } },
+          { code: { contains: t, mode: 'insensitive' as const } },
+        ],
+      })),
     },
-    take: topK,
-    select: { id: true, name: true, description: true, price: true, priceMax: true, priceType: true, currency: true, categoryId: true },
+    take: topK * 3,
+    select: { id: true, name: true, description: true, keywords: true, code: true, price: true, priceMax: true, priceType: true, currency: true, categoryId: true },
   })
-  return rows.map((r) => ({
-    id: r.id, name: r.name, description: r.description,
+
+  // Rank by token match count
+  const scored = rows.map((r) => {
+    const haystack = `${r.name} ${r.description || ''} ${r.keywords || ''} ${r.code || ''}`.toLowerCase()
+    let matchCount = 0
+    for (const t of tokens) {
+      if (haystack.includes(t)) matchCount++
+    }
+    return { row: r, matchCount }
+  })
+
+  scored.sort((a, b) => b.matchCount - a.matchCount)
+
+  return scored.slice(0, topK).map(({ row: r }) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
     price: r.price != null ? Number(r.price) : null,
     priceMax: r.priceMax != null ? Number(r.priceMax) : null,
-    priceType: r.priceType, currency: r.currency, categoryId: r.categoryId,
+    priceType: r.priceType,
+    currency: r.currency,
+    categoryId: r.categoryId,
     score: null,
   }))
 }

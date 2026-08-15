@@ -135,11 +135,12 @@ app.mount("/upload", StaticFiles(directory=UPLOAD_ROOT), name="upload")
 _fastapi_app = app
 app = socketio.ASGIApp(sio, other_asgi_app=_fastapi_app)
 
-# Khởi động serve r FastAPI (chỉ chạy khi thực thi trực tiếp)
+# Khởi động server FastAPI (chỉ chạy khi thực thi trực tiếp)
 if __name__ == "__main__":
     import uvicorn
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8002))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 
 

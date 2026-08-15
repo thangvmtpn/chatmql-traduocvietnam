@@ -70,9 +70,12 @@ async def verify_company_ip(request: Request):
 # @router.post("/login", response_model=TokenResponse, dependencies=[Depends(verify_company_ip)])
 @router.post("/login", response_model=TokenResponse)
 async def login(username: str = Form(...), password: str = Form(...)):
+    username = username.strip()
+    print(f"🔑 Login attempt for username: '{username}'")
     # Lấy thông tin user kèm department name
     user = await get_user_with_department(username)
     if not user:
+        print(f"❌ User not found: '{username}'")
         raise HTTPException(status_code=400, detail="Tài khoản không tồn tại")
 
     if password != user["password"]:
