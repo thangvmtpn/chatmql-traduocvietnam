@@ -1,0 +1,1 @@
+function e(e){if(!e)return``;let t=new Date(e);return isNaN(t.getTime())?``:t.toLocaleDateString(`vi-VN`,{day:`2-digit`,month:`2-digit`,year:`numeric`})}function t(t){return t?`Còn hạn đến ${e(t)}`:`Vô hạn`}function n(e){return{active:`Hoạt động`,unlimited:`Vô hạn`,expired:`Hết hạn`,suspended:`Tạm khóa`}[e]??e}export{e as n,n as r,t};

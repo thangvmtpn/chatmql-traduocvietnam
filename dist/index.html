@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trà Dược Việt Nam — Quản lý khách hàng</title>
+    <script>
+      (function() {
+        var search = window.location.search || '';
+        var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? 'http://localhost:4520'
+          : 'https://tracrm-api.bizino.ai';
+        fetch(apiBase + '/api/v1/platform/branding' + search)
+          .then(res => res.json())
+          .then(data => {
+            window.__BIZCRM_BRANDING__ = data;
+            if (data.brandName) {
+              document.title = data.brandName + (data.tagline ? ' — ' + data.tagline : ' — Quản lý khách hàng');
+            }
+            if (data.logoUrl) {
+              var favicon = document.querySelector('link[rel="icon"]');
+              if (favicon) favicon.href = data.logoUrl;
+            }
+            if (data.primaryColor) {
+              document.documentElement.style.setProperty('--primary-color', data.primaryColor);
+            }
+          })
+          .catch(function(e) { console.error('Branding load err:', e); });
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DjTjxkHg.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-S-ySWqyJ.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-libs-UKsf9aNG.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-CBAdMbMd.js">
+    <link rel="modulepreload" crossorigin href="/assets/socket-oGhg9xuP.js">
+    <link rel="modulepreload" crossorigin href="/assets/client-BrguTQai.js">
+    <link rel="modulepreload" crossorigin href="/assets/quote-status-Hcij18BP.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BdymvI8f.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
