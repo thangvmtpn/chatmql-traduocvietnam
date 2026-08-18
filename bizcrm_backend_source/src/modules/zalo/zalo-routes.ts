@@ -43,6 +43,7 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
         avatarUrl: true,
         phone: true,
         status: true,
+        isDisabled: true,
         lastConnectedAt: true,
         createdAt: true,
         owner: { select: { id: true, fullName: true, email: true } },
@@ -50,12 +51,30 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { createdAt: 'asc' },
     })
 
-    return accounts.map(a => {
+    const result = accounts.map(a => {
       const poolEntry = getPoolEntry(a.id)
       // OA accounts are HTTP-based: if we have tokens (status=connected) we are live.
       const liveStatus = a.platform === Platform.ZALO_OA ? a.status ?? 'disconnected' : (poolEntry?.status ?? a.status ?? 'disconnected')
       return { ...a, liveStatus }
     })
+
+    // Sort: connected first, then connecting/pending, then disconnected, with disabled at bottom
+    result.sort((a, b) => {
+      const getPriority = (acc: typeof a) => {
+        if (acc.isDisabled) return 100
+        const st = acc.liveStatus || acc.status || 'disconnected'
+        if (st === 'connected') return 1
+        if (st === 'connecting' || st === 'qr_pending') return 2
+        if (st === 'webhook_pending' || st === 'token_expired') return 3
+        return 4 // disconnected
+      }
+      const pA = getPriority(a)
+      const pB = getPriority(b)
+      if (pA !== pB) return pA - pB
+      return (a.displayName || '').localeCompare(b.displayName || '', 'vi')
+    })
+
+    return result
   })
 
   // POST /api/v1/zalo-accounts/connect — QR-first: create temp + trigger QR in 1 call
@@ -102,6 +121,11 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
         ...(isDisabled !== undefined ? { isDisabled } : {}),
       },
     })
+
+    if (isDisabled === true) {
+      await poolDisconnect(request.params.id).catch(() => {})
+    }
+
     return updated
   })
 
