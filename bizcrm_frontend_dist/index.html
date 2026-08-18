@@ -4,11 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>To Partners — Quản lý khách hàng</title>
+    <title>Trà Dược Việt Nam — Quản lý khách hàng</title>
     <script>
       (function() {
         var search = window.location.search || '';
-        fetch('http://localhost:4520/api/v1/platform/branding' + search)
+        var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? 'http://localhost:4520'
+          : 'https://tracrm-api.bizino.ai';
+        fetch(apiBase + '/api/v1/platform/branding' + search)
           .then(res => res.json())
           .then(data => {
             window.__BIZCRM_BRANDING__ = data;

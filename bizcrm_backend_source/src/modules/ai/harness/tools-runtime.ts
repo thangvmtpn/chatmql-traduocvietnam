@@ -111,7 +111,7 @@ export function isToolName(name: string): name is ToolName {
   return (TOOL_NAMES as string[]).includes(name)
 }
 
-const MAX_SNIPPET = 300
+const MAX_SNIPPET = 800
 const MAX_PRICE_DESC = 1000 // 'description' pricing lives in the text — give it room
 
 function formatProducts(rows: Array<{ name: string; price: number | null; priceMax: number | null; priceType: string; currency: string; description: string | null }>): string {

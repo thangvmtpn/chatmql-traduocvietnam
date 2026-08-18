@@ -40,9 +40,10 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-TRA-DINH-NGOC',
     slug: 'tra-dinh-ngoc',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'TRÀ ĐINH NGỌC - TINH HOA TRÀ XANH THÁI NGUYÊN - CỰC HIẾM.\nTrà Đinh Ngọc là dòng trà tinh hoa bậc nhất của Thái Nguyên – được xem như “ngọc trong trà”, biểu trưng cho sự tinh khiết và quý giá.\n(Chỉ nhận đặt hàng trước khi thu hái)\n\n• Nguồn gốc & Xuất xứ: Được thu hái thủ công từ những búp đinh chè non của giống chè Long Vân trứ danh tại Thái Nguyên - Việt Nam.\n• Hương – Vị – Sắc: Hương cốm non rất đặc trưng của dòng trà quý, thoảng hương - Tiền vị chát thanh - Hậu vị ngọt thơm, dư vị đậm đà - Sắc trà xanh cốm non.\n• Cánh trà: Đinh trà (100%) nhỏ & thẳng đều, xoăn, dầy búp đinh.\n• Quy cách đóng gói: Hộp mica 200G (đóng theo ấm) & Hộp thiếc - 200G, Túi 100G hoặc theo yêu cầu của khách hàng.\n• Cách pha: Trà pha với nước sôi ở nhiệt độ phù hợp nhất khoảng 85 - 90 độ. Mỗi ấm pha từ 8 - 10 gram với 200ml nước.\n• Bảo quản: Có kẹp chống ẩm hoặc hộp bảo quản, bảo quản tủ mát 0 - 5 độ.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 1500000,
+    description: 'TRÀ ĐINH NGỌC - TINH HOA TRÀ XANH THÁI NGUYÊN - CỰC HIẾM.\nGiá: 1.500.000đ/hộp 200g. Trà Đinh Ngọc là dòng trà tinh hoa bậc nhất của vùng đất Tân Cương, Thái Nguyên – được xem như “ngọc trong trà”, biểu trưng cho sự tinh khiết và quý giá.\n(Chỉ nhận đặt hàng trước khi thu hái)\n\n• Nguồn gốc & Xuất xứ: Được thu hái thủ công từ những búp đinh chè non của giống chè Long Vân trứ danh tại vùng Tân Cương, Thái Nguyên - Việt Nam.\n• Hương – Vị – Sắc: Hương cốm non rất đặc trưng của dòng trà quý, thoảng hương - Tiền vị chát thanh - Hậu vị ngọt thơm, dư vị đậm đà - Sắc trà xanh cốm non.\n• Cánh trà: Đinh trà (100%) nhỏ & thẳng đều, xoăn, dầy búp đinh.\n• Quy cách đóng gói: Hộp mica 200G (đóng theo ấm) & Hộp thiếc - 200G, Túi 100G hoặc theo yêu cầu của khách hàng.\n• Cách pha: Trà pha với nước sôi ở nhiệt độ phù hợp nhất khoảng 85 - 90 độ. Mỗi ấm pha từ 8 - 10 gram với 200ml nước.\n• Bảo quản: Có kẹp chống ẩm hoặc hộp bảo quản, bảo quản tủ mát 0 - 5 độ.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
-      origin: 'Long Vân, Thái Nguyên',
+      origin: 'Vùng Tân Cương, Thái Nguyên',
       flavor: 'Hương cốm non đặc trưng, chát thanh, hậu ngọt thơm sâu',
       color: 'Xanh cốm non',
       leaf_shape: 'Đinh trà 100% nhỏ thẳng đều',
@@ -51,16 +52,17 @@ const PRODUCTS: ProductData[] = [
       shelf_life: '24 tháng',
       standard: 'ISO 22000:2018',
     },
-    tags: ['tra_dinh', 'cao_cap', 'long_van', 'tinh_hoa', 'thai_nguyen', 'qua_bieu'],
+    tags: ['tra_dinh', 'cao_cap', 'tan_cuong', 'tinh_hoa', 'thai_nguyen', 'qua_bieu'],
   },
   {
     name: 'Vạn Thịnh Trà',
     code: 'SP-VAN-THINH-TRA',
     slug: 'van-thinh-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN THỊNH TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH THƯỢNG HẠNG.\nVạn Thịnh Trà mang ý nghĩa thịnh vượng và trường tồn, hưng thịnh sung túc.\n(Rất phù hợp làm đồ lễ trưng bày trên ban thờ gia tiên, thần tài hoặc nơi thờ phụng, quà biếu ngoại giao cao cấp)\n\n• Nguồn gốc & Xuất xứ: Thu hái thủ công từ búp đinh chè non giống Long Vân Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm cốm non thuần khiết - Tiền vị chát dịu - Hậu vị ngọt sâu - Sắc trà xanh cốm non đầu mùa.\n• Cánh trà: Đinh trà (~100%), nhỏ & thẳng đều, xoăn, mảnh búp đinh.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 10g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 120000,
+    description: 'VẠN THỊNH TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH THƯỢNG HẠNG.\nGiá niêm yết: 120.000đ/gói 100g (Túi 500g: 600.000đ được miễn phí vận chuyển toàn quốc).\nVạn Thịnh Trà mang ý nghĩa thịnh vượng và trường tồn, hưng thịnh sung túc.\n(Rất phù hợp làm đồ lễ trưng bày trên ban thờ gia tiên, thần tài hoặc nơi thờ phụng, quà biếu ngoại giao cao cấp)\n\n• Nguồn gốc & Xuất xứ: Thu hái thủ công từ búp đinh chè non giống Long Vân tại vùng Đệ nhất danh trà Tân Cương, Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm cốm non thuần khiết - Tiền vị chát dịu - Hậu vị ngọt sâu - Sắc trà xanh cốm non đầu mùa.\n• Cánh trà: Đinh trà (~100%), nhỏ & thẳng đều, xoăn, mảnh búp đinh.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 10g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
-      origin: 'Long Vân, Thái Nguyên',
+      origin: 'Vùng Tân Cương, Thái Nguyên',
       flavor: 'Hương cốm non thuần khiết, chát dịu, hậu ngọt sâu',
       color: 'Xanh cốm non đầu mùa',
       leaf_shape: 'Đinh trà ~100%',
@@ -69,16 +71,17 @@ const PRODUCTS: ProductData[] = [
       shelf_life: '24 tháng',
       standard: 'ISO 22000:2018',
     },
-    tags: ['tra_dinh', 'thuong_hang', 'long_van', 'le_than_tai', 'qua_bieu'],
+    tags: ['tra_dinh', 'thuong_hang', 'tan_cuong', 'le_than_tai', 'qua_bieu'],
   },
   {
     name: 'Vạn Khang Trà',
     code: 'SP-VAN-KHANG-TRA',
     slug: 'van-khang-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN KHANG TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH HẢO HẠNG.\nVạn Khang Trà ngụ ý tâm thân an hòa, khỏe mạnh, vạn sự khang.\n(Rất phù hợp cho việc biếu tặng lời chúc sức khỏe)\n\n• Nguồn gốc & Xuất xứ: Thu hái thủ công từ búp đinh chè non của giống Thanh Trà trứ danh tại Thái Nguyên.\n• Hương - Vị - Sắc: Hương cốm non thơm dịu - Tiền vị chát nhẹ - Hậu vị ngọt nhẹ - Sắc trà xanh cốm non ánh xanh.\n• Cánh trà: Đinh trà (~80%) & nõn tôm trà.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 10g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 90000,
+    description: 'VẠN KHANG TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH HẢO HẠNG.\nGiá niêm yết: 90.000đ/gói 100g (Túi 500g: 450.000đ).\nVạn Khang Trà ngụ ý tâm thân an hòa, khỏe mạnh, vạn sự khang.\n(Rất phù hợp cho việc biếu tặng lời chúc sức khỏe)\n\n• Nguồn gốc & Xuất xứ: Thu hái thủ công từ búp đinh chè non của giống Thanh Trà trứ danh tại vùng Tân Cương, Thái Nguyên.\n• Hương - Vị - Sắc: Hương cốm non thơm dịu - Tiền vị chát nhẹ - Hậu vị ngọt sâu lắng - Sắc trà xanh cốm non ánh xanh.\n• Cánh trà: Đinh trà (~80%) & nõn tôm trà.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 10g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
-      origin: 'Thanh Trà, Thái Nguyên',
+      origin: 'Vùng Tân Cương, Thái Nguyên',
       flavor: 'Hương cốm non thơm dịu, chát nhẹ, hậu ngọt nhẹ',
       color: 'Xanh cốm non ánh xanh',
       leaf_shape: 'Đinh trà (~80%) & nõn tôm',
@@ -87,16 +90,17 @@ const PRODUCTS: ProductData[] = [
       shelf_life: '24 tháng',
       standard: 'ISO 22000:2018',
     },
-    tags: ['tra_dinh', 'hao_hang', 'thanh_tra', 'chuc_suc_khoe', 'qua_bieu'],
+    tags: ['tra_dinh', 'hao_hang', 'tan_cuong', 'chuc_suc_khoe', 'qua_bieu'],
   },
   {
     name: 'Vạn Hỷ Trà',
     code: 'SP-VAN-HY-TRA',
     slug: 'van-hy-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN HỶ TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH NÕN THƯỢNG HẠNG.\nVạn Hỷ Trà ngụ ý người uống cảm nhận được nhiều niềm vui, hoan hỷ trong khi thưởng thức.\n(Rất phù hợp làm quà, tráp lễ, lễ cho việc hỷ, hoặc giỏ quà tặng)\n\n• Nguồn gốc & Xuất xứ: Búp đinh non giống chè Thanh Trà & Long Vân Thái Nguyên.\n• Hương - Vị - Sắc: Hương cốm non thoảng thơm - Tiền vị chát nhẹ - Hậu vị ngọt nhẹ - Sắc trà xanh ánh vàng.\n• Cánh trà: Đinh trà (~70%) & nõn tôm trà.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 12g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 70000,
+    description: 'VẠN HỶ TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ ĐINH NÕN THƯỢNG HẠNG.\nGiá: 70.000đ/gói 100g. Vạn Hỷ Trà ngụ ý người uống cảm nhận được nhiều niềm vui, hoan hỷ trong khi thưởng thức.\n(Rất phù hợp làm quà, tráp lễ, lễ cho việc hỷ, hoặc giỏ quà tặng)\n\n• Nguồn gốc & Xuất xứ: Búp đinh non giống chè Thanh Trà & Tân Cương Thái Nguyên.\n• Hương - Vị - Sắc: Hương cốm non thoảng thơm - Tiền vị chát nhẹ - Hậu vị ngọt nhẹ - Sắc trà xanh ánh vàng.\n• Cánh trà: Đinh trà (~70%) & nõn tôm trà.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp mica 200G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 8 - 12g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
-      origin: 'Thanh Trà & Long Vân, Thái Nguyên',
+      origin: 'Vùng Tân Cương, Thái Nguyên',
       flavor: 'Hương cốm thoảng thơm, chát nhẹ, hậu ngọt nhẹ',
       color: 'Xanh ánh vàng',
       leaf_shape: 'Đinh trà (~70%) & nõn tôm',
@@ -105,16 +109,17 @@ const PRODUCTS: ProductData[] = [
       shelf_life: '24 tháng',
       standard: 'ISO 22000:2018',
     },
-    tags: ['tra_dinh_non', 'thuong_hang', 'trap_le', 'le_hy', 'qua_tang'],
+    tags: ['tra_dinh_non', 'thuong_hang', 'tan_cuong', 'trap_le', 'le_hy', 'qua_tang'],
   },
   {
     name: 'Vạn Thọ Trà',
     code: 'SP-VAN-THO-TRA',
     slug: 'van-tho-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN THỌ TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ NÕN TÔM THƯỢNG HẠNG.\nVạn Thọ Trà gửi gắm ước nguyện trường thọ, thêm bền sức tuổi thọ kéo dài.\n(Rất phù hợp cho việc làm quà, tráp lễ, lễ chúc thọ hoặc chúc người nhận sức khỏe dồi dào - trường thọ)\n\n• Nguồn gốc & Xuất xứ: Búp chè nõn tôm non (1 tôm - 1 lá) giống Thanh Trà & Long Vân Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm cốm non dịu nhẹ – Tiền vị chát dịu êm – Hậu vị ngọt thanh – Sắc nước trà xanh ánh vàng.\n• Cánh trà: Nõn tôm, hơi cong, săn chắc và đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 12g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 700000,
+    description: 'VẠN THỌ TRÀ - TRÀ XANH THÁI NGUYÊN - BỘ QUÀ TẶNG TRƯỜNG THỌ.\nGiá: 700.000đ/bộ quà cao cấp. Vạn Thọ Trà gửi gắm ước nguyện trường thọ, thêm bền sức tuổi thọ kéo dài.\n(Rất phù hợp cho việc làm quà, tráp lễ, lễ chúc thọ hoặc chúc người nhận sức khỏe dồi dào - trường thọ)\n\n• Nguồn gốc & Xuất xứ: Búp chè nõn tôm non (1 tôm - 1 lá) vùng Tân Cương Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm cốm non dịu nhẹ – Tiền vị chát dịu êm – Hậu vị ngọt thanh – Sắc nước trà xanh ánh vàng.\n• Cánh trà: Nõn tôm, hơi cong, săn chắc và đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G, Hộp nhung đỏ quà tặng.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 12g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
-      origin: 'Thanh Trà & Long Vân, Thái Nguyên',
+      origin: 'Vùng Tân Cương, Thái Nguyên',
       flavor: 'Hương cốm non dịu nhẹ, chát dịu êm, hậu ngọt thanh',
       color: 'Xanh ánh vàng',
       leaf_shape: 'Nõn tôm (1 tôm 1 lá) hơi cong săn chắc',
@@ -123,14 +128,15 @@ const PRODUCTS: ProductData[] = [
       shelf_life: '24 tháng',
       standard: 'ISO 22000:2018',
     },
-    tags: ['tra_non_tom', 'thuong_hang', 'chuc_tho', 'suc_khoe', 'qua_tang'],
+    tags: ['tra_non_tom', 'thuong_hang', 'tan_cuong', 'chuc_tho', 'suc_khoe', 'qua_tang'],
   },
   {
     name: 'Vạn Lộc Trà',
     code: 'SP-VAN-LOC-TRA',
     slug: 'van-loc-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN LỘC TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ NÕN TÔM HẢO HẠNG.\nVạn Lộc Trà ngụ ý để mỗi ngụm trà như mở ra nguồn tài lộc và sung túc, giàu tiền tài.\n(Rất phù hợp thắp hương gia tiên, thần tài, cầu lộc hoặc biếu tặng ý nghĩa)\n\n• Nguồn gốc & Xuất xứ: Búp chè nõn tôm non (1 tôm - 1 lá) giống Thanh Trà Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm thanh dịu – Tiền vị chát vừa phải – Hậu vị ngọt thanh – Sắc nước trà vàng ánh xanh.\n• Cánh trà: Nõn tôm, hơi cong, săn chắc và đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 50000,
+    description: 'VẠN LỘC TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ NÕN TÔM HẢO HẠNG.\nGiá: 50.000đ/gói 100g. Vạn Lộc Trà ngụ ý để mỗi ngụm trà như mở ra nguồn tài lộc và sung túc, giàu tiền tài.\n(Rất phù hợp thắp hương gia tiên, thần tài, cầu lộc hoặc biếu tặng ý nghĩa)\n\n• Nguồn gốc & Xuất xứ: Búp chè nõn tôm non (1 tôm - 1 lá) giống Thanh Trà Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm thanh dịu – Tiền vị chát vừa phải – Hậu vị ngọt thanh – Sắc nước trà vàng ánh xanh.\n• Cánh trà: Nõn tôm, hơi cong, săn chắc và đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
       origin: 'Thanh Trà, Thái Nguyên',
       flavor: 'Hương thanh dịu, chát vừa phải, hậu ngọt thanh',
@@ -148,7 +154,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-VAN-PHUC-TRA',
     slug: 'van-phuc-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'VẠN PHÚC TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ MÓC CÂU THƯỢNG HẠNG.\nVạn Phúc Trà mang ý nghĩa phúc khí viên mãn, may mắn trọn vẹn, an vui và đủ đầy hạnh phúc.\n(Rất phù hợp làm lễ, tráp lễ, thắp hương hiếu hỷ, cầu phúc, cầu lộc, cầu tài)\n\n• Nguồn gốc & Xuất xứ: Búp chè 1 tôm 2 lá giống Thanh Trà Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm thanh dịu – Tiền vị chát đậm – Hậu vị ngọt thanh – Sắc nước vàng ánh xanh.\n• Cánh trà: Cong hình móc câu, săn chắc, đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 45000,
+    description: 'VẠN PHÚC TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ MÓC CÂU THƯỢNG HẠNG.\nGiá: 45.000đ/gói 100g. Vạn Phúc Trà mang ý nghĩa phúc khí viên mãn, may mắn trọn vẹn, an vui và đủ đầy hạnh phúc.\n(Rất phù hợp làm lễ, tráp lễ, thắp hương hiếu hỷ, cầu phúc, cầu lộc, cầu tài)\n\n• Nguồn gốc & Xuất xứ: Búp chè 1 tôm 2 lá giống Thanh Trà Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm thanh dịu – Tiền vị chát đậm – Hậu vị ngọt thanh – Sắc nước vàng ánh xanh.\n• Cánh trà: Cong hình móc câu, săn chắc, đều nhau.\n• Quy cách: Túi kraft 100G - 500G, Hộp thiếc 100G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
       origin: 'Thanh Trà, Thái Nguyên',
       flavor: 'Hương thanh dịu, chát đậm, hậu ngọt thanh',
@@ -166,7 +173,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-MAN-THAI-TRA',
     slug: 'man-thai-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'MẠN THÁI TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ MÓC CÂU TRUYỀN THỐNG.\nMạn Thái Trà mang ý nghĩa tinh hoa truyền thống trà mạn Việt Nam.\n(Phù hợp với khách hàng uống đậm vị, yêu thích trà truyền thống & pha cho tập thể dùng ở mức bình dân)\n\n• Nguồn gốc & Xuất xứ: Búp chè 1 tôm 2 lá giống chè Trung Du Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm dịu nhẹ – Tiền vị chát đậm – Hậu vị ngọt thanh – Sắc nước vàng ánh xanh.\n• Cánh trà: Cánh cong hình móc câu, săn chắc và đều nhau.\n• Quy cách: Túi Zip 100G - 500G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 35000,
+    description: 'MẠN THÁI TRÀ - TRÀ XANH THÁI NGUYÊN - TRÀ MÓC CÂU TRUYỀN THỐNG.\nGiá: 35.000đ/gói 100g. Mạn Thái Trà mang ý nghĩa tinh hoa truyền thống trà mạn Việt Nam.\n(Phù hợp với khách hàng uống đậm vị, yêu thích trà truyền thống & pha cho tập thể dùng ở mức bình dân)\n\n• Nguồn gốc & Xuất xứ: Búp chè 1 tôm 2 lá giống chè Trung Du Thái Nguyên.\n• Hương - Vị - Sắc: Hương thơm dịu nhẹ – Tiền vị chát đậm – Hậu vị ngọt thanh – Sắc nước vàng ánh xanh.\n• Cánh trà: Cánh cong hình móc câu, săn chắc và đều nhau.\n• Quy cách: Túi Zip 100G - 500G.\n• Cách pha: Nước sôi 85 - 90 độ, pha 10 - 15g với 200ml nước.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
       origin: 'Trung Du, Thái Nguyên',
       flavor: 'Đậm vị truyền thống, chát đậm, hậu ngọt thanh',
@@ -184,7 +192,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-HONG-HY-TRA',
     slug: 'hong-hy-tra',
     categorySlug: 'tra-xanh-thai-nguyen',
-    description: 'HỒNG HỶ TRÀ - HỒNG TRÀ SHAN TUYẾT CỔ THỤ.\nHồng Hỷ Trà mang ý nghĩa niềm vui và sự may mắn, hoan hỷ trong cuộc sống, tâm trạng phấn khởi, lạc quan.\n(Hồng trà đáp ứng nhiều lứa tuổi & giới tính, nhẹ nhàng, thanh tao & đặc biệt phù hợp uống buổi tối không lo mất ngủ)\n\n• Nguồn gốc & Xuất xứ: Búp trà non 1 tôm 1-2 lá từ cây chè Shan Tuyết cổ thụ trên núi cao Hà Giang, Yên Bái.\n• Hương - Vị - Sắc: Hương thơm mật ong, lúa mạch và trái cây chín tự nhiên - Vị ngọt dịu, thanh thoát không gắt - Hậu ngọt thanh - Sắc nước trà đỏ hồng ngọc.\n• Cánh trà: Xoăn chặt, đều, màu nâu đen có xen lẫn ánh kim và tơ trà.\n• Quy cách: Hộp thiếc - 80G.\n• Cách pha: Nước sôi 90 - 95 độ C, pha 5 - 8g với 200ml nước, hãm được nhiều lần.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
+    price: 80000,
+    description: 'HỒNG HỶ TRÀ - HỒNG TRÀ SHAN TUYẾT CỔ THỤ.\nGiá: 80.000đ/hộp 80g. Hồng Hỷ Trà mang ý nghĩa niềm vui và sự may mắn, hoan hỷ trong cuộc sống, tâm trạng phấn khởi, lạc quan.\n(Hồng trà đáp ứng nhiều lứa tuổi & giới tính, nhẹ nhàng, thanh tao & đặc biệt phù hợp uống buổi tối không lo mất ngủ)\n\n• Nguồn gốc & Xuất xứ: Búp trà non 1 tôm 1-2 lá từ cây chè Shan Tuyết cổ thụ trên núi cao Hà Giang, Yên Bái.\n• Hương - Vị - Sắc: Hương thơm mật ong, lúa mạch và trái cây chín tự nhiên - Vị ngọt dịu, thanh thoát không gắt - Hậu ngọt thanh - Sắc nước trà đỏ hồng ngọc.\n• Cánh trà: Xoăn chặt, đều, màu nâu đen có xen lẫn ánh kim và tơ trà.\n• Quy cách: Hộp thiếc - 80G.\n• Cách pha: Nước sôi 90 - 95 độ C, pha 5 - 8g với 200ml nước, hãm được nhiều lần.\n• Hạn sử dụng: 24 tháng. Tiêu chuẩn ISO 22000:2018.',
     specs: {
       origin: 'Shan Tuyết cổ thụ Hà Giang / Yên Bái',
       flavor: 'Mật ong, lúa mạch, trái cây chín, ngọt dịu thanh thoát',
@@ -202,7 +211,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-AM-CHEN-SON-THUY',
     slug: 'bo-am-chen-quy-toc-son-thuy',
     categorySlug: 'tra-cu-am-chen',
-    description: 'BỘ ẤM CHÉN BÁT TRÀNG – QUÝ TỘC SƠN THỦY.\nTượng trưng cho sự bền vững, hòa hợp và an yên. Mang thiên nhiên thu nhỏ về trong không gian sống.\n(Lý tưởng để thưởng trà, tiếp khách trang trọng, hay làm quà tặng cao cấp)\n\n• Chất liệu & Chế tác: Đất sét cao cấp Bát Tràng, nung 1200–1300°C bền chắc, giữ nhiệt tốt.\n• Họa tiết: Sơn thủy xanh lam vẽ tay trên nền men tro trắng mịn, viền vàng nâu thanh lịch.\n• Bộ sản phẩm gồm: 1 ấm dung tích 350ml, 6 chén nhỏ kèm đĩa lót đồng bộ.',
+    price: 1000000,
+    description: 'BỘ ẤM CHÉN BÁT TRÀNG – QUÝ TỘC SƠN THỦY.\nGiá: 1.000.000đ/bộ. Tượng trưng cho sự bền vững, hòa hợp và an yên. Mang thiên nhiên thu nhỏ về trong không gian sống.\n(Lý tưởng để thưởng trà, tiếp khách trang trọng, hay làm quà tặng cao cấp)\n\n• Chất liệu & Chế tác: Đất sét cao cấp Bát Tràng, nung 1200–1300°C bền chắc, giữ nhiệt tốt.\n• Họa tiết: Sơn thủy xanh lam vẽ tay trên nền men tro trắng mịn, viền vàng nâu thanh lịch.\n• Bộ sản phẩm gồm: 1 ấm dung tích 350ml, 6 chén nhỏ kèm đĩa lót đồng bộ.',
     specs: {
       origin: 'Làng gốm Bát Tràng, Hà Nội',
       set_items: '1 ấm 350ml + 6 chén + 6 đĩa lót',
@@ -216,7 +226,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-AM-CHEN-TRUC-LAM',
     slug: 'bo-am-chen-truc-lam-that-hien',
     categorySlug: 'tra-cu-am-chen',
-    description: 'BỘ ẤM CHÉN BÁT TRÀNG – TRÚC LÂM THẤT HIỀN.\nBiểu tượng của sự thanh cao, thoát tục, yêu thiên nhiên và nghệ thuật của bảy bậc hiền nhân.\n\n• Chất liệu: Đất sét cao cấp nung ở 1200–1300°C cho độ bền chắc và giữ nhiệt tốt.\n• Họa tiết: Bảy vị hiền nhân quây quần dưới rừng trúc vẽ tay màu xanh lam trên nền men trắng mịn viền vàng nâu.\n• Bộ sản phẩm gồm: 1 ấm 350ml, 6 chén nhỏ kèm đĩa lót.',
+    price: 950000,
+    description: 'BỘ ẤM CHÉN BÁT TRÀNG – TRÚC LÂM THẤT HIỀN.\nGiá: 950.000đ/bộ. Biểu tượng của sự thanh cao, thoát tục, yêu thiên nhiên và nghệ thuật của bảy bậc hiền nhân.\n\n• Chất liệu: Đất sét cao cấp nung ở 1200–1300°C cho độ bền chắc và giữ nhiệt tốt.\n• Họa tiết: Bảy vị hiền nhân quây quần dưới rừng trúc vẽ tay màu xanh lam trên nền men trắng mịn viền vàng nâu.\n• Bộ sản phẩm gồm: 1 ấm 350ml, 6 chén nhỏ kèm đĩa lót.',
     specs: {
       origin: 'Làng gốm Bát Tràng',
       set_items: '1 ấm 350ml + 6 chén + 6 đĩa lót',
@@ -230,7 +241,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-AM-CHEN-CUC-CO',
     slug: 'bo-am-chen-cuc-co-truong-tho',
     categorySlug: 'tra-cu-am-chen',
-    description: 'BỘ ẤM CHÉN BÁT TRÀNG – CÚC CỔ TRƯỜNG THỌ.\nHoa cúc là biểu tượng của sự trường thọ, sức khỏe và may mắn viên mãn.\n(Lý tưởng thưởng trà, tiếp khách quý, quà tặng mừng thọ, lễ Tết)\n\n• Bộ sản phẩm gồm: 1 ấm tích, 6 chén và 1 khay sứ trang trí đồng bộ.\n• Họa tiết: Hoa cúc cổ vẽ tay màu xanh lam trên nền men trắng ngà bóng mịn viền vàng nâu tinh tế.',
+    price: 1100000,
+    description: 'BỘ ẤM CHÉN BÁT TRÀNG – CÚC CỔ TRƯỜNG THỌ.\nGiá: 1.100.000đ/bộ. Hoa cúc là biểu tượng của sự trường thọ, sức khỏe và may mắn viên mãn.\n(Lý tưởng thưởng trà, tiếp khách quý, quà tặng mừng thọ, lễ Tết)\n\n• Bộ sản phẩm gồm: 1 ấm tích, 6 chén và 1 khay sứ trang trí đồng bộ.\n• Họa tiết: Hoa cúc cổ vẽ tay màu xanh lam trên nền men trắng ngà bóng mịn viền vàng nâu tinh tế.',
     specs: {
       origin: 'Làng gốm Bát Tràng',
       set_items: '1 ấm tích + 6 chén + 1 khay sứ',
@@ -244,7 +256,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-AM-CHEN-SEN-XANH',
     slug: 'bo-am-chen-hoa-sen-xanh',
     categorySlug: 'tra-cu-am-chen',
-    description: 'BỘ ẤM CHÉN BÁT TRÀNG – HOA SEN XANH.\nMen kem hoa sen xanh thanh nhã, biểu tượng thuần khiết và bình an.\n\n• Bộ sản phẩm gồm: 1 ấm dung tích 450ml, 6 chén nhỏ kèm đĩa kê.\n• Chất liệu: Phủ men kem trắng ngà bóng mịn, không bám cặn trà, dễ vệ sinh.',
+    price: 850000,
+    description: 'BỘ ẤM CHÉN BÁT TRÀNG – HOA SEN XANH.\nGiá: 850.000đ/bộ. Men kem hoa sen xanh thanh nhã, biểu tượng thuần khiết và bình an.\n\n• Bộ sản phẩm gồm: 1 ấm dung tích 450ml, 6 chén nhỏ kèm đĩa kê.\n• Chất liệu: Phủ men kem trắng ngà bóng mịn, không bám cặn trà, dễ vệ sinh.',
     specs: {
       origin: 'Làng gốm Bát Tràng',
       set_items: '1 ấm 450ml + 6 chén + 6 đĩa kê',
@@ -258,7 +271,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-HU-TRA-SON-THUY',
     slug: 'hu-dung-tra-son-thuy-huu-tinh',
     categorySlug: 'tra-cu-am-chen',
-    description: 'HŨ ĐỰNG TRÀ BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGốm sứ Bát Tràng nung 1200-1300°C, họa tiết sơn thủy xanh lam viền vàng nâu.\n• Thiết kế: Dáng trụ tròn thân phình nhẹ, nắp đậy khít chống ẩm mốc giữ nguyên hương trà.\n• Dung tích: 200–300g trà.',
+    price: 100000,
+    description: 'HŨ ĐỰNG TRÀ BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGiá: 100.000đ/hũ. Gốm sứ Bát Tràng nung 1200-1300°C, họa tiết sơn thủy xanh lam viền vàng nâu.\n• Thiết kế: Dáng trụ tròn thân phình nhẹ, nắp đậy khít chống ẩm mốc giữ nguyên hương trà.\n• Dung tích: 200–300g trà.',
     specs: {
       origin: 'Làng gốm Bát Tràng',
       capacity: '200g - 300g trà',
@@ -271,7 +285,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-TONG-TRA-SON-THUY',
     slug: 'tong-tra-son-thuy-huu-tinh',
     categorySlug: 'tra-cu-am-chen',
-    description: 'TỐNG TRÀ BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nDùng trung chuyển trà từ ấm sang các chén nhỏ, giúp hương vị và màu nước trà đồng đều.\n• Dung tích: 150–200ml, quai cầm nhỏ gọn vừa tay.\n• Họa tiết sơn thủy hữu tình vẽ tay viền vàng nâu đồng bộ.',
+    price: 80000,
+    description: 'TỐNG TRÀ BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGiá: 80.000đ/chiếc. Dùng trung chuyển trà từ ấm sang các chén nhỏ, giúp hương vị và màu nước trà đồng đều.\n• Dung tích: 150–200ml, quai cầm nhỏ gọn vừa tay.\n• Họa tiết sơn thủy hữu tình vẽ tay viền vàng nâu đồng bộ.',
     specs: {
       origin: 'Làng gốm Bát Tràng',
       capacity: '150ml - 200ml',
@@ -284,7 +299,8 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-GAT-TAN-SON-THUY',
     slug: 'gat-tan-son-thuy-huu-tinh',
     categorySlug: 'tra-cu-am-chen',
-    description: 'GẠT TÀN BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGốm sứ Bát Tràng cao cấp men trắng ngà vẽ sơn thủy xanh lam viền vàng nâu sang trọng cho bàn trà tiếp khách.',
+    price: 70000,
+    description: 'GẠT TÀN BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGiá: 70.000đ/chiếc. Gốm sứ Bát Tràng cao cấp men trắng ngà vẽ sơn thủy xanh lam viền vàng nâu sang trọng cho bàn trà tiếp khách.',
     specs: { origin: 'Làng gốm Bát Tràng', pattern: 'Sơn thủy hữu tình' },
     tags: ['tra_cu', 'gat_tan', 'bat_trang', 'phu_kien_ban_tra'],
   },
@@ -293,16 +309,18 @@ const PRODUCTS: ProductData[] = [
     code: 'SP-LO-TAM-SON-THUY',
     slug: 'lo-dung-tam-son-thuy-huu-tinh',
     categorySlug: 'tra-cu-am-chen',
-    description: 'LỌ ĐỰNG TĂM BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nDáng trụ nhỏ gọn, nắp đậy khít bảo vệ tăm khỏi bụi và ẩm, trang trí bàn trà đồng bộ.',
+    price: 50000,
+    description: 'LỌ ĐỰNG TĂM BÁT TRÀNG – SƠN THỦY HỮU TÌNH.\nGiá: 50.000đ/lọ. Dáng trụ nhỏ gọn, nắp đậy khít bảo vệ tăm khỏi bụi và ẩm, trang trí bàn trà đồng bộ.',
     specs: { origin: 'Làng gốm Bát Tràng', pattern: 'Sơn thủy hữu tình' },
     tags: ['tra_cu', 'lo_tam', 'bat_trang', 'phu_kien_ban_tra'],
   },
   {
     name: 'Bánh chè lam matcha',
     code: 'SP-BANH-CHE-LAM-MATCHA',
-    slug: 'banh-che-lam-matcha',
+    slug: 'banh-keo-lam-matcha',
     categorySlug: 'banh-keo-thuong-tra',
-    description: 'BÁNH CHÈ LAM MATCHA (Thương hiệu TraBa).\nGiao thoa tinh tế giữa quà quê Bắc Bộ và matcha tự nhiên.\n• Nguyên liệu: Bột gạo nếp Ruộng Rươi sinh thái Tứ Kỳ – Hải Dương (thuần khiết, không hóa chất), matcha tự nhiên, mật mía, lạc rang, gừng tươi.\n• Không sử dụng chất bảo quản. Dẻo mềm, ngọt thanh, bùi béo cay ấm dịu.\n• Rất hợp khi thưởng thức cùng một chén trà xanh Thái Nguyên ấm nóng.',
+    price: 30000,
+    description: 'BÁNH CHÈ LAM MATCHA (Thương hiệu TraBa).\nGiá: 30.000đ/hộp. Giao thoa tinh tế giữa quà quê Bắc Bộ và matcha tự nhiên.\n• Nguyên liệu: Bột gạo nếp Ruộng Rươi sinh thái Tứ Kỳ – Hải Dương (thuần khiết, không hóa chất), matcha tự nhiên, mật mía, lạc rang, gừng tươi.\n• Không sử dụng chất bảo quản. Dẻo mềm, ngọt thanh, bùi béo cay ấm dịu.\n• Rất hợp khi thưởng thức cùng một chén trà xanh Thái Nguyên ấm nóng.',
     specs: {
       brand: 'TraBa',
       ingredients: 'Nếp ruộng rươi Tứ Kỳ, Matcha tự nhiên, Mật mía, Lạc rang, Gừng tươi',
@@ -399,34 +417,48 @@ async function seed() {
       const p = PRODUCTS[i]
       const categoryId = categoryMap.get(p.categorySlug) || null
 
-      const createdProduct = await prisma.product.upsert({
-        where: { orgId_slug: { orgId: org.id, slug: p.slug } },
-        update: {
-          name: p.name,
-          code: p.code,
-          categoryId,
-          description: p.description,
-          specs: p.specs,
-          tags: p.tags,
-          sortOrder: i + 1,
-          status: 'active',
-        },
-        create: {
-          orgId: org.id,
-          name: p.name,
-          code: p.code,
-          slug: p.slug,
-          categoryId,
-          description: p.description,
-          specs: p.specs,
-          tags: p.tags,
-          sortOrder: i + 1,
-          status: 'active',
-          priceType: 'contact',
-          currency: 'VND',
-        },
+      const existing = await prisma.product.findFirst({
+        where: { orgId: org.id, OR: [{ code: p.code }, { slug: p.slug }] },
       })
-      console.log(`  ✓ [${i + 1}/${PRODUCTS.length}] Product: ${p.name} (${createdProduct.code})`)
+
+      let createdProduct
+      if (existing) {
+        createdProduct = await prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            name: p.name,
+            code: p.code,
+            slug: p.slug,
+            categoryId,
+            price: p.price ?? null,
+            priceType: p.price ? 'fixed' : 'contact',
+            description: p.description,
+            specs: p.specs,
+            tags: p.tags,
+            sortOrder: i + 1,
+            status: 'active',
+          },
+        })
+      } else {
+        createdProduct = await prisma.product.create({
+          data: {
+            orgId: org.id,
+            name: p.name,
+            code: p.code,
+            slug: p.slug,
+            categoryId,
+            price: p.price ?? null,
+            priceType: p.price ? 'fixed' : 'contact',
+            currency: 'VND',
+            description: p.description,
+            specs: p.specs,
+            tags: p.tags,
+            sortOrder: i + 1,
+            status: 'active',
+          },
+        })
+      }
+      console.log(`  ✓ [${i + 1}/${PRODUCTS.length}] Product: ${p.name} (${createdProduct.code} - ${p.price ? p.price.toLocaleString('vi-VN') + 'đ' : 'Liên hệ'})`)
     }
   }
 

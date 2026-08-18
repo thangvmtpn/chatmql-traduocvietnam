@@ -31,29 +31,28 @@ function versionOf(updatedAt: Date | undefined): string | null {
   return updatedAt ? String(updatedAt.getTime()) : null
 }
 
+const TRADUOC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" width="420" height="110">
+  <g transform="translate(10, 5)">
+    <!-- Star & Swoosh Icon -->
+    <circle cx="50" cy="50" r="40" fill="none" stroke="#E31D24" stroke-width="6"/>
+    <path d="M 25,65 Q 45,85 70,60 T 80,30" fill="none" stroke="#0D6838" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="50,10 60,35 85,35 65,50 72,75 50,60 28,75 35,50 15,35 40,35" fill="#F59E0B"/>
+  </g>
+  <!-- Text -->
+  <text x="115" y="52" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-weight="900" font-size="26" fill="#0D6838">TRÀ DƯỢC VIỆT NAM</text>
+  <text x="115" y="80" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-weight="600" font-size="13" stroke-width="0.5" fill="#E31D24">PHƯỚC LÀNH CHO SỨC KHỎE</text>
+</svg>`
+
 /** Public metadata used to render brand name/title/favicon before login. */
 export async function getBrandingMeta(host?: string): Promise<BrandingMeta & { tagline?: string; logoUrl?: string; primaryColor?: string }> {
-  const normalizedHost = (host || '').toLowerCase()
-  
-  if (normalizedHost.includes('traduoc') || normalizedHost.includes('tra-duoc')) {
-    return {
-      brandName: 'Trà Dược Việt Nam',
-      tagline: 'Phước lành cho sức khỏe',
-      logoUrl: '/assets/logo-traduocvietnam.svg',
-      faviconVersion: 'traduoc-v1',
-      logoVersion: 'traduoc-v1',
-      primaryColor: '#0D6838',
-    }
-  }
-
-  // Default Master Brand: To Partners
+  // Default Master Brand: Trà Dược Việt Nam
   return {
-    brandName: 'To Partners',
-    tagline: 'Kết nối cùng phát triển',
-    logoUrl: '/assets/logo-topartners.svg',
-    faviconVersion: 'topartners-v1',
-    logoVersion: 'topartners-v1',
-    primaryColor: '#1D70B8',
+    brandName: 'Trà Dược Việt Nam',
+    tagline: 'Phước lành cho sức khỏe',
+    logoUrl: '/assets/logo-traduocvietnam.svg',
+    faviconVersion: 'traduoc-v1',
+    logoVersion: 'traduoc-v1',
+    primaryColor: '#0D6838',
   }
 }
 
@@ -63,8 +62,14 @@ export async function getBrandingImage(kind: BrandingImageKind): Promise<Brandin
     where: { settingKey: brandingKeyForImage(kind) },
     select: { valueBytes: true, valueText: true },
   })
-  if (!row?.valueBytes || !row.valueText) return null
-  return { buffer: Buffer.from(row.valueBytes), mime: row.valueText }
+  if (row?.valueBytes && row.valueText) {
+    return { buffer: Buffer.from(row.valueBytes), mime: row.valueText }
+  }
+  // Fallback to built-in Trà Dược Việt Nam SVG
+  if (kind === 'logo') {
+    return { buffer: Buffer.from(TRADUOC_SVG, 'utf-8'), mime: 'image/svg+xml' }
+  }
+  return null
 }
 
 /** Upsert the brand name. Empty string clears it (reverts to default). */
