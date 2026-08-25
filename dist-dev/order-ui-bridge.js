@@ -4250,6 +4250,10 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
           </div>`;
 
         card.querySelector('#cc-panel-info').innerHTML = `
+          <div class="chat-detail__sticky-actions" style="position:sticky; top:0; z-index:10; background:#fff; padding:12px 16px; border-bottom:1px solid var(--gray-200); box-shadow:0 2px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:6px;">
+            <button class="chat-detail__profile-btn" id="cc-profile" style="margin:0;">🕘 Xem hồ sơ lịch sử mua hàng</button>
+            <button class="chat-detail__order-btn" id="cc-c360" style="margin:0;">✨ Phân tích khách hàng (AI)</button>
+          </div>
           <div class="chat-detail__section">
             <div class="chat-detail__section-header">
               <span class="chat-detail__section-title">THÔNG TIN TỪ CRM</span>
@@ -4281,10 +4285,6 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${rowFull('Địa chỉ', crm.address)}
               ${rowFull('Địa chỉ 2', crm.address2)}
             </div>
-          </div>
-          <div style="padding:16px; border-bottom:1px solid var(--gray-100);">
-            <button class="chat-detail__profile-btn" id="cc-profile">🕘 Xem hồ sơ lịch sử mua hàng</button>
-            <button class="chat-detail__order-btn" id="cc-c360">✨ Phân tích khách hàng (AI)</button>
           </div>`;
 
         card.querySelector('#cc-profile').onclick = () => window.openCustomerProfileDrawer?.();
