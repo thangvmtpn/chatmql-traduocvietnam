@@ -4391,10 +4391,12 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
       card.id = 'chatmql-cust-card';
       card.className = 'cust-card';
       card.innerHTML = `
-        <div id="cc-head"></div>
-        <div class="chat-detail__tabs">
-          ${CC_TABS.map(t => (t.sales ? '<span class="chat-detail__tabs-divider"></span>' : '') +
-            `<button type="button" class="chat-detail__tab${t.sales ? ' chat-detail__tab--sales' : ''}${t.id === 'info' ? ' chat-detail__tab--active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}
+        <div class="chat-detail__sticky-header" style="position:sticky; top:0; background:#fff; z-index:25; border-bottom:1px solid var(--gray-200); box-shadow:0 1px 4px rgba(0,0,0,0.03);">
+          <div id="cc-head"></div>
+          <div class="chat-detail__tabs" style="border-bottom:none; position:static;">
+            ${CC_TABS.map(t => (t.sales ? '<span class="chat-detail__tabs-divider"></span>' : '') +
+              `<button type="button" class="chat-detail__tab${t.sales ? ' chat-detail__tab--sales' : ''}${t.id === 'info' ? ' chat-detail__tab--active' : ''}" data-tab="${t.id}">${t.label}</button>`).join('')}
+          </div>
         </div>
         ${CC_TABS.map(t => `<div class="chat-detail__panel${t.id === 'info' ? ' chat-detail__panel--active' : ''}" data-panel="${t.id}" id="cc-panel-${t.id}"></div>`).join('')}`;
       sidebar.insertBefore(card, sidebar.firstChild);
@@ -4455,11 +4457,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
           </div>`;
 
         card.querySelector('#cc-panel-info').innerHTML = `
-          <div class="chat-detail__sticky-actions" style="position:sticky; top:0; z-index:10; background:#fff; padding:12px 16px; border-bottom:1px solid var(--gray-200); box-shadow:0 2px 8px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:6px;">
-            <button class="chat-detail__profile-btn" id="cc-profile" style="margin:0;">🕘 Xem hồ sơ lịch sử mua hàng</button>
-            <button class="chat-detail__order-btn" id="cc-c360" style="margin:0;">✨ Phân tích khách hàng (AI)</button>
-          </div>
-          <div class="chat-detail__section">
+          <div class="chat-detail__section" style="padding-bottom:16px;">
             <div class="chat-detail__section-header">
               <span class="chat-detail__section-title">THÔNG TIN TỪ CRM</span>
               <button class="chat-list__action-btn" id="cc-refresh" title="Đồng bộ lại từ CRM">⟳</button>
@@ -4490,6 +4488,11 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${rowFull('Địa chỉ', crm.address)}
               ${rowFull('Địa chỉ 2', crm.address2)}
             </div>
+          </div>
+          <!-- Sticky Bottom Actions -->
+          <div class="chat-detail__sticky-actions" style="position:sticky; bottom:0; z-index:20; background:#fff; padding:10px 14px; border-top:1px solid var(--gray-200); box-shadow:0 -4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; gap:8px;">
+            <button class="chat-detail__profile-btn" id="cc-profile" style="margin:0; height:38px; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; font-size:13px; color:#1e293b; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">🕘 Xem hồ sơ lịch sử mua hàng</button>
+            <button class="chat-detail__order-btn" id="cc-c360" style="margin:0; height:40px; border:none; border-radius:8px; font-weight:700; font-size:13px; color:#fff; background:#15803d; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 2px 8px rgba(21,128,61,0.25);">✨ Phân tích khách hàng (AI)</button>
           </div>`;
 
         card.querySelector('#cc-profile').onclick = () => window.openCustomerProfileDrawer?.();
@@ -4660,7 +4663,9 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
         </div>
       </div>
       <div class="bday-card__hint">Gợi ý: gửi lời chúc kèm ưu đãi sinh nhật cho khách.</div>`;
-    card.appendChild(el);
+    const actions = card.querySelector('.chat-detail__sticky-actions');
+    if (actions) card.insertBefore(el, actions);
+    else card.appendChild(el);
   }
 
   // ══════════════════════════════════════════════════════════════════
