@@ -2451,7 +2451,7 @@
               </div>
             </div>
 
-            <!-- Đợt 1: trạng thái đơn & kho xuất -->
+            <!-- Đợt 1: trạng thái đơn & hình thức thanh toán -->
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div class="chatmql-form-group">
                 <label class="chatmql-form-label">Trạng thái đơn</label>
@@ -2462,11 +2462,10 @@
                 </select>
               </div>
               <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Kho xuất hàng</label>
-                <select id="order-warehouse" class="chatmql-form-select">
-                  ${lookups.warehouses.map(w => `
-                    <option value="${w.id}" ${w.id === warehouseId ? 'selected' : ''}>${w.name}</option>
-                  `).join('')}
+                <label class="chatmql-form-label">Hình thức thanh toán</label>
+                <select id="order-pay-method" class="chatmql-form-select">
+                  <option value="vietqr" ${paymentMethod === 'vietqr' ? 'selected' : ''}>💳 Chuyển khoản VietQR (Tự sinh mã QR)</option>
+                  <option value="cod" ${paymentMethod === 'cod' ? 'selected' : ''}>💵 Thu hộ COD khi nhận hàng</option>
                 </select>
               </div>
             </div>
@@ -2498,78 +2497,122 @@
               <input type="text" id="order-cust-addr" class="chatmql-form-input" value="${form.addr}" placeholder="Số nhà, đường, thôn/xóm…" />
             </div>
 
-            <!-- Products List -->
+            <!-- Products & Gifts Section -->
             <div class="chatmql-form-group" style="margin-top:16px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <label class="of__section-title" style="margin:0;">Sản phẩm đặt mua</label>
-                <button type="button" id="btn-add-product" style="font-size:12px; color:#16a34a; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 8px; border-radius:4px; cursor:pointer; font-weight:600;">+ Thêm dòng</button>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
+                <div style="font-size:14px; font-weight:700; color:#0f172a;">Sản phẩm</div>
               </div>
 
-              <!-- Thanh tìm kiếm nhanh sản phẩm -->
-              <div style="position:relative; margin-bottom:10px;">
-                <div id="quick-prod-search-wrap" style="display:flex; align-items:center; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; box-shadow:0 1px 2px rgba(0,0,0,0.04); transition:border-color 0.15s, box-shadow 0.15s;">
-                  <span style="font-size:13px; color:#64748b; margin-right:8px;">🔍</span>
-                  <input type="text" id="quick-prod-search" placeholder="Gõ tên hoặc mã SKU để tìm nhanh & thêm vào đơn..." style="flex:1; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
-                  <button type="button" id="btn-clear-prod-search" style="display:none; border:none; background:none; color:#94a3b8; cursor:pointer; font-size:13px; padding:0 4px;" title="Xóa tìm kiếm">✕</button>
+              <!-- 3-Column Search/Filter Bar: [ Kho ▼ ] [ Tìm sản phẩm ] [ Tìm quà tặng ] -->
+              <div style="display:grid; grid-template-columns: 95px 1fr 1fr; gap:8px; margin-bottom:12px;">
+                <!-- Dropdown Kho -->
+                <div style="position:relative;">
+                  <select id="order-warehouse" class="chatmql-form-select" style="width:100%; height:38px; font-size:12.5px; padding:0 24px 0 10px; border-radius:8px; border:none; background:#f1f5f9; font-weight:600; color:#334155; cursor:pointer; appearance:none;">
+                    ${lookups.warehouses.map(w => `
+                      <option value="${w.id}" ${w.id === warehouseId ? 'selected' : ''}>${w.name}</option>
+                    `).join('')}
+                  </select>
+                  <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:10px; color:#64748b; pointer-events:none;">▼</span>
                 </div>
-                <div id="quick-prod-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;">
+
+                <!-- Input Tìm sản phẩm -->
+                <div style="position:relative;">
+                  <div id="prod-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; padding:0 10px; height:38px;">
+                    <input type="text" id="input-search-product" placeholder="Tìm sản phẩm" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
+                  </div>
+                  <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
+                </div>
+
+                <!-- Input Tìm quà tặng -->
+                <div style="position:relative;">
+                  <div id="gift-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; padding:0 10px; height:38px;">
+                    <input type="text" id="input-search-gift" placeholder="Tìm quà tặng" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
+                  </div>
+                  <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
                 </div>
               </div>
 
+              <!-- Column Header: Sản phẩm | Giá tiền -->
+              <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:#334155; padding:4px 2px 8px;">
+                <span>Sản phẩm</span>
+                <span>Giá tiền</span>
+              </div>
+
+              <!-- Item Cards Container -->
               <div id="order-items-container">
                 ${!catalog.length ? `
                   <div style="padding:14px; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; font-size:12.5px; color:#92400e;">
                     <b>Kho này chưa có sản phẩm nào.</b><br>
-                    Chọn kho khác ở ô "Kho xuất hàng" phía trên để tiếp tục lên đơn.
+                    Chọn kho khác ở ô "Kho" phía trên để tiếp tục lên đơn.
                   </div>
                 ` : !items.length ? `
-                  <div style="padding:14px; background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:6px; font-size:12.5px; color:#64748b; text-align:center;">
-                    Chưa có sản phẩm nào — bấm "+ Thêm sản phẩm" để chọn.
+                  <div style="padding:14px; background:#f1f5f9; border:1px dashed #cbd5e1; border-radius:8px; font-size:12.5px; color:#64748b; text-align:center;">
+                    Chưa có sản phẩm nào — gõ vào ô "Tìm sản phẩm" hoặc "Tìm quà tặng" ở trên để thêm vào đơn.
                   </div>
                 ` : ''}
-                ${items.map((item, idx) => `
-                  <div class="op-item" style="display:flex; gap:8px; align-items:center;">
-                    <div style="flex:1; min-width:0;">
-                      <select class="chatmql-form-select item-select" data-idx="${idx}">
-                        ${catalog.map(prod => `
-                          <option value="${prod.code}" ${prod.code === item.code ? 'selected' : ''}>
-                            ${productLabel(prod)}
-                          </option>
-                        `).join('')}
-                      </select>
-                      ${(() => {
-                        const p = findProd(item.code);
-                        if (!p) return '';
-                        const bits = [`<span style="font-family:ui-monospace,monospace;">${p.code}</span>`];
-                        if (p.weight) bits.push(`${vnd(p.weight)}g`);
-                        if (p.vat_note) bits.push(p.vat_note);
-                        const low = p.inventory <= 0;
-                        const warn = !low && p.inventory < item.quantity;
-                        bits.push(
-                          low
-                            ? '<span style="color:#dc2626; font-weight:700;">HẾT HÀNG</span>'
-                            : warn
-                              ? `<span style="color:#b45309; font-weight:700;">Chỉ còn ${vnd(p.inventory)}</span>`
-                              : `<span style="color:#15803d;">Tồn ${vnd(p.inventory)}</span>`
-                        );
-                        return `<div style="font-size:11px; color:#64748b; margin-top:3px; display:flex; gap:8px; flex-wrap:wrap;">${bits.join('<span style="color:#cbd5e1;">·</span>')}</div>`;
-                      })()}
+
+                ${items.map((item, idx) => {
+                  const p = findProd(item.code) || item;
+                  const isGift = !!item.isGift;
+                  const lineTotal = isGift ? 0 : item.price * item.quantity;
+                  const formattedLineTotal = isGift ? '0' : new Intl.NumberFormat('vi-VN').format(lineTotal);
+                  const unitStr = p.unit || 'Túi';
+                  const unitPriceStr = isGift ? `0 đ/Gói` : `${new Intl.NumberFormat('vi-VN').format(item.price)} đ/${unitStr}`;
+                  const weightStr = p.weight ? `${p.weight}g` : '';
+                  const vatStr = p.vat_note ? ` · ${p.vat_note}` : (isGift ? '' : ' · Đã có VAT 8%');
+                  const subtitleText = isGift
+                    ? `${p.name}${weightStr ? ' - ' + weightStr : ''} · Quà tặng — không tính tiền`
+                    : `${p.name} - ${unitStr} ${weightStr ? weightStr + ' ' : ''}${vatStr}`;
+                  const inventoryCount = p.inventory != null ? p.inventory : (item.inventory || 0);
+
+                  return `
+                    <div class="chatmql-item-card" data-idx="${idx}" style="
+                      background:${isGift ? '#fffdf5' : '#fff'};
+                      border:1px solid ${isGift ? '#fef08a' : '#f1f5f9'};
+                      border-radius:10px;
+                      padding:12px 14px;
+                      margin-bottom:10px;
+                      box-shadow:0 1px 3px rgba(0,0,0,0.03);
+                    ">
+                      <!-- Top Line: SKU Code & Trash button -->
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <span style="font-family:ui-monospace,monospace; font-weight:700; font-size:13.5px; color:#0f172a;">${p.code}</span>
+                          ${isGift ? `<span style="background:#fef3c7; color:#b45309; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; border:1px solid #fde68a;">🎁 Quà tặng</span>` : ''}
+                        </div>
+                        <button type="button" class="btn-remove-item" data-idx="${idx}" style="
+                          width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+                          border:1px solid #fecaca; background:#fff5f5; color:#ef4444; border-radius:6px; cursor:pointer; font-size:13px;
+                        " title="Xóa dòng này">🗑️</button>
+                      </div>
+
+                      <!-- Subtitle -->
+                      <div style="font-size:12px; color:#475569; margin-bottom:6px; line-height:1.4;">
+                        ${subtitleText}
+                      </div>
+
+                      <!-- Bottom Row: Price, Stock vs Stepper, Line Total -->
+                      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:4px;">
+                        <div>
+                          <div style="font-size:12px; color:#64748b;">${unitPriceStr}${weightStr ? ' · ' + weightStr : ''}</div>
+                          <div style="font-size:12px; color:#64748b; margin-top:2px;">Tồn: <span style="font-weight:600; color:${inventoryCount <= 0 ? '#dc2626' : '#1e293b'};">${inventoryCount}</span></div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                          <div style="display:inline-flex; align-items:center; border:1px solid #e2e8f0; border-radius:6px; background:#fff; overflow:hidden;">
+                            <button type="button" class="btn-qty-minus" data-idx="${idx}" style="width:28px; height:26px; border:none; background:#fff; color:#475569; cursor:pointer; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;">−</button>
+                            <input type="number" class="item-qty" data-idx="${idx}" value="${item.quantity}" min="1" style="width:34px; height:26px; border:none; text-align:center; font-weight:700; font-size:13px; color:#0f172a; padding:0; outline:none; background:transparent;" />
+                            <button type="button" class="btn-qty-plus" data-idx="${idx}" style="width:28px; height:26px; border:none; background:#fff; color:#475569; cursor:pointer; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;">+</button>
+                          </div>
+                          <div style="font-weight:700; font-size:15px; color:#0f172a; font-variant-numeric:tabular-nums; margin-top:2px;">
+                            ${formattedLineTotal}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                      <button type="button" class="btn-qty-minus" data-idx="${idx}" style="width:28px; height:28px; border:1px solid #cbd5e1; background:#fff; border-radius:4px; cursor:pointer;">-</button>
-                      <input type="number" class="item-qty" data-idx="${idx}" value="${item.quantity}" min="1" style="width:45px; text-align:center; padding:4px; border:1px solid #cbd5e1; border-radius:4px;" />
-                      <button type="button" class="btn-qty-plus" data-idx="${idx}" style="width:28px; height:28px; border:1px solid #cbd5e1; background:#fff; border-radius:4px; cursor:pointer;">+</button>
-                    </div>
-                    <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:${item.isGift ? '#b45309' : '#94a3b8'}; cursor:pointer; white-space:nowrap; user-select:none;" title="Quà tặng không tính vào tiền hàng">
-                      <input type="checkbox" class="item-gift" data-idx="${idx}" ${item.isGift ? 'checked' : ''} style="cursor:pointer;" />
-                      🎁 Quà
-                    </label>
-                    <div style="min-width:90px; text-align:right; font-weight:600; font-size:13px; color:${item.isGift ? '#b45309' : '#0f172a'};">
-                      ${item.isGift ? '0đ' : vnd(item.price * item.quantity) + 'đ'}
-                    </div>
-                    ${items.length > 1 ? `<button type="button" class="btn-remove-item" data-idx="${idx}" style="color:#ef4444; border:none; background:none; cursor:pointer; font-size:16px;">🗑️</button>` : ''}
-                  </div>
-                `).join('')}
+                  `;
+                }).join('')}
               </div>
             </div>
 
@@ -2604,15 +2647,8 @@
                 </label>`).join('')}
             </div>
 
-            <!-- Discount, Shipping, Payment -->
+            <!-- Discount, Shipping, Carrier -->
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Hình thức thanh toán</label>
-                <select id="order-pay-method" class="chatmql-form-select">
-                  <option value="vietqr" ${paymentMethod === 'vietqr' ? 'selected' : ''}>💳 Chuyển khoản VietQR (Tự sinh mã QR)</option>
-                  <option value="cod" ${paymentMethod === 'cod' ? 'selected' : ''}>💵 Thu hộ COD khi nhận hàng</option>
-                </select>
-              </div>
               <div class="chatmql-form-group">
                 <label class="chatmql-form-label">Đơn vị vận chuyển</label>
                 <select id="order-carrier" class="chatmql-form-select">
@@ -2621,22 +2657,21 @@
                   <option value="vnpost">📮 VNPost (Bưu điện)</option>
                 </select>
               </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div class="chatmql-form-group">
                 <label class="chatmql-form-label">Chiết khấu / Giảm giá (VNĐ)</label>
                 <input type="number" id="order-discount" class="chatmql-form-input" value="${discount}" min="0" step="10000" />
               </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div class="chatmql-form-group">
                 <label class="chatmql-form-label">Phí vận chuyển (VNĐ)</label>
                 <input type="number" id="order-shipping-fee" class="chatmql-form-input" value="${shippingFee}" min="0" step="5000" />
               </div>
-            </div>
-
-            <div class="chatmql-form-group">
-              <label class="chatmql-form-label">Ghi chú đơn hàng</label>
-              <input type="text" id="order-notes" class="chatmql-form-input" value="${form.notes}" placeholder="VD: Khách VIP đóng túi quà, giao giờ hành chính..." />
+              <div class="chatmql-form-group">
+                <label class="chatmql-form-label">Ghi chú đơn hàng</label>
+                <input type="text" id="order-notes" class="chatmql-form-input" value="${form.notes}" placeholder="VD: Khách VIP đóng túi quà..." />
+              </div>
             </div>
 
             <!-- Đợt 5: mã ưu đãi -->
@@ -2701,7 +2736,7 @@
             </div>
           </div>
 
-          <div class="chatmql-modal-footer">
+          <div class="chatmql-modal-footer" style="position:sticky; bottom:0; background:#fff; z-index:30; border-top:1px solid #e2e8f0; box-shadow:0 -4px 12px rgba(0,0,0,0.06); padding:12px 16px; display:flex; align-items:center; justify-content:flex-end; gap:10px;">
             <button type="button" id="btn-cancel-order" style="padding:8px 16px; font-size:13px; font-weight:600; color:#475569; background:#fff; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">Hủy bỏ</button>
             <button type="button" id="btn-submit-order" style="padding:8px 20px; font-size:13.5px; font-weight:700; color:#fff; background:linear-gradient(135deg,#16a34a,#15803d); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; gap:8px;">
               <span>✅ XÁC NHẬN LÊN ĐƠN (ĐỒNG BỘ CRM & FM)</span>
@@ -2714,55 +2749,31 @@
       modalOverlay.querySelector('#chatmql-close-modal').onclick = () => modalOverlay.remove();
       modalOverlay.querySelector('#btn-cancel-order').onclick = () => modalOverlay.remove();
 
-      // Add product
-      modalOverlay.querySelector('#btn-add-product').onclick = () => {
-        // Thêm sản phẩm: ưu tiên món còn hàng chưa có trong giỏ.
-        const avail = catalog.find(p => p.inventory > 0 && !items.some(i => i.code === p.code))
-          || catalog.find(p => !items.some(i => i.code === p.code))
-          || catalog[0];
-        if (!avail) { alert('Danh mục sản phẩm đang trống.'); return; }
-        items.push({ code: avail.code, name: avail.name, price: avail.price, quantity: 1 });
-        renderModalContent();
-      };
-
-      // Quick Product Search & Auto-add
-      const prodSearchInput = modalOverlay.querySelector('#quick-prod-search');
-      const prodSearchWrap = modalOverlay.querySelector('#quick-prod-search-wrap');
-      const prodSearchResults = modalOverlay.querySelector('#quick-prod-results');
-      const btnClearProdSearch = modalOverlay.querySelector('#btn-clear-prod-search');
-
+      // Search Product
+      const prodSearchInput = modalOverlay.querySelector('#input-search-product');
+      const prodSearchResults = modalOverlay.querySelector('#prod-search-results');
       if (prodSearchInput && prodSearchResults) {
-        const renderSearchResults = (query) => {
+        const renderProdSearch = (query) => {
           const qNorm = removeVietnameseTones(query);
-          if (!qNorm) {
-            prodSearchResults.style.display = 'none';
-            btnClearProdSearch.style.display = 'none';
-            return;
-          }
-          btnClearProdSearch.style.display = 'block';
+          if (!qNorm) { prodSearchResults.style.display = 'none'; return; }
           const matched = catalog.filter(p => {
             const nameNorm = removeVietnameseTones(p.name || '');
             const codeNorm = removeVietnameseTones(p.code || '');
             return nameNorm.includes(qNorm) || codeNorm.includes(qNorm);
           });
-
           if (!matched.length) {
-            prodSearchResults.innerHTML = `
-              <div style="padding:12px; font-size:12.5px; color:#64748b; text-align:center;">
-                Không tìm thấy sản phẩm nào khớp với "<b>${query}</b>"
-              </div>`;
+            prodSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">Không tìm thấy sản phẩm</div>';
             prodSearchResults.style.display = 'block';
             return;
           }
-
           prodSearchResults.innerHTML = matched.map(p => `
             <div class="quick-prod-item" data-code="${p.code}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:6px; cursor:pointer; transition:background 0.12s; border-bottom:1px solid #f1f5f9;">
               <div style="flex:1; min-width:0; margin-right:10px;">
                 <div style="font-weight:600; font-size:12.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.name}</div>
                 <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; gap:8px; align-items:center;">
                   <span style="font-family:ui-monospace,monospace; background:#f1f5f9; padding:1px 4px; border-radius:3px; font-size:10.5px;">${p.code}</span>
-                  ${p.weight ? `<span>${vnd(p.weight)}g</span>` : ''}
-                  ${p.inventory > 0 ? `<span style="color:#15803d; font-weight:600;">Tồn ${vnd(p.inventory)}</span>` : `<span style="color:#dc2626; font-weight:700;">Hết hàng</span>`}
+                  ${p.weight ? `<span>${p.weight}g</span>` : ''}
+                  ${p.inventory > 0 ? `<span style="color:#15803d; font-weight:600;">Tồn ${p.inventory}</span>` : `<span style="color:#dc2626; font-weight:700;">Hết hàng</span>`}
                 </div>
               </div>
               <div style="text-align:right; white-space:nowrap;">
@@ -2776,41 +2787,86 @@
             itemEl.onmouseenter = () => { itemEl.style.background = '#f0fdf4'; };
             itemEl.onmouseleave = () => { itemEl.style.background = 'transparent'; };
             itemEl.onmousedown = (e) => {
-              e.preventDefault(); // prevent input blur before click
+              e.preventDefault();
               const code = itemEl.dataset.code;
               const prod = findProd(code);
               if (prod) {
-                const existing = items.find(i => i.code === code);
+                const existing = items.find(i => i.code === code && !i.isGift);
                 if (existing) {
                   existing.quantity++;
                 } else {
-                  items.push({ code: prod.code, name: prod.name, price: prod.price, quantity: 1 });
+                  items.push({ code: prod.code, name: prod.name, price: prod.price, quantity: 1, isGift: false });
                 }
                 renderModalContent();
               }
             };
           });
-
           prodSearchResults.style.display = 'block';
         };
 
-        prodSearchInput.oninput = (e) => renderSearchResults(e.target.value);
-        prodSearchInput.onfocus = (e) => {
-          prodSearchWrap.style.borderColor = '#16a34a';
-          prodSearchWrap.style.boxShadow = '0 0 0 2px rgba(22, 163, 74, 0.15)';
-          if (e.target.value.trim()) renderSearchResults(e.target.value);
+        prodSearchInput.oninput = e => renderProdSearch(e.target.value);
+        prodSearchInput.onfocus = e => { if (e.target.value.trim()) renderProdSearch(e.target.value); };
+        prodSearchInput.onblur = () => setTimeout(() => { prodSearchResults.style.display = 'none'; }, 200);
+      }
+
+      // Search Gift
+      const giftSearchInput = modalOverlay.querySelector('#input-search-gift');
+      const giftSearchResults = modalOverlay.querySelector('#gift-search-results');
+      if (giftSearchInput && giftSearchResults) {
+        const renderGiftSearch = (query) => {
+          const qNorm = removeVietnameseTones(query);
+          if (!qNorm) { giftSearchResults.style.display = 'none'; return; }
+          const matched = catalog.filter(p => {
+            const nameNorm = removeVietnameseTones(p.name || '');
+            const codeNorm = removeVietnameseTones(p.code || '');
+            return nameNorm.includes(qNorm) || codeNorm.includes(qNorm);
+          });
+          if (!matched.length) {
+            giftSearchResults.innerHTML = '<div style="padding:10px; font-size:12px; color:#64748b; text-align:center;">Không tìm thấy quà tặng</div>';
+            giftSearchResults.style.display = 'block';
+            return;
+          }
+          giftSearchResults.innerHTML = matched.map(p => `
+            <div class="quick-gift-item" data-code="${p.code}" style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:6px; cursor:pointer; transition:background 0.12s; border-bottom:1px solid #fef3c7;">
+              <div style="flex:1; min-width:0; margin-right:10px;">
+                <div style="font-weight:600; font-size:12.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.name}</div>
+                <div style="font-size:11px; color:#64748b; margin-top:2px; display:flex; gap:8px; align-items:center;">
+                  <span style="font-family:ui-monospace,monospace; background:#fef3c7; color:#b45309; padding:1px 4px; border-radius:3px; font-size:10.5px;">${p.code}</span>
+                  ${p.weight ? `<span>${p.weight}g</span>` : ''}
+                  ${p.inventory > 0 ? `<span style="color:#15803d; font-weight:600;">Tồn ${p.inventory}</span>` : `<span style="color:#dc2626; font-weight:700;">Hết hàng</span>`}
+                </div>
+              </div>
+              <div style="text-align:right; white-space:nowrap;">
+                <div style="font-weight:700; font-size:12.5px; color:#b45309;">0đ (Quà tặng)</div>
+                <span style="font-size:11px; color:#b45309; font-weight:600;">+ Thêm quà 🎁</span>
+              </div>
+            </div>
+          `).join('');
+
+          giftSearchResults.querySelectorAll('.quick-gift-item').forEach(itemEl => {
+            itemEl.onmouseenter = () => { itemEl.style.background = '#fffbeb'; };
+            itemEl.onmouseleave = () => { itemEl.style.background = 'transparent'; };
+            itemEl.onmousedown = (e) => {
+              e.preventDefault();
+              const code = itemEl.dataset.code;
+              const prod = findProd(code);
+              if (prod) {
+                const existing = items.find(i => i.code === code && i.isGift);
+                if (existing) {
+                  existing.quantity++;
+                } else {
+                  items.push({ code: prod.code, name: prod.name, price: prod.price, quantity: 1, isGift: true });
+                }
+                renderModalContent();
+              }
+            };
+          });
+          giftSearchResults.style.display = 'block';
         };
-        prodSearchInput.onblur = () => {
-          prodSearchWrap.style.borderColor = '#cbd5e1';
-          prodSearchWrap.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
-          setTimeout(() => { prodSearchResults.style.display = 'none'; }, 200);
-        };
-        btnClearProdSearch.onclick = () => {
-          prodSearchInput.value = '';
-          prodSearchResults.style.display = 'none';
-          btnClearProdSearch.style.display = 'none';
-          prodSearchInput.focus();
-        };
+
+        giftSearchInput.oninput = e => renderGiftSearch(e.target.value);
+        giftSearchInput.onfocus = e => { if (e.target.value.trim()) renderGiftSearch(e.target.value); };
+        giftSearchInput.onblur = () => setTimeout(() => { giftSearchResults.style.display = 'none'; }, 200);
       }
 
       // Tra CRM ngay khi nhân viên gõ số điện thoại.
@@ -3014,6 +3070,15 @@
         el.onclick = (e) => {
           const idx = parseInt(e.target.dataset.idx, 10);
           items[idx].quantity++;
+          renderModalContent();
+        };
+      });
+
+      modalOverlay.querySelectorAll('.item-qty').forEach(el => {
+        el.onchange = (e) => {
+          const idx = parseInt(e.target.dataset.idx, 10);
+          const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+          items[idx].quantity = val;
           renderModalContent();
         };
       });
