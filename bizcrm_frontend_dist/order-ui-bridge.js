@@ -2331,24 +2331,17 @@
     let provinceId = null;
     let wardId = null;
     let wards = [];
-    let discount = 0;
-    let shippingFee = 0;
-    let paymentMethod = 'vietqr';
-    let shippingProvider = 'jt_express';
-    // ── Đợt 3 ──
-    let depositAmount = 0;
-    let orderType = '';
-    let orderSource = 'Zalo';
-    let selfShipping = false;
-    let isFragile = false;
-    let isExchange = false;
-    // ── Đợt 5: mã ưu đãi ──
-    let promoCode = '';
-    let promoApplied = null;   // { promotion, discount_amount, free_shipping, message }
+    let discountPercent = 0;
+    let usedPoints = 0;
+    let sellerName = staffCare || 'Trần Trang';
+    let pkgWeight = null;
+    let pkgLength = '';
+    let pkgWidth = '';
+    let pkgHeight = '';
+    shippingFee = 25000;
+    shippingProvider = 'vnpost';
 
     // Giá trị các ô nhập tay được giữ trong state, KHÔNG đọc lại từ template.
-    // renderModalContent() dựng lại toàn bộ HTML mỗi lần đổi kho/tỉnh/sản phẩm;
-    // nếu render từ giá trị gốc thì mọi thứ nhân viên vừa gõ sẽ bị xóa sạch.
     const form = {
       name: customerName || '',
       phone: phone || '',
@@ -2390,10 +2383,27 @@
     function calcGift() {
       return items.reduce((sum, i) => sum + (i.isGift ? i.price * i.quantity : 0), 0);
     }
+    function calcTotalWeight() {
+      return items.reduce((sum, i) => {
+        const p = findProd(i.code);
+        const w = (p && p.weight) ? p.weight : 100;
+        return sum + (w * i.quantity);
+      }, 0);
+    }
+    function calcDiscountAmount() {
+      const sub = calcSubtotal();
+      if (discountPercent > 0) {
+        return Math.round((sub * discountPercent) / 100);
+      }
+      return discount || 0;
+    }
     function calculateTotal() {
+      const subtotal = calcSubtotal();
       const promoOff = promoApplied?.discount_amount || 0;
-      const ship = promoApplied?.free_shipping ? 0 : shippingFee;
-      return Math.max(0, calcSubtotal() - discount - promoOff + ship);
+      const discountAmt = calcDiscountAmount();
+      const pointsOff = (usedPoints || 0) * 1000;
+      const ship = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
+      return Math.max(0, subtotal - discountAmt - promoOff - pointsOff + ship);
     }
 
     const modalOverlay = document.createElement('div');
@@ -2401,104 +2411,167 @@
     modalOverlay.id = 'chatmql-order-modal-root';
 
     function renderModalContent() {
-      captureForm();   // giữ lại những gì nhân viên vừa gõ trước khi dựng lại HTML
+      captureForm();
       const subtotal = calcSubtotal();
       const total = calculateTotal();
-      const formattedTotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
-      const formattedSubtotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(subtotal);
+      const totalWeight = pkgWeight != null ? pkgWeight : calcTotalWeight();
+      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+      const formattedTotal = new Intl.NumberFormat('vi-VN').format(total);
+      const formattedSubtotal = new Intl.NumberFormat('vi-VN').format(subtotal);
 
       modalOverlay.innerHTML = `
-        <div class="chatmql-modal" onclick="event.stopPropagation()">
+        <div class="chatmql-modal" onclick="event.stopPropagation()" style="font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <div class="chatmql-modal-header">
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="font-size:22px;">🛍️</span>
               <div>
                 <div style="font-weight:700; font-size:16px; color:#0f172a;">Lên Đơn Hàng — Trà Dược Việt Nam</div>
-                <div style="font-size:12px; color:#64748b;">Đồng bộ tự động 3 chiều (ChatMQL ⟷ CRM ⟷ Hệ thống FM)</div>
+                <div style="font-size:12px; color:#64748b;">Đồng bộ tự động 3 chiều (ChatMQL ⟷ CRM ⟷ FM)</div>
               </div>
             </div>
             <button id="chatmql-close-modal" style="border:none; background:none; font-size:20px; color:#94a3b8; cursor:pointer;">✕</button>
           </div>
 
-          <div class="chatmql-modal-body">
-            <!-- CRM Status Banner -->
-            <div class="chatmql-crm-card" style="margin-top:0;" id="order-crm-card">
+          <div class="chatmql-modal-body" style="padding:14px 16px;">
+            <!-- CRM Status Card -->
+            <div class="chatmql-crm-card" style="margin-top:0; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px;" id="order-crm-card">
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <span class="chatmql-crm-badge" id="order-crm-badge">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
-                  <span style="font-weight:700; color:#15803d;">Nhóm: <span id="order-crm-group">${crmData?.priority_level || '—'}</span></span>
+                  <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
+                  <span style="font-weight:700; font-size:12px; color:#15803d;">Nhóm: <span id="order-crm-group">${crmData?.priority_level || '—'}</span></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
-                  👤 Nhân sự đang Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
+                  👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
                 </div>
               </div>
-              <div style="display:flex; gap:16px; font-size:12px; color:#334155;">
-                <span>📊 Tổng chi tiêu (GMV): <b id="order-crm-gmv">${gmvFormatted}</b></span>
+              <div style="display:flex; gap:12px; font-size:11.5px; color:#475569; flex-wrap:wrap;">
+                <span>📊 GMV: <b id="order-crm-gmv">${gmvFormatted}</b></span>
                 <span>📦 Đã mua: <b id="order-crm-count">${orderCount} đơn</b></span>
                 <span>🍵 Gu trà: <b id="order-crm-taste">${crmData?.thich_dung_hang || '—'}</b></span>
               </div>
             </div>
 
-            <!-- Customer Shipping Info -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Tên khách hàng</label>
-                <input type="text" id="order-cust-name" class="chatmql-form-input" value="${form.name}" />
+            <!-- 1. THÔNG TIN ĐƠN HÀNG -->
+            <div class="chatmql-form-section" style="margin-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
+                <div style="font-size:14px; font-weight:700; color:#0f172a;">Thông tin đơn hàng</div>
               </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Số điện thoại</label>
-                <input type="text" id="order-cust-phone" class="chatmql-form-input" value="${form.phone}" />
-              </div>
-            </div>
 
-            <!-- Đợt 1: trạng thái đơn & hình thức thanh toán -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Trạng thái đơn</label>
-                <select id="order-status" class="chatmql-form-select">
-                  ${lookups.statuses.map(st => `
-                    <option value="${st.id}" ${st.id === orderStatusId ? 'selected' : ''}>${st.label}</option>
-                  `).join('')}
-                </select>
+              <!-- Trạng thái & Chọn nhân viên -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:10px;">○</span> Chọn trạng thái
+                  </label>
+                  <select id="order-status" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#2563eb; font-weight:600; padding:0 10px;">
+                    <option value="1" ${orderStatusId === 1 ? 'selected' : ''}>Đang lấy hàng</option>
+                    <option value="2" ${orderStatusId === 2 ? 'selected' : ''}>Chờ xác nhận</option>
+                    <option value="3" ${orderStatusId === 3 ? 'selected' : ''}>Đang giao hàng</option>
+                    <option value="4" ${orderStatusId === 4 ? 'selected' : ''}>Hoàn thành</option>
+                    <option value="5" ${orderStatusId === 5 ? 'selected' : ''}>Hủy</option>
+                    ${lookups.statuses.filter(st => ![1,2,3,4,5].includes(st.id)).map(st => `
+                      <option value="${st.id}" ${st.id === orderStatusId ? 'selected' : ''}>${st.label}</option>
+                    `).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                    <span>👤</span> Chọn nhân viên
+                  </label>
+                  <select id="order-seller" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                    <option value="">Chọn nhân viên</option>
+                    <option value="Trần Trang" ${sellerName === 'Trần Trang' ? 'selected' : ''}>Trần Trang</option>
+                    <option value="Lê Nga" ${sellerName === 'Lê Nga' ? 'selected' : ''}>Lê Nga</option>
+                    <option value="Lê Tuấn" ${sellerName === 'Lê Tuấn' ? 'selected' : ''}>Lê Tuấn</option>
+                    <option value="Vũ Đức Văn" ${sellerName === 'Vũ Đức Văn' ? 'selected' : ''}>Vũ Đức Văn</option>
+                    <option value="Nguyễn Thị Huệ" ${sellerName === 'Nguyễn Thị Huệ' ? 'selected' : ''}>Nguyễn Thị Huệ</option>
+                    <option value="Trà Dược CSKH" ${sellerName === 'Trà Dược CSKH' ? 'selected' : ''}>Trà Dược CSKH</option>
+                  </select>
+                </div>
               </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Hình thức thanh toán</label>
-                <select id="order-pay-method" class="chatmql-form-select">
-                  <option value="vietqr" ${paymentMethod === 'vietqr' ? 'selected' : ''}>💳 Chuyển khoản VietQR (Tự sinh mã QR)</option>
-                  <option value="cod" ${paymentMethod === 'cod' ? 'selected' : ''}>💵 Thu hộ COD khi nhận hàng</option>
-                </select>
-              </div>
-            </div>
 
-            <!-- Đợt 1: địa chỉ 3 cấp -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Tỉnh/Thành phố</label>
-                <select id="order-province" class="chatmql-form-select">
-                  <option value="">— Chọn tỉnh/thành —</option>
+              <!-- Tên & Số điện thoại (ẩn dưới form nếu có sẵn, hoặc hiện rõ ràng) -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Tên khách hàng</label>
+                  <input type="text" id="order-cust-name" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${form.name}" placeholder="Tên khách hàng" />
+                </div>
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Số điện thoại</label>
+                  <input type="text" id="order-cust-phone" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${form.phone}" placeholder="Số điện thoại..." />
+                </div>
+              </div>
+
+              <!-- Tỉnh/Thành phố -->
+              <div style="margin-bottom:10px;">
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                  <span>📍</span> Tỉnh/Thành phố
+                </label>
+                <select id="order-province" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                  <option value="">Chọn tỉnh/thành phố</option>
                   ${lookups.provinces.map(pv => `
                     <option value="${pv.id}" ${pv.id === provinceId ? 'selected' : ''}>${pv.name}</option>
                   `).join('')}
                 </select>
               </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Phường/Xã</label>
-                <select id="order-ward" class="chatmql-form-select" ${wards.length ? '' : 'disabled'}>
-                  <option value="">${provinceId ? '— Chọn phường/xã —' : 'Chọn tỉnh trước'}</option>
+
+              <!-- Phường/Xã -->
+              <div style="margin-bottom:10px;">
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                  <span>🏢</span> Phường/Xã
+                </label>
+                <select id="order-ward" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;" ${wards.length ? '' : 'disabled'}>
+                  <option value="">${provinceId ? 'Chọn phường/xã' : 'Chọn tỉnh trước'}</option>
                   ${wards.map(wd => `
                     <option value="${wd.id}" ${wd.id === wardId ? 'selected' : ''}>${wd.name}</option>
                   `).join('')}
                 </select>
               </div>
+
+              <!-- Địa chỉ chi tiết -->
+              <div style="margin-bottom:10px;">
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                  <span>📍</span> Địa chỉ chi tiết
+                </label>
+                <input type="text" id="order-cust-addr" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${form.addr}" placeholder="Điền địa chỉ chi tiết..." />
+              </div>
             </div>
 
-            <div class="chatmql-form-group">
-              <label class="chatmql-form-label">Địa chỉ nhận hàng</label>
-              <input type="text" id="order-cust-addr" class="chatmql-form-input" value="${form.addr}" placeholder="Số nhà, đường, thôn/xóm…" />
+            <!-- 2. THÔNG TIN KHÁC -->
+            <div class="chatmql-form-section" style="margin-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
+                <div style="font-size:14px; font-weight:700; color:#0f172a;">Thông tin khác</div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chọn nguồn đơn hàng</label>
+                  <select id="order-source" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                    <option value="">Chọn nguồn đơn hàng</option>
+                    ${['Zalo', 'Facebook', 'Website', 'Hotline', 'Khác'].map(t =>
+                      `<option value="${t}" ${t === orderSource ? 'selected' : ''}>${t}</option>`).join('')}
+                  </select>
+                </div>
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chọn loại đơn hàng</label>
+                  <select id="order-type" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                    <option value="">Chọn loại đơn hàng</option>
+                    ${['Bán lẻ', 'Bán buôn', 'Đơn mẫu'].map(t =>
+                      `<option value="${t}" ${t === orderType ? 'selected' : ''}>${t}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Ghi chú</label>
+                <textarea id="order-notes" class="chatmql-form-input" rows="2" style="width:100%; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:8px 12px; box-sizing:border-box; resize:vertical;" placeholder="Nhập ghi chú đơn hàng...">${form.notes}</textarea>
+              </div>
             </div>
 
-            <!-- Products & Gifts Section -->
-            <div class="chatmql-form-group" style="margin-top:16px;">
+            <!-- 3. SẢN PHẨM -->
+            <div class="chatmql-form-section" style="margin-bottom:16px;">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
                 <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
                 <div style="font-size:14px; font-weight:700; color:#0f172a;">Sản phẩm</div>
@@ -2508,7 +2581,7 @@
               <div style="display:grid; grid-template-columns: 95px 1fr 1fr; gap:8px; margin-bottom:12px;">
                 <!-- Dropdown Kho -->
                 <div style="position:relative;">
-                  <select id="order-warehouse" class="chatmql-form-select" style="width:100%; height:38px; font-size:12.5px; padding:0 24px 0 10px; border-radius:8px; border:none; background:#f1f5f9; font-weight:600; color:#334155; cursor:pointer; appearance:none;">
+                  <select id="order-warehouse" class="chatmql-form-select" style="width:100%; height:38px; font-size:12.5px; padding:0 24px 0 10px; border-radius:8px; border:1px solid #e2e8f0; background:#f1f5f9; font-weight:600; color:#334155; cursor:pointer; appearance:none;">
                     ${lookups.warehouses.map(w => `
                       <option value="${w.id}" ${w.id === warehouseId ? 'selected' : ''}>${w.name}</option>
                     `).join('')}
@@ -2518,7 +2591,7 @@
 
                 <!-- Input Tìm sản phẩm -->
                 <div style="position:relative;">
-                  <div id="prod-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; padding:0 10px; height:38px;">
+                  <div id="prod-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-product" placeholder="Tìm sản phẩm" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
                   <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
@@ -2526,7 +2599,7 @@
 
                 <!-- Input Tìm quà tặng -->
                 <div style="position:relative;">
-                  <div id="gift-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border-radius:8px; padding:0 10px; height:38px;">
+                  <div id="gift-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-gift" placeholder="Tìm quà tặng" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
                   <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
@@ -2614,132 +2687,169 @@
                   `;
                 }).join('')}
               </div>
+
+              <!-- Product Total Summary Line -->
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 2px 4px; border-top:1px solid #f1f5f9; margin-top:6px;">
+                <span style="font-size:13px; font-weight:600; color:#334155;">Tổng: ${totalQty} SP · ${totalWeight}g</span>
+                <span style="font-size:15px; font-weight:800; color:#0f172a; font-variant-numeric:tabular-nums;">${formattedSubtotal}đ</span>
+              </div>
             </div>
 
-            <!-- Đợt 3: loại đơn, nguồn đơn -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Loại đơn hàng</label>
-                <select id="order-type" class="chatmql-form-select">
-                  <option value="">— Chọn loại đơn —</option>
-                  ${['Bán lẻ', 'Bán buôn', 'Đơn mẫu'].map(t =>
-                    `<option value="${t}" ${t === orderType ? 'selected' : ''}>${t}</option>`).join('')}
+            <!-- 4. VẬN CHUYỂN -->
+            <div class="chatmql-form-section" style="margin-bottom:16px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
+                  <div style="font-size:14px; font-weight:700; color:#0f172a;">Vận chuyển</div>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:#334155; cursor:pointer;">
+                  <input type="checkbox" id="order-self-ship" ${selfShipping ? 'checked' : ''} style="cursor:pointer;" /> Tự vận chuyển
+                </label>
+              </div>
+
+              <div style="margin-bottom:10px;">
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                  <span>🚚</span> Chọn đơn vị vận chuyển
+                </label>
+                <select id="order-carrier" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                  <option value="vnpost" ${shippingProvider === 'vnpost' ? 'selected' : ''}>VN Post - 25.000đ</option>
+                  <option value="jt_express" ${shippingProvider === 'jt_express' ? 'selected' : ''}>J&T Express - 30.000đ</option>
+                  <option value="viettel_post" ${shippingProvider === 'viettel_post' ? 'selected' : ''}>Viettel Post - 28.000đ</option>
                 </select>
               </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Nguồn đơn hàng</label>
-                <select id="order-source" class="chatmql-form-select">
-                  ${['Zalo', 'Facebook', 'Website', 'Hotline', 'Khác'].map(t =>
-                    `<option value="${t}" ${t === orderSource ? 'selected' : ''}>${t}</option>`).join('')}
-                </select>
+
+              <div style="margin-bottom:6px;">
+                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chi phí vận chuyển</label>
+                <input type="number" id="order-shipping-fee" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${shippingFee}" />
+              </div>
+
+              <div style="font-size:11.5px; color:#64748b; margin-bottom:10px; display:flex; align-items:center; gap:4px;">
+                <span>ⓘ</span> <span>Thông tin: ${shippingProvider === 'vnpost' ? 'VN Post - Mạng lưới bưu cục phủ khắp toàn quốc' : shippingProvider === 'viettel_post' ? 'Viettel Post - Giao nhanh, mạng lưới rộng khắp' : 'J&T Express - Chuyển phát nhanh chuyên nghiệp'}</span>
+              </div>
+
+              <div style="margin-bottom:10px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:#334155; cursor:pointer;">
+                  <input type="checkbox" id="order-fragile" ${isFragile ? 'checked' : ''} style="cursor:pointer;" /> Hàng dễ vỡ <span style="color:#94a3b8; font-size:11px;">ⓘ</span>
+                </label>
+              </div>
+
+              <!-- Dimensions & Weight 4-Grid -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">
+                <input type="number" id="order-pkg-weight" class="chatmql-form-input" style="height:36px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; padding:0 10px;" value="${totalWeight}" placeholder="Khối lượng (g)" />
+                <input type="number" id="order-pkg-length" class="chatmql-form-input" style="height:36px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; padding:0 10px;" value="${pkgLength}" placeholder="Dài (cm)" />
+                <input type="number" id="order-pkg-width" class="chatmql-form-input" style="height:36px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; padding:0 10px;" value="${pkgWidth}" placeholder="Rộng (cm)" />
+                <input type="number" id="order-pkg-height" class="chatmql-form-input" style="height:36px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; padding:0 10px;" value="${pkgHeight}" placeholder="Cao (cm)" />
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
+                <span style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase;">${shippingProvider === 'vnpost' ? 'VN POST' : shippingProvider === 'viettel_post' ? 'VIETTEL POST' : 'J&T EXPRESS'}</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:#334155; cursor:pointer;">
+                  <input type="checkbox" id="order-exchange" ${isExchange ? 'checked' : ''} style="cursor:pointer;" /> Đơn đổi trả
+                </label>
               </div>
             </div>
 
-            <!-- Đợt 3: cờ vận chuyển -->
-            <div style="display:flex; gap:16px; flex-wrap:wrap; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:12px;">
-              ${[
-                ['order-self-ship', selfShipping, '🚚 Shop tự vận chuyển'],
-                ['order-fragile', isFragile, '⚠️ Hàng dễ vỡ'],
-                ['order-exchange', isExchange, '🔄 Đơn đổi trả'],
-              ].map(([id, checked, label]) => `
-                <label style="display:flex; align-items:center; gap:5px; font-size:12.5px; color:#334155; cursor:pointer; user-select:none;">
-                  <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} style="cursor:pointer;" /> ${label}
-                </label>`).join('')}
-            </div>
-
-            <!-- Discount, Shipping, Carrier -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Đơn vị vận chuyển</label>
-                <select id="order-carrier" class="chatmql-form-select">
-                  <option value="jt_express">🚚 J&T Express</option>
-                  <option value="viettel_post">📦 Viettel Post</option>
-                  <option value="vnpost">📮 VNPost (Bưu điện)</option>
-                </select>
-              </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Chiết khấu / Giảm giá (VNĐ)</label>
-                <input type="number" id="order-discount" class="chatmql-form-input" value="${discount}" min="0" step="10000" />
-              </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Phí vận chuyển (VNĐ)</label>
-                <input type="number" id="order-shipping-fee" class="chatmql-form-input" value="${shippingFee}" min="0" step="5000" />
-              </div>
-              <div class="chatmql-form-group">
-                <label class="chatmql-form-label">Ghi chú đơn hàng</label>
-                <input type="text" id="order-notes" class="chatmql-form-input" value="${form.notes}" placeholder="VD: Khách VIP đóng túi quà..." />
-              </div>
-            </div>
-
-            <!-- Đợt 5: mã ưu đãi -->
-            <div class="chatmql-form-group">
-              <label class="chatmql-form-label">Mã ưu đãi</label>
-              <div style="display:flex; gap:6px;">
-                <input type="text" id="order-promo" class="chatmql-form-input" value="${esc(promoCode)}" placeholder="Nhập mã khách đưa…" style="flex:1; text-transform:uppercase;" ${promoApplied ? 'disabled' : ''} />
-                <button type="button" id="order-promo-btn" style="
-                  flex:none; padding:8px 14px; font-size:12.5px; font-weight:700; border-radius:6px; cursor:pointer;
-                  color:#fff; border:none; background:${promoApplied ? '#dc2626' : '#0369a1'};">${promoApplied ? 'Bỏ mã' : 'Áp dụng'}</button>
-              </div>
-              <div id="order-promo-msg" style="font-size:11.5px; margin-top:5px; color:${promoApplied ? '#15803d' : '#94a3b8'};">
-                ${promoApplied ? '✓ ' + esc(promoApplied.message) : 'Bỏ trống nếu khách không có mã.'}
-              </div>
-            </div>
-
-            <!-- Summary Box -->
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-top:14px;">
-              <div style="display:flex; justify-content:space-between; font-size:13px; color:#64748b; margin-bottom:4px;">
-                <span>Tiền hàng:</span>
-                <span>${formattedSubtotal}</span>
-              </div>
-              ${promoApplied && promoApplied.discount_amount > 0 ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:#0369a1; margin-bottom:4px;">
-                  <span>🏷️ ${esc(promoApplied.promotion.name)}:</span>
-                  <span>-${vnd(promoApplied.discount_amount)}đ</span>
-                </div>` : ''}
-              ${promoApplied && promoApplied.free_shipping ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:#0369a1; margin-bottom:4px;">
-                  <span>🚚 ${esc(promoApplied.promotion.name)}:</span>
-                  <span>Miễn phí ship</span>
-                </div>` : ''}
-              ${calcGift() > 0 ? `
-                <div style="display:flex; justify-content:space-between; font-size:13px; color:#b45309; margin-bottom:4px;">
-                  <span>🎁 Quà tặng kèm:</span>
-                  <span>${vnd(calcGift())}đ (không tính tiền)</span>
-                </div>` : ''}
-              <div style="display:flex; justify-content:space-between; font-size:15px; font-weight:700; color:#0f172a; border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:6px;">
-                <span>Tổng thanh toán:</span>
-                <span style="color:#16a34a; font-size:18px;">${formattedTotal}</span>
+            <!-- 5. THANH TOÁN -->
+            <div class="chatmql-form-section" style="margin-bottom:16px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="width:3px; height:16px; background:#ef4444; border-radius:2px;"></div>
+                  <div style="font-size:14px; font-weight:700; color:#0f172a;">Thanh toán</div>
+                </div>
+                <span style="font-size:15px; color:#64748b; cursor:pointer;" title="Cài đặt">⚙</span>
               </div>
 
-              <!-- Đợt 3: đặt cọc & COD còn phải thu -->
-              <div style="border-top:1px dashed #cbd5e1; margin-top:10px; padding-top:10px;">
-                <label class="chatmql-form-label" style="margin-bottom:4px;">Chuyển khoản đặt cọc (VNĐ)</label>
-                <input type="number" id="order-deposit" class="chatmql-form-input" value="${depositAmount}" min="0" style="margin-bottom:6px;" />
-                ${(() => {
-                  const total = calculateTotal();
-                  const con = Math.max(0, total - depositAmount);
-                  const du = depositAmount > total;
-                  if (paymentMethod !== 'cod') {
-                    return `<div style="font-size:12px; color:#64748b;">Thanh toán chuyển khoản toàn bộ — không thu COD.</div>`;
-                  }
-                  return `
-                    <div style="display:flex; justify-content:space-between; font-size:13.5px; font-weight:700; color:${du ? '#dc2626' : '#0f172a'};">
-                      <span>Còn phải thu (COD):</span>
-                      <span>${vnd(con)}đ</span>
-                    </div>
-                    ${du ? `<div style="font-size:11.5px; color:#dc2626; margin-top:3px;">Tiền cọc lớn hơn tổng đơn — kiểm tra lại.</div>` : ''}`;
-                })()}
+              <!-- Chiết khấu -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:12.5px; font-weight:600; color:#334155;">Chiết khấu</span>
+                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
+                  <input type="number" id="order-discount-pct" value="${discountPercent}" min="0" max="100" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <span style="font-size:12px; color:#64748b; margin-left:4px;">%</span>
+                </div>
+              </div>
+
+              <!-- Mã ưu đãi -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:12.5px; font-weight:600; color:#334155;">Mã ưu đãi</span>
+                <div style="display:flex; gap:6px; max-width:210px; width:100%;">
+                  <input type="text" id="order-promo" value="${esc(promoCode)}" placeholder="Nhập mã" style="flex:1; height:34px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; font-size:12px; padding:0 8px; text-transform:uppercase; outline:none;" ${promoApplied ? 'disabled' : ''} />
+                  <button type="button" id="order-promo-btn" style="padding:0 12px; height:34px; border:none; border-radius:8px; background:${promoApplied ? '#dc2626' : '#2563eb'}; color:#fff; font-size:12px; font-weight:700; cursor:pointer;">
+                    ${promoApplied ? 'Bỏ' : 'Áp dụng'}
+                  </button>
+                </div>
+              </div>
+              ${promoApplied ? `
+                <div style="font-size:11.5px; color:#15803d; text-align:right; margin:-6px 0 8px;">✓ ${esc(promoApplied.message || 'Đã áp dụng mã')}</div>
+              ` : ''}
+
+              <!-- Tiêu Lá -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                  <span style="font-size:12.5px; font-weight:600; color:#334155;">Tiêu "Lá"</span>
+                  <span style="font-size:11px; color:#94a3b8; margin-left:4px;">1 Lá = 1.000đ</span>
+                </div>
+                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
+                  <input type="number" id="order-points" value="${usedPoints}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <span style="font-size:12px; color:#64748b; margin-left:4px;">Lá</span>
+                </div>
+              </div>
+
+              <!-- Quy đổi Lá -->
+              <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
+                <span>Quy đổi Lá</span>
+                <span style="font-weight:700; color:#0f172a;">-${vnd(usedPoints * 1000)}đ</span>
+              </div>
+
+              <!-- Phí vận chuyển -->
+              <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:12px;">
+                <span>Phí vận chuyển</span>
+                <span style="font-weight:700; color:#0f172a;">${vnd(selfShipping || promoApplied?.free_shipping ? 0 : shippingFee)}đ</span>
+              </div>
+
+              <!-- Highlight Box: Tổng thanh toán -->
+              <div style="background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-size:13.5px; font-weight:700; color:#1e3a8a;">Tổng thanh toán</span>
+                <span style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}</span>
+              </div>
+
+              <!-- Chuyển khoản đặt cọc -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:12.5px; font-weight:600; color:#334155;">Chuyển khoản (đặt cọc)</span>
+                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:140px;">
+                  <input type="number" id="order-deposit" value="${depositAmount}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <span style="font-size:12px; color:#64748b; margin-left:4px;">đ</span>
+                </div>
+              </div>
+
+              <!-- Đã đặt cọc -->
+              <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
+                <span>Đã đặt cọc</span>
+                <span style="font-weight:700; color:#16a34a;">${vnd(depositAmount)}đ</span>
+              </div>
+
+              <!-- Còn phải thu (COD) -->
+              <div style="display:flex; justify-content:space-between; font-size:13px; color:#334155; margin-bottom:10px;">
+                <span>Còn phải thu (COD)</span>
+                <span style="font-weight:700; color:#ea580c; font-size:14px;">${vnd(Math.max(0, total - depositAmount))}đ</span>
+              </div>
+
+              <!-- Trạng thái thanh toán -->
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:#334155; padding-top:8px; border-top:1px dashed #e2e8f0;">
+                <span>Trạng thái thanh toán</span>
+                <span style="background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:11.5px; font-weight:600;">
+                  ${depositAmount >= total && total > 0 ? 'Đã thanh toán' : depositAmount > 0 ? 'Đã cọc một phần' : 'Chưa thanh toán'}
+                </span>
               </div>
             </div>
           </div>
 
-          <div class="chatmql-modal-footer" style="position:sticky; bottom:0; background:#fff; z-index:30; border-top:1px solid #e2e8f0; box-shadow:0 -4px 12px rgba(0,0,0,0.06); padding:12px 16px; display:flex; align-items:center; justify-content:flex-end; gap:10px;">
-            <button type="button" id="btn-cancel-order" style="padding:8px 16px; font-size:13px; font-weight:600; color:#475569; background:#fff; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer;">Hủy bỏ</button>
-            <button type="button" id="btn-submit-order" style="padding:8px 20px; font-size:13.5px; font-weight:700; color:#fff; background:linear-gradient(135deg,#16a34a,#15803d); border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; gap:8px;">
-              <span>✅ XÁC NHẬN LÊN ĐƠN (ĐỒNG BỘ CRM & FM)</span>
+          <!-- 6. STICKY FOOTER -->
+          <div class="chatmql-modal-footer" style="position:sticky; bottom:0; background:#fff; z-index:30; border-top:1px solid #e2e8f0; box-shadow:0 -4px 12px rgba(0,0,0,0.06); padding:10px 14px; display:flex; align-items:center; gap:10px;">
+            <button type="button" id="btn-reset-order" style="padding:10px 16px; font-size:13px; font-weight:700; color:#ef4444; background:#fff; border:1px solid #fca5a5; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+              <span>🔄</span> <span>Tạo lại</span>
+            </button>
+            <button type="button" id="btn-submit-order" style="flex:1; padding:10px 20px; font-size:14px; font-weight:700; color:#fff; background:#1b4332; border:none; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 2px 8px rgba(27,67,50,0.3);">
+              <span>🛒</span> <span>Đặt hàng</span>
             </button>
           </div>
         </div>
@@ -2747,7 +2857,18 @@
 
       // Attach Event Handlers
       modalOverlay.querySelector('#chatmql-close-modal').onclick = () => modalOverlay.remove();
-      modalOverlay.querySelector('#btn-cancel-order').onclick = () => modalOverlay.remove();
+      const resetBtnEl = modalOverlay.querySelector('#btn-reset-order');
+      if (resetBtnEl) {
+        resetBtnEl.onclick = () => {
+          items = [];
+          discountPercent = 0;
+          usedPoints = 0;
+          depositAmount = 0;
+          promoApplied = null;
+          promoCode = '';
+          renderModalContent();
+        };
+      }
 
       // Search Product
       const prodSearchInput = modalOverlay.querySelector('#input-search-product');
@@ -2985,25 +3106,76 @@
       if (typeSel) typeSel.onchange = e => { orderType = e.target.value; };
       const srcSel = modalOverlay.querySelector('#order-source');
       if (srcSel) srcSel.onchange = e => { orderSource = e.target.value; };
+      const sellerSel = modalOverlay.querySelector('#order-seller');
+      if (sellerSel) sellerSel.onchange = e => { sellerName = e.target.value; };
 
       const selfEl = modalOverlay.querySelector('#order-self-ship');
-      if (selfEl) selfEl.onchange = e => { selfShipping = e.target.checked; };
+      if (selfEl) selfEl.onchange = e => {
+        selfShipping = e.target.checked;
+        renderModalContent();
+      };
       const fragEl = modalOverlay.querySelector('#order-fragile');
       if (fragEl) fragEl.onchange = e => { isFragile = e.target.checked; };
       const exEl = modalOverlay.querySelector('#order-exchange');
       if (exEl) exEl.onchange = e => { isExchange = e.target.checked; };
 
+      // Đơn vị vận chuyển
+      const carrierSel = modalOverlay.querySelector('#order-carrier');
+      if (carrierSel) {
+        carrierSel.onchange = e => {
+          shippingProvider = e.target.value;
+          if (shippingProvider === 'vnpost') shippingFee = 25000;
+          else if (shippingProvider === 'jt_express') shippingFee = 30000;
+          else if (shippingProvider === 'viettel_post') shippingFee = 28000;
+          renderModalContent();
+        };
+      }
+
+      // Kích thước & Cân nặng
+      const wEl = modalOverlay.querySelector('#order-pkg-weight');
+      if (wEl) wEl.oninput = e => { pkgWeight = Number(e.target.value) || 0; };
+      const lEl = modalOverlay.querySelector('#order-pkg-length');
+      if (lEl) lEl.oninput = e => { pkgLength = e.target.value; };
+      const wiEl = modalOverlay.querySelector('#order-pkg-width');
+      if (wiEl) wiEl.oninput = e => { pkgWidth = e.target.value; };
+      const hEl = modalOverlay.querySelector('#order-pkg-height');
+      if (hEl) hEl.oninput = e => { pkgHeight = e.target.value; };
+
+      // Chiết khấu %
+      const discountPctInput = modalOverlay.querySelector('#order-discount-pct');
+      if (discountPctInput) {
+        discountPctInput.oninput = e => {
+          discountPercent = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+          renderModalContent();
+        };
+      }
+
+      // Tiêu Lá (Points)
+      const pointsInput = modalOverlay.querySelector('#order-points');
+      if (pointsInput) {
+        pointsInput.oninput = e => {
+          usedPoints = Math.max(0, Number(e.target.value) || 0);
+          renderModalContent();
+        };
+      }
+
+      // Đặt cọc
       const depEl = modalOverlay.querySelector('#order-deposit');
-      if (depEl) depEl.oninput = e => {
-        depositAmount = Math.max(0, Number(e.target.value) || 0);
-        // Chỉ vẽ lại dòng COD, không dựng lại cả modal — nếu không con trỏ
-        // sẽ nhảy ra khỏi ô đang gõ sau mỗi ký tự.
-        const box = depEl.parentElement;
-        const total = calculateTotal();
-        const con = Math.max(0, total - depositAmount);
-        const line = box.querySelector('span:last-child');
-        if (line && paymentMethod === 'cod') line.textContent = vnd(con) + 'đ';
-      };
+      if (depEl) {
+        depEl.oninput = e => {
+          depositAmount = Math.max(0, Number(e.target.value) || 0);
+          renderModalContent();
+        };
+      }
+
+      // Phí vận chuyển
+      const feeInput = modalOverlay.querySelector('#order-shipping-fee');
+      if (feeInput) {
+        feeInput.oninput = e => {
+          shippingFee = Number(e.target.value) || 0;
+          renderModalContent();
+        };
+      }
 
       // ── Đợt 1: trạng thái, kho, địa chỉ 3 cấp ──────────────────────
       const statusSel = modalOverlay.querySelector('#order-status');
@@ -3016,14 +3188,12 @@
         whSel.disabled = true;
         catalog = await loadCatalog(warehouseId);
         if (catalog.length) {
-          // Bỏ khỏi giỏ những sản phẩm kho mới không có, để không đặt hàng ảo.
           items = items.filter(it => catalog.some(p => p.code === it.code));
           if (!items.length) {
             const f = catalog.find(p => p.inventory > 0) || catalog[0];
             if (f) items = [{ code: f.code, name: f.name, price: f.price, quantity: 1 }];
           }
         } else {
-          // Kho trống: xóa giỏ để không gửi đơn với sản phẩm không thuộc kho này.
           items = [];
         }
         renderModalContent();
@@ -3040,21 +3210,6 @@
 
       const wardSel = modalOverlay.querySelector('#order-ward');
       if (wardSel) wardSel.onchange = e => { wardId = parseInt(e.target.value, 10) || null; };
-
-      // Select product
-      modalOverlay.querySelectorAll('.item-select').forEach(el => {
-        el.onchange = (e) => {
-          const idx = parseInt(e.target.dataset.idx, 10);
-          const found = findProd(e.target.value);
-          if (found) {
-            items[idx] = {
-              code: found.code, name: found.name, price: found.price,
-              quantity: items[idx].quantity,
-            };
-            renderModalContent();
-          }
-        };
-      });
 
       // Quantity changes
       modalOverlay.querySelectorAll('.btn-qty-minus').forEach(el => {
@@ -3091,43 +3246,26 @@
         };
       });
 
-      // Discount & Shipping
-      const discountInput = modalOverlay.querySelector('#order-discount');
-      discountInput.oninput = (e) => {
-        discount = Number(e.target.value) || 0;
-      };
-      const feeInput = modalOverlay.querySelector('#order-shipping-fee');
-      feeInput.oninput = (e) => {
-        shippingFee = Number(e.target.value) || 0;
-      };
-
       // Submit Order — MỘT đường duy nhất: ChatMQL backend -> CRM.
-      //
-      // requestId sinh MỘT LẦN cho mỗi lần mở modal và giữ nguyên qua các lần
-      // bấm lại. Nếu request đầu timeout mà đơn thật ra đã tạo, lần bấm sau
-      // mang cùng requestId nên CRM trả về đúng đơn cũ thay vì tạo đơn thứ hai.
       const orderRequestId = `ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       const submitBtn = modalOverlay.querySelector('#btn-submit-order');
       const resetBtn = () => {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '✅ XÁC NHẬN LÊN ĐƠN (ĐỒNG BỘ CRM & FM)';
+        submitBtn.innerHTML = '<span>🛒</span> <span>Đặt hàng</span>';
       };
 
       submitBtn.onclick = async () => {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '⏳ Đang đồng bộ CRM & FM...';
+        submitBtn.innerHTML = '<span>⏳</span> <span>Đang đồng bộ CRM & FM...</span>';
 
         captureForm();
         const custName = (form.name || '').trim();
         const custPhone = (form.phone || '').trim();
         const custAddr = (form.addr || '').trim();
-        const payMethod = modalOverlay.querySelector('#order-pay-method').value;
-        const carrier = modalOverlay.querySelector('#order-carrier').value;
+        const payMethod = depositAmount > 0 ? 'vietqr' : 'cod';
+        const carrier = shippingProvider || 'vnpost';
         const notes = (form.notes || '').trim();
 
-        // Khoảng một nửa contact đến từ Zalo không có sẵn số điện thoại và địa
-        // chỉ, nên ô sẽ trống khi mở modal. Báo RÕ thiếu ô nào, tô đỏ và nhảy con
-        // trỏ vào đó — thông báo chung chung khiến nhân viên tưởng hệ thống hỏng.
         const thieu = [];
         if (!custName)  thieu.push({ o: '#order-cust-name',  ten: 'Tên khách hàng' });
         if (!custPhone) thieu.push({ o: '#order-cust-phone', ten: 'Số điện thoại' });
@@ -3170,11 +3308,12 @@
           return;
         }
 
-        // Địa chỉ đầy đủ ghép từ 3 cấp để đơn vị vận chuyển đọc được liền mạch,
-        // đồng thời vẫn gửi riêng từng cấp để FM lưu vào đúng cột.
         const provName = lookups.provinces.find(pv => pv.id === provinceId)?.name || '';
         const wardName = wards.find(wd => wd.id === wardId)?.name || '';
         const fullAddress = [custAddr, wardName, provName].filter(Boolean).join(', ');
+
+        const finalDiscountAmount = calcDiscountAmount() + (promoApplied?.discount_amount || 0) + (usedPoints * 1000);
+        const finalShipFee = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
 
         const payload = {
           requestId: orderRequestId,
@@ -3198,9 +3337,14 @@
           selfShipping: selfShipping,
           isFragile: isFragile,
           isExchange: isExchange,
+          sellerName: sellerName,
           // ── Đợt 5 ──
           promoCode: promoApplied?.promotion?.code || null,
           promoDiscount: promoApplied?.discount_amount || 0,
+          usedPoints: usedPoints,
+          pointDiscount: usedPoints * 1000,
+          pkgWeight: pkgWeight != null ? pkgWeight : calcTotalWeight(),
+          pkgDimensions: { length: pkgLength, width: pkgWidth, height: pkgHeight },
           items: items.map(i => ({
             productCode: i.code,
             productName: i.name,
@@ -3208,14 +3352,10 @@
             unitPrice: i.price,
             isGift: !!i.isGift,
           })),
-          // Gộp giảm tay và giảm từ mã ưu đãi thành một con số cho CRM/FM.
-          discountAmount: discount + (promoApplied?.discount_amount || 0),
-          shippingFee: promoApplied?.free_shipping ? 0 : shippingFee,
+          discountAmount: finalDiscountAmount,
+          shippingFee: finalShipFee,
           paymentMethod: payMethod,
           shippingProvider: carrier,
-          // KHÔNG gửi sellerName: người lên đơn do backend lấy từ phiên đăng
-          // nhập. staffCare chỉ là nhân sự đang chăm sóc khách, không phải
-          // người bấm nút — gửi lên sẽ ghi đơn cho nhầm người.
           notes: notes,
         };
 
