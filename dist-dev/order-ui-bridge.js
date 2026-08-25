@@ -3602,7 +3602,8 @@
   const DESIGN_CSS = `/* Bảng màu gốc từ design */
 :root{--primary:var(--primary-color,#0D6838);--primary-500:#2563eb;--gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;--gray-300:#cbd5e1;--gray-400:#94a3b8;--gray-500:#64748b;--gray-600:#475569;--gray-700:#334155;--gray-800:#1e293b;--gray-900:#0f172a;}
 .topnav{display:flex; align-items:center; gap:20px; padding:0 20px; height:56px; border-bottom:1px solid var(--gray-200); background:#fff; flex-shrink:0;}
-.topnav__logo-img{height:34px; display:block;}
+.topnav__logo{display:flex; align-items:center;}
+.topnav__logo-img{height:42px; max-height:44px; width:auto; object-fit:contain; display:block;}
 .topnav__tabs{display:flex; gap:4px;}
 .topnav__tab{display:flex; align-items:center; gap:6px; padding:8px 14px; border:none; background:none; border-radius:8px; font-size:13.5px; font-weight:500; color:var(--gray-600); cursor:pointer;}
 .topnav__tab:hover{background:var(--gray-100);}
@@ -5161,6 +5162,24 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     });
   }
 
+  function updateAppLogo() {
+    const LOGO_SRC = '/assets/logo-traduocvietnam.png';
+    document.querySelectorAll('.topnav__logo img, .topnav__logo-img, img[alt*="Trà Dược"], img[src*="logo-tdvn"], img[src*="logo-traduocvietnam"], .app-header img').forEach(img => {
+      if (!img.src.includes('logo-traduocvietnam.png') && !img.closest('.sd-tile') && !img.closest('.chat-item__avatar')) {
+        img.src = LOGO_SRC;
+      }
+      img.style.maxHeight = '44px';
+      img.style.height = '42px';
+      img.style.width = 'auto';
+      img.style.objectFit = 'contain';
+      img.style.display = 'block';
+    });
+    const fav = document.querySelector('link[rel="icon"]');
+    if (fav && !fav.href.includes('favicon.png')) {
+      fav.href = '/favicon.png';
+    }
+  }
+
   const SD_STYLE_ID = 'chatmql-sd-style';
   function ensureSalesDocsStyle() {
     if (document.getElementById(SD_STYLE_ID)) return;
@@ -5419,6 +5438,8 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   // Nhãn menu phải đúng ở MỌI trang, kể cả khi chưa mở hội thoại nào.
   renameNavTabs();
   setInterval(renameNavTabs, 1200);
+  updateAppLogo();
+  setInterval(updateAppLogo, 1000);
   wireIconBar();
   setInterval(wireIconBar, 1200);
   renderImageJsonBubbles();

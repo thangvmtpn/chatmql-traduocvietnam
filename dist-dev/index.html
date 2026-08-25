@@ -9,8 +9,8 @@
       (function() {
         var search = window.location.search || '';
         var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-          ? 'http://localhost:4520'
-          : 'https://tracrm-api.bizino.ai';
+          ? 'https://chatmql-dev.traduocvietnam.com'
+          : 'https://chatmql-dev.traduocvietnam.com';
         fetch(apiBase + '/api/v1/platform/branding' + search)
           .then(res => res.json())
           .then(data => {
