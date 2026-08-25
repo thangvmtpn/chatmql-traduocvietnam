@@ -5281,11 +5281,17 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
 
   async function sdLoad(kind) {
     if (sdState.cache[kind]) return sdState.cache[kind];
-    const res = await fetch(`${API_BASE}/api/v1/library?kind=${kind}`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('Lỗi ' + res.status);
-    const d = await res.json();
-    sdState.cache[kind] = d.groups || [];
-    return sdState.cache[kind];
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/library/items?kind=${kind}`, { headers: authHeaders() });
+      if (!res.ok) throw new Error('Lỗi ' + res.status);
+      const d = await res.json();
+      sdState.cache[kind] = d.groups || [];
+      return sdState.cache[kind];
+    } catch (e) {
+      console.warn('[library] Lỗi nạp tài liệu:', e);
+      sdState.cache[kind] = [];
+      return [];
+    }
   }
 
   function sdRenderBody(box) {
@@ -5295,11 +5301,11 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     if (!groups) { body.innerHTML = '<div class="sd__empty">Đang tải…</div>'; return; }
 
     const q = sdState.q.trim().toLowerCase();
-    const match = it => !q || `${it.title || ''} ${it.code || ''} ${it.text || ''}`.toLowerCase().includes(q);
+    const match = it => !q || `${it.title || ''} ${it.code || ''} ${it.text || ''} ${it.content || ''}`.toLowerCase().includes(q);
 
     let html = '';
     if (sdState.tab === 'content') {
-      const items = groups.flatMap(g => g.items).filter(match);
+      const items = groups.flatMap(g => g.items || []).filter(match);
       html = items.length
         ? items.map(it => `
             <div class="sd-content">
@@ -5307,24 +5313,25 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
                 <div class="sd-content__title">${sdEsc(it.title)}</div>
                 <button type="button" class="sd-content__copy" data-copy="${sdEsc(it.id)}">📋 Copy</button>
               </div>
-              <div class="sd-content__text">${sdEsc(it.text || '')}</div>
+              <div class="sd-content__text">${sdEsc(it.text || it.content || '')}</div>
             </div>`).join('')
-        : '<div class="sd__empty">Không tìm thấy tài liệu phù hợp.</div>';
+        : '<div class="sd__empty" style="padding:28px 14px; text-align:center; color:#64748b; font-size:12.5px;">Chưa có tài liệu content nào.</div>';
     } else {
       let bg = 0, any = false;
       groups.forEach(g => {
-        const items = g.items.filter(match);
+        const items = (g.items || []).filter(match);
         if (!items.length) return;
         any = true;
         html += `<div class="sd__group">📁 ${sdEsc(g.name)}</div><div class="sd__grid">`;
         items.forEach(it => {
           const checked = sdState.selected.has(it.id) ? ' checked' : '';
-          const hasImg = !!it.url;
+          const imgSrc = it.thumbUrl || it.fullUrl || it.url || '';
+          const hasImg = !!imgSrc;
           html += `
             <label class="sd-tile${hasImg ? ' sd-tile--has-img' : ''}" style="background:${SD_TILE_BG[bg++ % SD_TILE_BG.length]};"
                    title="${sdEsc(it.title)}${it.code ? ' — Mã: ' + sdEsc(it.code) : ''}">
               <input type="checkbox" data-id="${sdEsc(it.id)}"${checked}>
-              ${hasImg ? `<img class="sd-tile__img" src="${sdEsc(it.url)}" alt=""
+              ${hasImg ? `<img class="sd-tile__img" src="${sdEsc(imgSrc)}" alt=""
                     onerror="var t=this.closest('.sd-tile'); this.remove(); if(t) t.classList.remove('sd-tile--has-img');">` : ''}
               <span class="sd-tile__emoji">${sdState.tab === 'video' ? '🎬' : '🍵'}</span>
               <span class="sd-tile__name">${sdEsc(it.title)}</span>
@@ -5332,7 +5339,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
         });
         html += '</div>';
       });
-      if (!any) html = '<div class="sd__empty">Không tìm thấy tài liệu phù hợp.</div>';
+      if (!any) html = `<div class="sd__empty" style="padding:28px 14px; text-align:center; color:#64748b; font-size:12.5px;">Chưa có ${sdState.tab === 'video' ? 'video' : 'hình ảnh'} nào được duyệt.</div>`;
     }
     body.innerHTML = html;
 
