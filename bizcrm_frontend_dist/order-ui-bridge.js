@@ -2286,18 +2286,37 @@
    * Toàn bộ nghiệp vụ dùng chung một bản — chỉ khác chỗ chứa và lớp CSS.
    */
   window.openChatMqlOrderModal = async function (mountEl) {
-    const [ctx, lookups] = await Promise.all([
-      fetchConversationContext(),
-      loadLookups(),
+    let [ctx, lookups] = await Promise.all([
+      fetchConversationContext().catch(() => null),
+      loadLookups().catch(() => null),
     ]);
 
     if (!ctx) {
-      alert(
-        'Chưa xác định được khách hàng của hội thoại này.\n\n' +
-        'Hãy mở một cuộc hội thoại rồi bấm "Lên đơn" lại. ' +
-        'Nếu vẫn không được, tải lại trang giúp em.'
-      );
-      return;
+      ctx = {
+        contact: {
+          name: ccState.name || 'Khách hàng',
+          phone: ccState.phone || '',
+          address: '',
+          city: 'Hà Nội'
+        },
+        crm: currentCrmCustomer || null
+      };
+    }
+
+    if (!lookups || !lookups.warehouses || !lookups.warehouses.length) {
+      lookups = {
+        statuses: [
+          { id: 1, label: 'Đang lấy hàng' },
+          { id: 2, label: 'Chờ xác nhận' },
+          { id: 3, label: 'Đang giao hàng' },
+          { id: 4, label: 'Hoàn thành' },
+          { id: 5, label: 'Hủy' }
+        ],
+        warehouses: [
+          { id: 1, name: 'Kho Tổng' }
+        ],
+        provinces: []
+      };
     }
 
     const phone = ctx.contact.phone || '';
@@ -4051,23 +4070,15 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     .chatmql-order-inline{position:static !important; inset:auto !important; background:none !important;
       display:block !important; padding:0 !important; z-index:auto !important;}
     .chatmql-order-inline .chatmql-modal{width:100% !important; max-width:none !important;
-      max-height:none !important; box-shadow:none !important; border-radius:0 !important;}
+      max-height:none !important; box-shadow:none !important; border-radius:0 !important; background:transparent !important;}
     /* Tiêu đề và nút đóng thuộc về hộp thoại — trong cột đã có tab rồi, bỏ đi. */
     .chatmql-order-inline .chatmql-modal-header{display:none !important;}
     .chatmql-order-inline #btn-cancel-order{display:none !important;}
-    .chatmql-order-inline .chatmql-modal-body{padding:14px 14px 0 !important; overflow:visible !important;}
-    /* Chân form dính đáy cột đúng như .of__footer */
-    .chatmql-order-inline .chatmql-modal-footer{position:sticky; bottom:0; background:#fff;
-      border-top:1px solid var(--gray-100); padding:12px 14px 14px !important; margin-top:8px;}
-    .chatmql-order-inline #btn-submit-order{width:100%;}
-    /* Cột chỉ rộng ~365px: mọi hàng hai cột phải tự xuống dòng, ô nhập chiếm trọn bề ngang. */
-    .chatmql-order-inline .chatmql-modal-body div[style*="display:flex"][style*="gap"]{flex-wrap:wrap;}
-    .chatmql-order-inline .chatmql-form-group{min-width:0;}
-    /* Ô nhập chiếm trọn bề ngang — TRỪ ô tick và nút chọn. Rule cũ quét cả
-       input[type=checkbox] nên ô tick bị kéo rộng 80px, đẩy chữ xuống dòng,
-       thành ra ba lựa chọn "Shop tự vận chuyển / Hàng dễ vỡ / Đơn đổi trả"
-       nằm lệch nhau. */
-    .chatmql-order-inline input:not([type=checkbox]):not([type=radio]),
+    .chatmql-order-inline .chatmql-modal-body{padding:10px 14px !important; overflow:visible !important;}
+    /* Chân form dính đáy cột */
+    .chatmql-order-inline .chatmql-modal-footer{position:sticky; bottom:0; background:#fff; z-index:20;
+      border-top:1px solid var(--gray-200); padding:10px 14px !important; margin-top:8px;}
+    .chatmql-order-inline input:not([type=checkbox]):not([type=radio]):not(.item-qty):not(#order-discount-pct):not(#order-points):not(#order-deposit):not(#order-pkg-weight):not(#order-pkg-length):not(#order-pkg-width):not(#order-pkg-height),
     .chatmql-order-inline select, .chatmql-order-inline textarea{
       width:100% !important; box-sizing:border-box;}
     .chatmql-order-inline input[type=checkbox],
@@ -4379,6 +4390,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
       pn.classList.toggle('chat-detail__panel--active', pn.dataset.panel === id));
     ccSyncAppSections(sidebar);
     if (id === 'notes') renderNotesPanel(card);
+    if (id === 'order') renderOrderPanel(card);
   }
 
   function renderCustomerCard(sidebar) {
@@ -4547,19 +4559,25 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   function renderOrderPanel(card) {
     const panel = card.querySelector('#cc-panel-order');
     if (!panel) return;
-    panel.innerHTML = `
-      <div id="cc-order-form"></div>
-      <div style="padding:0 16px 16px;">
-        <div class="chat-detail__section-header" style="padding:0; margin-bottom:6px;">
-          <span class="chat-detail__section-title">ĐƠN GẦN ĐÂY</span>
+    let formWrap = panel.querySelector('#cc-order-form');
+    if (!formWrap) {
+      panel.innerHTML = `
+        <div id="cc-order-form">
+          <div style="padding:16px; text-align:center; font-size:12.5px; color:#64748b;">Đang tải form tạo đơn hàng...</div>
         </div>
-        <div id="cc-order-history"></div>
-      </div>`;
-    const hist = document.getElementById('chatmql-order-history-container');
-    if (hist) panel.querySelector('#cc-order-history').appendChild(hist);
-    // Form dựng ngay trong cột. Chỉ dựng một lần cho mỗi hội thoại — dựng lại
-    // mỗi lần đổi tab sẽ xoá mất những gì nhân viên đang gõ dở.
-    window.openChatMqlOrderModal?.(panel.querySelector('#cc-order-form'));
+        <div style="padding:14px 16px 16px; border-top:1px solid var(--gray-200); margin-top:14px;">
+          <div class="chat-detail__section-header" style="padding:0; margin-bottom:10px;">
+            <span class="chat-detail__section-title">ĐƠN GẦN ĐÂY</span>
+          </div>
+          <div id="cc-order-history"></div>
+        </div>`;
+      formWrap = panel.querySelector('#cc-order-form');
+      const hist = document.getElementById('chatmql-order-history-container');
+      if (hist) panel.querySelector('#cc-order-history').appendChild(hist);
+    }
+    if (formWrap && !formWrap.querySelector('.chatmql-modal-body')) {
+      window.openChatMqlOrderModal?.(formWrap);
+    }
   }
 
   // ── Tab "Ghi chú nhanh" ───────────────────────────────────────────
