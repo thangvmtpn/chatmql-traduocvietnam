@@ -2319,23 +2319,22 @@
       };
     }
 
-    const phone = ctx.contact.phone || '';
-    const customerName = ctx.contact.name || '';
-    const crmData = ctx.crm;
+    const phone = ccState.phone || ctx?.contact?.phone || '';
+    const customerName = ccState.name || ctx?.contact?.name || '';
+    const crmData = ccState.crmData || ctx?.crm || currentCrmCustomer || null;
 
-    // Không bịa địa chỉ. Trống thì để nhân viên tự nhập — điền sẵn địa chỉ của
-    // người khác nguy hiểm hơn nhiều so với việc bắt gõ thêm một dòng.
-    const defaultAddress = ctx.contact.address || '';
-    const defaultCity = ctx.contact.city || crmData?.city || 'Hà Nội';
-    const staffCare = crmData?.staff_in_charge || 'Trà Dược CSKH';
+    // Không bịa địa chỉ. Trống thì để nhân viên tự nhập
+    const defaultAddress = crmData?.address || ctx?.contact?.address || '';
+    const defaultCity = crmData?.city || ctx?.contact?.city || 'Hà Nội';
+    const staffCare = crmData?.staff_in_charge || ccState.staff || 'Trà Dược CSKH';
 
     // Đồng bộ cache để sidebar lịch sử đơn cũng bám đúng khách này.
     if (phone) {
       currentCrmCustomer = crmData || null;
       lastFetchedPhone = '';
     }
-    const gmvFormatted = crmData ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(crmData.gmv_total) : '0 ₫';
-    const orderCount = crmData?.order_count || customerOrdersCache.length;
+    const gmvFormatted = crmData?.gmv_total != null ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(crmData.gmv_total) : '0 ₫';
+    const orderCount = crmData?.order_count ?? customerOrdersCache.length;
 
     // Đợt 1: kho mặc định là kho đầu tiên; danh mục lấy theo kho đó.
     let warehouseId = lookups.warehouses[0]?.id || null;
@@ -2515,14 +2514,11 @@
                   <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
                     <span>👤</span> Chọn nhân viên
                   </label>
-                  <select id="order-seller" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
+                    <select id="order-seller" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
                     <option value="">Chọn nhân viên</option>
-                    <option value="Trần Trang" ${sellerName === 'Trần Trang' ? 'selected' : ''}>Trần Trang</option>
-                    <option value="Lê Nga" ${sellerName === 'Lê Nga' ? 'selected' : ''}>Lê Nga</option>
-                    <option value="Lê Tuấn" ${sellerName === 'Lê Tuấn' ? 'selected' : ''}>Lê Tuấn</option>
-                    <option value="Vũ Đức Văn" ${sellerName === 'Vũ Đức Văn' ? 'selected' : ''}>Vũ Đức Văn</option>
-                    <option value="Nguyễn Thị Huệ" ${sellerName === 'Nguyễn Thị Huệ' ? 'selected' : ''}>Nguyễn Thị Huệ</option>
-                    <option value="Trà Dược CSKH" ${sellerName === 'Trà Dược CSKH' ? 'selected' : ''}>Trà Dược CSKH</option>
+                    ${['Trần Trang', 'Lê Nga', 'Lê Tuấn', 'Vũ Đức Văn', 'Nguyễn Thị Huệ', 'Trà Dược CSKH', sellerName].filter((v, i, a) => v && a.indexOf(v) === i).map(st => `
+                      <option value="${esc(st)}" ${st === sellerName ? 'selected' : ''}>${esc(st)}</option>
+                    `).join('')}
                   </select>
                 </div>
               </div>
@@ -4445,6 +4441,16 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     ccState.convId = convId;
     ccState.loading = true;
     ccState.notesLoaded = false;
+    ccState.crmData = null;
+    ccState.name = '';
+    ccState.phone = '';
+    ccState.staff = '';
+    convContextCache = { id: null, data: null, promise: null };
+    currentCrmCustomer = null;
+    lastFetchedPhone = '';
+    const orderPanel = card.querySelector('#cc-panel-order');
+    if (orderPanel) orderPanel.innerHTML = '';
+
     card.querySelector('#cc-panel-info').innerHTML =
       '<div class="chat-detail__empty" style="padding:14px;">Đang tải thông tin khách…</div>';
 
@@ -4463,10 +4469,13 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
       .then(async d => {
         const crm = d.crm || {};
         const chat = d.chatmql || {};
-        const name = crm.full_name || chat.name || 'Khách chưa định danh';
+        const name = crm.full_name || chat.name || d.name || 'Khách chưa định danh';
         const phone = d.phone || crm.phone || chat.phone || '';
         ccState.name = name;
         ccState.phone = phone;
+        ccState.crmData = crm;
+        ccState.staff = crm.staff_in_charge || '';
+        currentCrmCustomer = crm;
 
         let points = '—';
         if (phone) {
@@ -4582,25 +4591,25 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   function renderOrderPanel(card) {
     const panel = card.querySelector('#cc-panel-order');
     if (!panel) return;
-    let formWrap = panel.querySelector('#cc-order-form');
-    if (!formWrap) {
-      panel.innerHTML = `
-        <div id="cc-order-form">
-          <div style="padding:16px; text-align:center; font-size:12.5px; color:#64748b;">Đang tải form tạo đơn hàng...</div>
+    const currentConv = getCurrentConversationId();
+    if (ccState.orderFormConvId === currentConv && panel.querySelector('#cc-order-form')?.children.length > 0) {
+      return;
+    }
+    ccState.orderFormConvId = currentConv;
+    panel.innerHTML = `
+      <div id="cc-order-form">
+        <div style="padding:16px; text-align:center; font-size:12.5px; color:#64748b;">Đang tải form tạo đơn hàng...</div>
+      </div>
+      <div style="padding:14px 16px 16px; border-top:1px solid var(--gray-200); margin-top:14px;">
+        <div class="chat-detail__section-header" style="padding:0; margin-bottom:10px;">
+          <span class="chat-detail__section-title">ĐƠN GẦN ĐÂY</span>
         </div>
-        <div style="padding:14px 16px 16px; border-top:1px solid var(--gray-200); margin-top:14px;">
-          <div class="chat-detail__section-header" style="padding:0; margin-bottom:10px;">
-            <span class="chat-detail__section-title">ĐƠN GẦN ĐÂY</span>
-          </div>
-          <div id="cc-order-history"></div>
-        </div>`;
-      formWrap = panel.querySelector('#cc-order-form');
-      const hist = document.getElementById('chatmql-order-history-container');
-      if (hist) panel.querySelector('#cc-order-history').appendChild(hist);
-    }
-    if (formWrap && !formWrap.querySelector('.chatmql-modal-body')) {
-      window.openChatMqlOrderModal?.(formWrap);
-    }
+        <div id="cc-order-history"></div>
+      </div>`;
+    const hist = document.getElementById('chatmql-order-history-container');
+    if (hist) panel.querySelector('#cc-order-history').appendChild(hist);
+    const formWrap = panel.querySelector('#cc-order-form');
+    window.openChatMqlOrderModal?.(formWrap);
   }
 
   // ── Tab "Ghi chú nhanh" ───────────────────────────────────────────
