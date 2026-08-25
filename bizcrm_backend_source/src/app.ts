@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
@@ -26,6 +27,7 @@ import { knowledgeGapRoutes } from './modules/ai/knowledge-gap-routes.js'
 import { scenarioRoutes } from './modules/ai/scenario-routes.js'
 import { ensureVectorIndexes } from './shared/ensure-vector-indexes.js'
 import kbRoutes from './modules/knowledge/kb-routes.js'
+import { libraryRoutes } from './modules/knowledge/library-routes.js'
 import { analyticsRoutes } from './modules/analytics/analytics-routes.js'
 import { zaloWebhookRoutes } from './modules/zalo/zalo-webhook.js'
 import { autoReconnectSavedAccounts } from './modules/zalo/zalo-pool.js'
@@ -44,6 +46,7 @@ import { zaloOaOAuthRoutes } from './modules/zalo-oa/oauth-routes.js'
 import { zaloOaWebhookRoutes } from './modules/zalo-oa/oa-webhook.js'
 import { csWindowRoutes } from './modules/zalo-oa/cs-window.js'
 import { facebookPageOAuthRoutes } from './modules/facebook-page/oauth-routes.js'
+import { fbTokenImportRoutes } from './modules/facebook-page/fb-token-import-routes.js'
 import { facebookPageWebhookRoutes } from './modules/facebook-page/fb-webhook.js'
 import { znsRoutes } from './modules/zalo-oa/zns-routes.js'
 import { znsCampaignRoutes } from './modules/zalo-oa/zns-campaign-routes.js'
@@ -73,6 +76,9 @@ import { platformEnterCompanyRoutes } from './modules/platform/enter-company-rou
 import { platformReportRoutes } from './modules/platform/report-routes.js'
 import { platformBrandingRoutes } from './modules/platform/platform-branding-routes.js'
 import { productRoutes, PRODUCT_UPLOADS_DIR } from './modules/products/product-routes.js'
+import { crmSyncRoutes } from './modules/integrations/crm-sync/crm-sync-routes.js'
+import { orderRoutes } from './modules/orders/order-routes.js'
+import { promotionAdminRoutes } from './modules/orders/promotion-admin-routes.js'
 import { CHAT_MEDIA_DIR } from './modules/chat/chat-media-store.js'
 import { embedAndStoreProduct } from './modules/products/product-embedding.js'
 
@@ -103,7 +109,14 @@ await app.register(cors, {
   allowedHeaders: ['Content-Type', 'Authorization'],
 })
 // W1-FIX: Security headers (X-Content-Type-Options, X-Frame-Options, HSTS, etc.)
-await app.register(helmet, { contentSecurityPolicy: false })
+// crossOriginResourcePolicy: 'cross-origin' — allows frontend on different origin
+// (e.g. localhost:3000, chatmql.traduocvietnam.com) to load static assets
+// (uploaded images, avatars, product images) served from the API.
+await app.register(helmet, {
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+})
 // C1-FIX: Fail-fast if JWT_SECRET is missing or weak in production
 const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me'
 if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-me')) {
@@ -173,6 +186,34 @@ await app.register(fastifyStatic, {
   decorateReply: false,
 })
 
+// ── Public Media Proxy (no auth needed for img tags) ─────────────────
+app.get('/api/v1/media/proxy', async (request, reply) => {
+  const { url } = request.query as { url?: string }
+  if (!url) return reply.status(400).send({ error: 'Missing url query parameter' })
+  try {
+    const parsed = new URL(url)
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return reply.status(400).send({ error: 'Invalid url protocol' })
+    }
+    const fetchRes = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      }
+    })
+    if (!fetchRes.ok) {
+      return reply.status(fetchRes.status).send({ error: `Proxy upstream returned ${fetchRes.status}` })
+    }
+    const contentType = fetchRes.headers.get('content-type') || 'image/jpeg'
+    reply.header('Content-Type', contentType)
+    reply.header('Cache-Control', 'public, max-age=604800, immutable')
+    const buffer = Buffer.from(await fetchRes.arrayBuffer())
+    return reply.send(buffer)
+  } catch (err: any) {
+    return reply.status(500).send({ error: err.message })
+  }
+})
+
 // ── Route-level Redis cache (register before routes) ──────────────────
 await app.register(fastifyCachePlugin)
 
@@ -199,6 +240,7 @@ await app.register(masterRoutes)
 await app.register(knowledgeGapRoutes)
 await app.register(scenarioRoutes)
 await app.register(kbRoutes)
+await app.register(libraryRoutes)
 await app.register(analyticsRoutes)
 await app.register(zaloWebhookRoutes) // Internal webhook — no JWT
 await app.register(cdpPropertyRoutes)
@@ -214,6 +256,7 @@ await app.register(zaloOaOAuthRoutes)
 await app.register(zaloOaWebhookRoutes) // Public — secured by signature (grace mode)
 await app.register(csWindowRoutes)
 await app.register(facebookPageOAuthRoutes)
+await app.register(fbTokenImportRoutes)
 await app.register(facebookPageWebhookRoutes) // Public — enforces hub.challenge + X-Hub-Signature-256
 await app.register(znsRoutes)
 await app.register(znsCampaignRoutes)
@@ -233,6 +276,11 @@ await app.register(platformBrandingRoutes)
 
 // ── Product Knowledge Base ───────────────────────────────────────────
 await app.register(productRoutes)
+
+// ── CRM & FM Integrations + Order Dispatch ───────────────────────────
+await app.register(crmSyncRoutes)
+await app.register(orderRoutes)
+await app.register(promotionAdminRoutes)
 
 // Error handler
 app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, _request, reply) => {

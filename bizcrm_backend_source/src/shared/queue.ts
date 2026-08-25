@@ -14,6 +14,7 @@
  *   AUTOMATION_MAX_PARALLEL — max concurrent actions per BFS level (default: 5)
  *   AUTOMATION_TRIGGER_CONCURRENCY — max concurrent trigger workers (default: 3)
  */
+import 'dotenv/config'
 import { Queue, Worker, type Job, type ConnectionOptions } from 'bullmq'
 import IORedis from 'ioredis'
 import { logger } from './logger.js'
@@ -25,16 +26,33 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379'
 /** Namespace prefix — isolates this project's keys from others on the same Redis */
 export const REDIS_PREFIX = process.env.REDIS_PREFIX || 'bizcrm'
 
-/** Shared IORedis instance for BullMQ */
+function getRedisOptions(): ConnectionOptions {
+  const urlStr = process.env.REDIS_URL || 'redis://localhost:6379'
+  try {
+    const url = new URL(urlStr)
+    return {
+      host: url.hostname || '127.0.0.1',
+      port: parseInt(url.port || '6379', 10),
+      password: url.password || undefined,
+      db: url.pathname && url.pathname !== '/' ? parseInt(url.pathname.replace('/', '') || '0', 10) : undefined,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    }
+  } catch {
+    return { host: '127.0.0.1', port: 6379, maxRetriesPerRequest: null, enableReadyCheck: false }
+  }
+}
+
+export const connection: ConnectionOptions = getRedisOptions()
+
+/** Shared IORedis instance for BullMQ queue utilities */
 export const redisConnection = new IORedis(REDIS_URL, {
   maxRetriesPerRequest: null, // Required by BullMQ
   enableReadyCheck: false,
 })
 
-redisConnection.on('connect', () => logger.info({ prefix: REDIS_PREFIX }, '[queue] Redis connected'))
+redisConnection.on('connect', () => logger.info({ prefix: REDIS_PREFIX, url: REDIS_URL }, '[queue] Redis connected'))
 redisConnection.on('error', (err) => logger.error({ err }, '[queue] Redis error'))
-
-export const connection: ConnectionOptions = redisConnection
 
 // ─── Queue Names ──────────────────────────────────────────────────────────────
 
@@ -176,13 +194,10 @@ export async function enqueueAiReply(convId: string, delayMs: number): Promise<s
   try {
     const existingJob = await aiReplyQueue.getJob(convId)
     if (existingJob) {
-      const state = await existingJob.getState()
-      if (state === 'delayed' || state === 'waiting') {
-        await existingJob.remove()
-      }
+      await existingJob.remove()
     }
   } catch {
-    // Non-fatal — if removal fails, the new job with same jobId will replace it
+    // Non-fatal
   }
 
   const job = await aiReplyQueue.add(
