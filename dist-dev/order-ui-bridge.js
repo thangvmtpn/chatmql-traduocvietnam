@@ -2350,6 +2350,7 @@
     let provinceId = null;
     let wardId = null;
     let wards = [];
+    let discount = 0;
     let discountPercent = 0;
     let usedPoints = 0;
     let sellerName = staffCare || 'Trần Trang';
@@ -2357,8 +2358,24 @@
     let pkgLength = '';
     let pkgWidth = '';
     let pkgHeight = '';
-    shippingFee = 25000;
-    shippingProvider = 'vnpost';
+    let shippingFee = 25000;
+    let shippingProvider = 'vnpost';
+    let selfShipping = false;
+    let promoCode = '';
+    let promoApplied = null;
+    let isExchange = false;
+    let isFragile = false;
+    let depositAmount = 0;
+    let orderSource = 'Zalo OA';
+    let orderType = 'Đơn sỉ';
+
+    function vnd(num) {
+      return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0));
+    }
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
 
     // Giá trị các ô nhập tay được giữ trong state, KHÔNG đọc lại từ template.
     const form = {
@@ -2797,9 +2814,7 @@
                   </button>
                 </div>
               </div>
-              ${promoApplied ? `
-                <div style="font-size:11.5px; color:#15803d; text-align:right; margin:-6px 0 8px;">✓ ${esc(promoApplied.message || 'Đã áp dụng mã')}</div>
-              ` : ''}
+              <div id="order-promo-msg" style="font-size:11.5px; text-align:right; margin:-4px 0 8px;">${promoApplied ? `<span style="color:#15803d;">✓ ${esc(promoApplied.message || 'Đã áp dụng mã')}</span>` : ''}</div>
 
               <!-- Tiêu Lá -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -3449,13 +3464,20 @@
       };
     }
 
-    renderModalContent();
-    if (mountEl) {
-      modalOverlay.classList.add('chatmql-order-inline');
-      mountEl.innerHTML = '';
-      mountEl.appendChild(modalOverlay);
-    } else {
-      document.body.appendChild(modalOverlay);
+    try {
+      renderModalContent();
+      if (mountEl) {
+        modalOverlay.classList.add('chatmql-order-inline');
+        mountEl.innerHTML = '';
+        mountEl.appendChild(modalOverlay);
+      } else {
+        document.body.appendChild(modalOverlay);
+      }
+    } catch (e) {
+      console.error('[order] Lỗi render form lên đơn:', e);
+      if (mountEl) {
+        mountEl.innerHTML = `<div style="padding:14px; color:#dc2626; font-size:12.5px;">Lỗi tải form tạo đơn: ${e.message}</div>`;
+      }
     }
   };
 
