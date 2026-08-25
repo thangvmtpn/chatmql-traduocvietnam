@@ -13,6 +13,9 @@ import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../auth/auth-middleware.js'
 import { prisma } from '../../shared/prisma-client.js'
 import { logger } from '../../shared/logger.js'
+import { sendImageCore } from '../chat/send-image-core.js'
+import { emitNewMessage } from '../realtime/socket-gateway.js'
+import { transformMessageForFrontend } from '../chat/chat-routes.js'
 
 type AuthUser = { orgId: string; id: string; fullName?: string }
 
@@ -28,35 +31,27 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Danh sách tài liệu đã duyệt, gom theo nhóm ────────────────────
   app.get<{ Querystring: { kind?: string; q?: string } }>(
-    '/api/v1/library',
+    '/api/v1/library/items',
     async (request) => {
       const user = request.user as AuthUser
-      const kind = request.query.kind?.trim() || 'all'   // image | content | video | all
-      const q = request.query.q?.trim().toLowerCase()
+      const kind = (request.query?.kind || 'all').toLowerCase()
+      const q = (request.query?.q || '').trim()
 
-      const groups: Array<{
-        id: string
-        name: string
-        kind: 'image' | 'content' | 'video'
-        items: Array<{
-          id: string
-          title: string
-          kind: 'image' | 'content' | 'video'
-          url: string | null
-          text: string | null
-          productName: string | null
-        }>
-      }> = []
+      const groups: Array<{ id: string; name: string; items: any[] }> = []
 
-      // ── Ảnh sản phẩm ────────────────────────────────────────────
+      // 1. Ảnh sản phẩm từ bảng products (chỉ sản phẩm active có ảnh)
       if (kind === 'all' || kind === 'image') {
         const cats = await prisma.productCategory.findMany({
           where: { orgId: user.orgId },
           orderBy: { name: 'asc' },
           select: {
-            id: true, name: true,
+            id: true,
+            name: true,
             products: {
-              where: { status: 'active' },
+              where: {
+                status: 'active',
+                ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+              },
               orderBy: { name: 'asc' },
               select: { id: true, name: true, code: true, images: true },
             },
@@ -69,64 +64,75 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
               .filter(Boolean)
               .map((img, idx) => ({
                 id: `prod:${p.id}:${idx}`,
-                title: p.name + ((p.images || []).length > 1 ? ` (${idx + 1})` : ''),
-                kind: 'image' as const,
-                url: absolute(img),
-                text: null,
-                productName: p.name,
+                kind: 'image',
+                title: (p.images || []).length > 1 ? `${p.name} (${idx + 1})` : p.name,
+                thumbUrl: absolute(img),
+                fullUrl: absolute(img),
+                meta: { sku: p.code },
               })),
-          ).filter(i => !q || i.title.toLowerCase().includes(q))
+          )
 
-          if (items.length) groups.push({ id: `cat:${c.id}`, name: c.name, kind: 'image', items })
+          if (items.length) {
+            groups.push({ id: `cat:${c.id}`, name: c.name, items })
+          }
         }
       }
 
-      // ── Kho tri thức đã duyệt ───────────────────────────────────
+      // 2. Bài viết, chính sách, tài liệu từ knowledge_entries (status='active')
       if (kind === 'all' || kind === 'content' || kind === 'video') {
         const entries = await prisma.knowledgeEntry.findMany({
-          // status='active' = đã duyệt. Đây là rào chắn quan trọng nhất của file này.
           where: {
             orgId: user.orgId,
             status: 'active',
-            ...(kind === 'video' ? { mediaType: 'video' } : {}),
-            ...(q ? { OR: [{ title: { contains: q, mode: 'insensitive' } }, { content: { contains: q, mode: 'insensitive' } }] } : {}),
+            ...(kind === 'video'
+              ? { mediaType: 'video', mediaUrls: { isEmpty: false } }
+              : kind === 'content'
+                ? { mediaUrls: { isEmpty: true } }
+                : {}),
+            ...(q
+              ? {
+                  OR: [
+                    { title: { contains: q, mode: 'insensitive' } },
+                    { content: { contains: q, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
           },
-          orderBy: { updatedAt: 'desc' },
-          take: 300,
           select: {
-            id: true, title: true, content: true, type: true,
-            mediaUrls: true, mediaType: true,
+            id: true,
+            title: true,
+            content: true,
+            mediaUrls: true,
+            mediaType: true,
             category: { select: { name: true } },
-            product: { select: { name: true } },
           },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
         })
 
-        const byCat = new Map<string, typeof groups[number]['items']>()
+        const byCat = new Map<string, any[]>()
         for (const e of entries) {
-          const itemKind: 'image' | 'content' | 'video' =
-            e.mediaType === 'video' ? 'video' : e.mediaType === 'image' ? 'image' : 'content'
-          if (kind === 'content' && itemKind !== 'content') continue
-          if (kind === 'video' && itemKind !== 'video') continue
-
-          const catName = e.category?.name || (itemKind === 'content' ? 'Bài viết & chính sách' : 'Tài liệu khác')
+          const catName = e.category?.name || 'Kho tri thức'
           if (!byCat.has(catName)) byCat.set(catName, [])
+          const isVideo = e.mediaType === 'video'
+          const itemKind = isVideo ? 'video' : (e.mediaUrls.length ? 'image' : 'content')
+          const firstMedia = e.mediaUrls[0]
+
           byCat.get(catName)!.push({
             id: `kb:${e.id}`,
-            // title có thể null trong schema — không để lọt chuỗi 'null' ra giao diện.
-            title: e.title?.trim() || '(chưa đặt tiêu đề)',
             kind: itemKind,
-            url: e.mediaUrls?.[0] ? absolute(e.mediaUrls[0]) : null,
-            text: itemKind === 'content' ? (e.content || '').slice(0, 4000) : null,
-            productName: e.product?.name || null,
+            title: e.title || '(Chưa có tiêu đề)',
+            content: e.content,
+            thumbUrl: firstMedia ? absolute(firstMedia) : undefined,
+            fullUrl: firstMedia ? absolute(firstMedia) : undefined,
           })
         }
-        for (const [name, items] of byCat) {
-          if (items.length) groups.push({ id: `kb:${name}`, name, kind: items[0].kind, items })
+        for (const [name, items] of byCat.entries()) {
+          groups.push({ id: `kbcat:${name}`, name, items })
         }
       }
 
-      const total = groups.reduce((n, g) => n + g.items.length, 0)
-      return { groups, total, approvedOnly: true }
+      return { groups }
     },
   )
 
@@ -146,8 +152,6 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
     })
     if (!conv) return reply.status(404).send({ error: 'Không tìm thấy hội thoại' })
 
-    // Nạp lại nội dung từ nguồn thay vì tin dữ liệu client gửi lên — client chỉ
-    // được phép nói "gửi mục nào", không được quyết định nội dung gửi đi.
     const created: string[] = []
     const skipped: Array<{ id: string; reason: string }> = []
 
@@ -163,46 +167,61 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
           const img = p?.images?.[parseInt(idxRaw || '0', 10)]
           if (!img) { skipped.push({ id: raw, reason: 'Không tìm thấy ảnh' }); continue }
 
-          await prisma.message.create({
-            data: {
-              conversationId: conv.id,
-              senderType: 'user',
-              repliedByUserId: user.id,
-              contentType: 'image',
-              content: JSON.stringify({
-                href: absolute(img), thumb: absolute(img),
-                caption: p!.name, title: p!.name,
-              }),
-              sentAt: new Date(),
-            },
+          const result = await sendImageCore({
+            orgId: user.orgId,
+            conversationId: conv.id,
+            imageUrl: img,
+            caption: p.name,
+            sender: 'staff',
+            repliedByUserId: user.id,
           })
-          created.push(raw)
+
+          if (result.sent) {
+            created.push(raw)
+          } else {
+            skipped.push({ id: raw, reason: result.error || 'Không gửi được ảnh' })
+          }
           continue
         }
 
         if (prefix === 'kb') {
           const e = await prisma.knowledgeEntry.findFirst({
-            // Kiểm tra lại status ở đây: mục có thể bị rút duyệt sau khi
-            // nhân viên mở thư viện nhưng trước khi bấm gửi.
             where: { id, orgId: user.orgId, status: 'active' },
             select: { title: true, content: true, mediaUrls: true, mediaType: true },
           })
           if (!e) { skipped.push({ id: raw, reason: 'Tài liệu chưa được duyệt hoặc đã bị gỡ' }); continue }
 
           const media = e.mediaUrls?.[0]
-          await prisma.message.create({
-            data: {
+          if (media && e.mediaType !== 'video') {
+            const result = await sendImageCore({
+              orgId: user.orgId,
               conversationId: conv.id,
-              senderType: 'user',
+              imageUrl: media,
+              caption: e.title || undefined,
+              sender: 'staff',
               repliedByUserId: user.id,
-              contentType: media ? (e.mediaType === 'video' ? 'video' : 'image') : 'text',
-              content: media
-                ? JSON.stringify({ href: absolute(media), thumb: absolute(media), caption: e.title, title: e.title })
-                : `**${e.title}**\n\n${e.content || ''}`,
-              sentAt: new Date(),
-            },
-          })
-          created.push(raw)
+            })
+            if (result.sent) {
+              created.push(raw)
+            } else {
+              skipped.push({ id: raw, reason: result.error || 'Không gửi được ảnh' })
+            }
+          } else {
+            const msg = await prisma.message.create({
+              data: {
+                conversationId: conv.id,
+                senderType: 'user',
+                repliedByUserId: user.id,
+                contentType: media ? (e.mediaType === 'video' ? 'video' : 'image') : 'text',
+                content: media
+                  ? JSON.stringify({ href: absolute(media), thumb: absolute(media), caption: e.title, title: e.title })
+                  : `**${e.title || ''}**\n\n${e.content || ''}`,
+                sentAt: new Date(),
+              },
+            })
+            emitNewMessage(user.orgId, conv.id, transformMessageForFrontend(msg))
+            created.push(raw)
+          }
           continue
         }
 
@@ -217,6 +236,6 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
       { conversationId: conv.id, userId: user.id, sent: created.length, skipped: skipped.length },
       '[library] Nhân viên gửi tài liệu vào hội thoại',
     )
-    return { sent: created.length, skipped }
+    return { sent: created.length, created, skipped }
   })
 }

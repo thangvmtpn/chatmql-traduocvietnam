@@ -5004,7 +5004,8 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     const st = document.createElement('style');
     st.id = SD_STYLE_ID;
     st.textContent = `
-      #chatmql-sd{--sdp:#0ea5a4; padding:12px 14px; border-top:1px solid #e2e8f0; margin-top:10px;}
+      #chatmql-sd{--sdp:#0ea5a4; padding:12px 14px 16px; border-top:1px solid #e2e8f0; margin-top:10px; position:relative;}
+      #chatmql-sd #sd-body{padding-bottom:60px;}
       #chatmql-sd .sd__head{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700;
         color:#b45309; padding-bottom:9px; border-bottom:2px solid #b45309; width:fit-content; margin-bottom:10px;}
       #chatmql-sd .sd__tabs{display:flex; gap:16px; border-bottom:1px solid #e2e8f0; margin-bottom:10px;}
@@ -5037,12 +5038,12 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
       #chatmql-sd .sd-tile--has-img .sd-tile__name{color:#fff; background:rgba(0,0,0,.55); border-radius:4px;
         padding:1px 4px; position:absolute; left:4px; right:4px; bottom:4px;}
       #chatmql-sd .sd-tile--has-img .sd-tile__emoji{display:none;}
-      #chatmql-sd .sd__send-wrap{position:sticky; bottom:0; padding:10px 0 4px; margin-top:12px;
-        background:linear-gradient(to top,#fff 72%,rgba(255,255,255,0));}
+      #chatmql-sd .sd__send-wrap{position:sticky; bottom:0; left:0; right:0; padding:10px 14px; margin:12px -14px -16px;
+        background:#fff; border-top:1px solid #e2e8f0; box-shadow:0 -4px 12px rgba(0,0,0,0.08); z-index:30;}
       #chatmql-sd .sd__send-btn{width:100%; display:inline-flex; align-items:center; justify-content:center;
-        gap:6px; background:var(--sdp); color:#fff; border:none; font-size:12.5px; font-weight:700;
-        padding:9px 12px; border-radius:8px; cursor:pointer;}
-      #chatmql-sd .sd__send-btn:disabled{background:#e2e8f0; color:#94a3b8; cursor:default;}
+        gap:6px; background:var(--sdp); color:#fff; border:none; font-size:13px; font-weight:700;
+        padding:10px 14px; border-radius:8px; cursor:pointer; box-shadow:0 2px 6px rgba(14,165,164,0.3);}
+      #chatmql-sd .sd__send-btn:disabled{background:#e2e8f0; color:#94a3b8; cursor:default; box-shadow:none;}
       #chatmql-sd .sd-content{border:1px solid #f1f5f9; border-radius:10px; padding:10px 12px; margin-bottom:8px;}
       #chatmql-sd .sd-content__head{display:flex; align-items:center; gap:8px; margin-bottom:5px;}
       #chatmql-sd .sd-content__title{font-size:12.5px; font-weight:700; color:#1e293b; flex:1; min-width:0;}
