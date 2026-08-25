@@ -12,6 +12,8 @@ import { retrieveKbSemantic } from '../../knowledge/embedding-service.js'
 import { aggregate } from '../../products/product-query-service.js'
 import { TOOL_NAMES, type ToolName, type ToolsConfig } from '../tools-config-service.js'
 import type { OpenaiToolDef } from '../providers/openai.js'
+import { prisma } from '../../../shared/prisma-client.js'
+import { isImageAvailable } from '../../chat/send-image-core.js'
 
 const QUERY_PARAM = {
   type: 'object',
@@ -95,6 +97,31 @@ const CATALOG_OVERVIEW_DEF: OpenaiToolDef = {
 }
 
 /** Build OpenAI tool defs: enabled search tools + overview + always-on action tools. */
+// Action tool — gửi ẢNH SẢN PHẨM cho khách.
+//
+// Mô hình chỉ được nói GỬI ẢNH CỦA SẢN PHẨM NÀO, không được tự đưa URL. Máy chủ
+// tra sản phẩm trong catalog (chỉ sản phẩm status='active'), lấy ảnh đã duyệt
+// rồi mới gửi — đúng cùng một chốt chặn như thư viện tài liệu của nhân viên.
+export const SEND_IMAGE_TOOL = 'send_product_image'
+const SEND_IMAGE_DEF: OpenaiToolDef = {
+  type: 'function',
+  function: {
+    name: SEND_IMAGE_TOOL,
+    description:
+      'Gửi ẢNH THẬT của một sản phẩm cho khách qua Zalo. Dùng khi khách hỏi xem ảnh, ' +
+      'hỏi mẫu mã/bao bì/hình dáng sản phẩm, hoặc khi ảnh giúp khách quyết định mua. ' +
+      'Chỉ gọi khi đã xác định được sản phẩm cụ thể. Không bịa tên sản phẩm.',
+    parameters: {
+      type: 'object',
+      properties: {
+        product: { type: 'string', description: 'Tên hoặc mã sản phẩm cần gửi ảnh (đúng như trong catalog)' },
+        caption: { type: 'string', description: 'Lời nhắn ngắn gửi kèm ảnh (tuỳ chọn)' },
+      },
+      required: ['product'],
+    },
+  },
+}
+
 export function buildOpenaiTools(tools: ToolsConfig): OpenaiToolDef[] {
   const search = TOOL_NAMES.filter((n) => tools[n].enabled).map((n) => ({
     type: 'function' as const,
@@ -104,7 +131,15 @@ export function buildOpenaiTools(tools: ToolsConfig): OpenaiToolDef[] {
   const anySearch = TOOL_NAMES.some((n) => tools[n].enabled)
   // log_knowledge_gap is only meaningful when the AI can actually search knowledge
   // (no search tools → the auto-log can't fire anyway, so don't offer the tool).
-  return [...search, ...(anySearch ? [CATALOG_OVERVIEW_DEF, LOG_GAP_DEF] : []), HANDOFF_DEF, APPOINTMENT_DEF]
+  // Gửi ảnh chỉ có nghĩa khi AI tra được sản phẩm — không có search_products thì
+  // nó không biết sản phẩm nào tồn tại để mà gửi.
+  const canSendImage = tools.search_products?.enabled
+  return [
+    ...search,
+    ...(anySearch ? [CATALOG_OVERVIEW_DEF, LOG_GAP_DEF] : []),
+    ...(canSendImage ? [SEND_IMAGE_DEF] : []),
+    HANDOFF_DEF, APPOINTMENT_DEF,
+  ]
 }
 
 export function isToolName(name: string): name is ToolName {
@@ -169,6 +204,90 @@ export type ToolResult = { text: string; hits: ToolHit[] }
  * model sees plus per-hit relevance scores (recorded in the trace so the Master
  * can diagnose retrieval quality). `minScore` overrides the default RAG threshold.
  */
+export interface ResolvedProductImage {
+  productId: string
+  productName: string
+  imageUrl: string
+}
+
+/**
+ * Kết quả tra ảnh. Phân biệt "không có sản phẩm" với "có sản phẩm nhưng ảnh
+ * hỏng" — hai tình huống này cần AI nói với khách hai kiểu khác nhau, và nếu
+ * gộp làm một thì mô hình hay cãi lại ("search_products vừa thấy sản phẩm mà").
+ */
+export type ProductImageLookup =
+  | { status: 'ok'; image: ResolvedProductImage }
+  | { status: 'no_image'; productName: string }
+  | { status: 'not_found' }
+
+/**
+ * Tra sản phẩm theo tên/mã rồi lấy ảnh ĐÃ DUYỆT đầu tiên.
+ *
+ * Chỉ nhận sản phẩm status='active' — giống hệt luật của thư viện tài liệu.
+ * Trả về null nếu không tìm thấy hoặc sản phẩm chưa có ảnh; khi đó AI được báo
+ * lại để nó tự nói với khách thay vì im lặng.
+ */
+export async function resolveProductImage(
+  orgId: string,
+  query: string,
+): Promise<ProductImageLookup> {
+  const q = (query || '').trim()
+  if (!q) return { status: 'not_found' }
+
+  // 1. Tìm theo mã hoặc tên cụ thể
+  const rows = await prisma.product.findMany({
+    where: {
+      orgId,
+      status: 'active',
+      OR: [
+        { code: { equals: q, mode: 'insensitive' } },
+        { name: { equals: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+        { code: { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, name: true, images: true },
+    take: 5,
+  })
+
+  // Duyệt qua các sản phẩm tìm được để lấy ảnh hợp lệ trên đĩa
+  for (const row of rows) {
+    const images = Array.isArray(row.images) ? (row.images as string[]) : []
+    for (const url of images) {
+      if (!url) continue
+      if (await isImageAvailable(url)) {
+        return { status: 'ok', image: { productId: row.id, productName: row.name, imageUrl: url } }
+      }
+    }
+  }
+
+  // 2. Nếu khách hỏi chung chung (sản phẩm, mẫu, trà, tham khảo...) hoặc sản phẩm cụ thể chưa có file ảnh
+  const isGeneric = /^(sản phẩm|các sản phẩm|trà|mẫu|ảnh|hình|tham khảo|bán chạy|nổi bật|quà)/i.test(q)
+  if (isGeneric || rows.length === 0) {
+    const sampleProducts = await prisma.product.findMany({
+      where: { orgId, status: 'active' },
+      select: { id: true, name: true, images: true },
+      take: 20,
+    })
+
+    for (const row of sampleProducts) {
+      const images = Array.isArray(row.images) ? (row.images as string[]) : []
+      for (const url of images) {
+        if (!url) continue
+        if (await isImageAvailable(url)) {
+          return { status: 'ok', image: { productId: row.id, productName: row.name, imageUrl: url } }
+        }
+      }
+    }
+  }
+
+  if (rows.length > 0) {
+    return { status: 'no_image', productName: rows[0].name }
+  }
+
+  return { status: 'not_found' }
+}
+
 export async function executeTool(
   orgId: string,
   name: string,
