@@ -71,9 +71,8 @@ export declare function enqueueTrigger(data: TriggerJobData): Promise<string>;
 export declare function enqueueZnsSend(data: ZnsSendJobData): Promise<string>;
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Uses convId as jobId so each subsequent message REPLACES the pending job
- * (debounce: the timer resets on every new message).
- * Removes any existing delayed job for the same convId before adding.
+ * Cancels pending delayed jobs for the same convId (debounce reset)
+ * and assigns a unique jobId so subsequent turns are never blocked.
  */
 export declare function enqueueAiReply(convId: string, delayMs: number): Promise<string>;
 /**

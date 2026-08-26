@@ -104,7 +104,7 @@ function deriveRequestId(input: CreateOrderInput): string {
 }
 
 function formatVnd(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)
+  return Math.round(amount || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫'
 }
 
 /**

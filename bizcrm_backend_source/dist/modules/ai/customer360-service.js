@@ -21,7 +21,7 @@ import { dispatchProvider } from './ai-service.js';
 import { fetchCustomer } from '../orders/crm-order-client.js';
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 phút — hội thoại ít đổi nhanh hơn thế
 function money(n) {
-    return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0)) + 'đ';
+    return Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ';
 }
 /** Tháng sinh nhật, chấp nhận vài định dạng CRM đang lưu lẫn lộn. */
 function birthdayMonthDay(raw) {

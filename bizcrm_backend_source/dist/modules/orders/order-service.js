@@ -40,7 +40,7 @@ function deriveRequestId(input) {
     return `chatmql-${createHash('sha256').update(seed).digest('hex').slice(0, 32)}`;
 }
 function formatVnd(amount) {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    return Math.round(amount || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫';
 }
 /**
  * Bỏ số điện thoại lặp ở cuối tên. Rất nhiều contact Zalo được đặt tên kèm số

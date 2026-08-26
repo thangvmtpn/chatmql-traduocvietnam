@@ -125,25 +125,30 @@ export async function enqueueZnsSend(data) {
 }
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Uses convId as jobId so each subsequent message REPLACES the pending job
- * (debounce: the timer resets on every new message).
- * Removes any existing delayed job for the same convId before adding.
+ * Cancels pending delayed jobs for the same convId (debounce reset)
+ * and assigns a unique jobId so subsequent turns are never blocked.
  */
 export async function enqueueAiReply(convId, delayMs) {
-    // Remove existing delayed job (debounce reset) — best-effort
+    // Remove existing delayed/waiting jobs for this convId to reset debounce
     try {
-        const existingJob = await aiReplyQueue.getJob(convId);
-        if (existingJob) {
-            await existingJob.remove();
+        const delayedJobs = await aiReplyQueue.getJobs(['delayed', 'waiting']);
+        for (const j of delayedJobs) {
+            if (j.data?.convId === convId) {
+                await j.remove().catch(() => { });
+            }
         }
     }
     catch {
         // Non-fatal
     }
-    const job = await aiReplyQueue.add('ai-reply', { convId }, 
-    // attempts:1 — never auto-retry an AI send (avoids duplicate customer messages).
-    { jobId: convId, delay: delayMs, attempts: 1, removeOnComplete: true, removeOnFail: true });
-    logger.debug({ jobId: job.id, convId, delayMs }, '[queue] AI reply job enqueued');
+    const job = await aiReplyQueue.add('ai-reply', { convId }, {
+        jobId: `${convId}:${Date.now()}`,
+        delay: delayMs,
+        attempts: 1,
+        removeOnComplete: true,
+        removeOnFail: true,
+    });
+    logger.info({ jobId: job.id, convId, delayMs }, '[queue] AI reply job enqueued');
     return job.id;
 }
 /**

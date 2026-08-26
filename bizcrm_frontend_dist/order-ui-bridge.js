@@ -43,6 +43,11 @@
   let customerOrdersCache = [];
   let lastFetchedPhone = '';
 
+  function formatDot(n) {
+    if (n === null || n === undefined || isNaN(n)) return '0';
+    return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
   // Inject CSS Styles
   const styleEl = document.createElement('style');
   styleEl.textContent = `
@@ -332,7 +337,7 @@
       const { customer, orders } = result;
       const orderCount = orders ? orders.length : 0;
       const gmvTotal = orders ? orders.reduce((sum, o) => sum + (o.total_amount || 0), 0) : 0;
-      const formattedGmv = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(gmvTotal);
+      const formattedGmv = `${formatDot(gmvTotal)} ₫`;
 
       historyBox.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
@@ -361,7 +366,7 @@
         ` : `
           <div style="max-height:220px; overflow-y:auto; padding-right:2px;">
             ${orders.slice(0, 6).map(o => {
-              const formattedTotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(o.total_amount || 0);
+              const formattedTotal = `${formatDot(o.total_amount || 0)} ₫`;
               const isDone = o.status === 'Giao thành công';
               const dateStr = o.created_at ? new Date(o.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
               const itemsSummary = o.items && o.items.length > 0 ? o.items.map(i => `${i.name} (x${i.quantity})`).join(', ') : 'Đơn hàng trà';
@@ -495,7 +500,7 @@
     }
   }
 
-  const vnd = n => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
+  const vnd = n => formatDot(Math.round(n || 0));
 
   /** Nhãn một dòng sản phẩm trong ô chọn: tên · giá · tồn kho. */
   function productLabel(p) {
@@ -510,8 +515,7 @@
   // CRM (mã KH, nghề nghiệp, GMV, lịch hẹn). Backend đã ghép sẵn nên ở đây chỉ
   // gọi một lần.
 
-  const fmtVnd = n =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0);
+  const fmtVnd = n => `${formatDot(n || 0)} ₫`;
 
   const fmtDate = iso => {
     if (!iso) return null;
@@ -1600,7 +1604,7 @@
             ['Khách có điểm', s2.customers_with_points, '#0f172a'],
             ['Khớp', s2.matched, '#15803d'],
             ['Lệch', s2.mismatched, '#b45309'],
-            ['Tổng chênh', s2.total_gap.toLocaleString('vi-VN') + ' điểm', '#b91c1c'],
+            ['Tổng chênh', formatDot(s2.total_gap) + ' điểm', '#b91c1c'],
           ].map(([l, v, c]) => `
             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:9px 10px;">
               <div style="font-size:10.5px; color:#64748b; margin-bottom:2px;">${l}</div>
@@ -2333,7 +2337,7 @@
       currentCrmCustomer = crmData || null;
       lastFetchedPhone = '';
     }
-    const gmvFormatted = crmData?.gmv_total != null ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(crmData.gmv_total) : '0 ₫';
+    const gmvFormatted = crmData?.gmv_total != null ? `${formatDot(crmData.gmv_total)} ₫` : '0 ₫';
     const orderCount = crmData?.order_count ?? customerOrdersCache.length;
 
     // Đợt 1: kho mặc định là kho đầu tiên; danh mục lấy theo kho đó.
@@ -2370,7 +2374,7 @@
     let orderType = 'Đơn sỉ';
 
     function vnd(num) {
-      return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0));
+      return formatDot(Math.round(num || 0));
     }
     function esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, c =>
@@ -2467,8 +2471,8 @@
       const total = calculateTotal();
       const totalWeight = pkgWeight != null ? pkgWeight : calcTotalWeight();
       const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-      const formattedTotal = new Intl.NumberFormat('vi-VN').format(total);
-      const formattedSubtotal = new Intl.NumberFormat('vi-VN').format(subtotal);
+      const formattedTotal = formatDot(total);
+      const formattedSubtotal = formatDot(subtotal);
 
       modalOverlay.innerHTML = `
         <div class="chatmql-modal" onclick="event.stopPropagation()" style="font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -2677,9 +2681,9 @@
                   const p = findProd(item.code) || item;
                   const isGift = !!item.isGift;
                   const lineTotal = isGift ? 0 : item.price * item.quantity;
-                  const formattedLineTotal = isGift ? '0' : new Intl.NumberFormat('vi-VN').format(lineTotal);
+                  const formattedLineTotal = isGift ? '0' : formatDot(lineTotal);
                   const unitStr = p.unit || 'Túi';
-                  const unitPriceStr = isGift ? `0 đ/Gói` : `${new Intl.NumberFormat('vi-VN').format(item.price)} đ/${unitStr}`;
+                  const unitPriceStr = isGift ? `0 đ/Gói` : `${formatDot(item.price)} đ/${unitStr}`;
                   const weightStr = p.weight ? `${p.weight}g` : '';
                   const vatStr = p.vat_note ? ` · ${p.vat_note}` : (isGift ? '' : ' · Đã có VAT 8%');
                   const subtitleText = isGift
@@ -2868,7 +2872,7 @@
               <!-- Highlight Box: Tổng thanh toán -->
               <div style="background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <span style="font-size:13.5px; font-weight:700; color:#1e3a8a;">Tổng thanh toán</span>
-                <span id="summary-total" style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}</span>
+                <span id="summary-total" style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}đ</span>
               </div>
 
               <!-- Chuyển khoản đặt cọc -->
@@ -3070,8 +3074,7 @@
           set('order-crm-badge', crm ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM');
           set('order-crm-group', crm?.priority_level || '—');
           set('order-crm-staff', crm?.staff_in_charge || 'Trà Dược CSKH');
-          set('order-crm-gmv', new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-            .format(crm?.gmv_total || 0));
+          set('order-crm-gmv', `${formatDot(crm?.gmv_total || 0)} ₫`);
           set('order-crm-count', `${crm?.order_count || 0} đơn`);
           set('order-crm-taste', crm?.thich_dung_hang || '—');
         };
@@ -3210,7 +3213,7 @@
         const cod = Math.max(0, tot - (depositAmount || 0));
 
         const totEl = modalOverlay.querySelector('#summary-total');
-        if (totEl) totEl.textContent = vnd(tot);
+        if (totEl) totEl.textContent = `${vnd(tot)}đ`;
 
         const discEl = modalOverlay.querySelector('#summary-discount');
         if (discEl) discEl.textContent = `-${vnd(disc)}đ`;
@@ -3507,7 +3510,7 @@
           modalOverlay.remove();
           if (inlineHost) window.openChatMqlOrderModal(inlineHost);
 
-          const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
+          const money = `${formatDot(total)} ₫`;
           if (result.replayed) {
             alert(`ℹ️ ĐƠN NÀY ĐÃ ĐƯỢC TẠO TRƯỚC ĐÓ [${result.order_code}]\n\n• Tổng tiền: ${money}\n\nHệ thống không tạo đơn trùng.`);
           } else if (fmOk) {
@@ -4449,7 +4452,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   }
   function ccFmtMoney(v) {
     if (v == null) return '—';
-    return new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+    return formatDot(v) + 'đ';
   }
   function ccInitials(name) {
     const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
@@ -4990,9 +4993,9 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     if (v == null) return '—';
     if (v >= 1e9) return (v / 1e9).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
     if (v >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + ' tr';
-    return new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+    return formatDot(v) + 'đ';
   }
-  function dnum(v) { return new Intl.NumberFormat('vi-VN').format(v ?? 0); }
+  function dnum(v) { return formatDot(v ?? 0); }
 
   function dashCard(label, value, sub, tone) {
     const c = tone || '#0f172a';

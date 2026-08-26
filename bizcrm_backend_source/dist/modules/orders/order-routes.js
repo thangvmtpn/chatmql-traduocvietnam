@@ -438,7 +438,7 @@ export async function orderRoutes(app) {
                         id: `ord:${o.order_code}`, type: 'order',
                         at: new Date(o.created_at),
                         title: `Đơn hàng ${o.order_code}`,
-                        detail: `${new Intl.NumberFormat('vi-VN').format(o.total_amount || 0)}đ · ${o.status || ''}`.trim(),
+                        detail: `${Math.round(o.total_amount || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ · ${o.status || ''}`.trim(),
                         meta: { orderCode: o.order_code, status: o.status, amount: o.total_amount },
                     });
                 }
