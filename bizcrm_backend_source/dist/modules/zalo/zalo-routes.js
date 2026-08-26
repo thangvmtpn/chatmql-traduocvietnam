@@ -1,0 +1,498 @@
+import { Platform } from '../../shared/constants.js';
+import { authMiddleware } from '../auth/auth-middleware.js';
+import { prisma } from '../../shared/prisma-client.js';
+import { loginWithQR, disconnectAccount as poolDisconnect, reconnectWithSession, getPoolEntry, getDebugLog, getPoolStatus } from './zalo-pool.js';
+import { getRateLimitStatus } from './zalo-rate-limiter.js';
+import { logger } from '../../shared/logger.js';
+import { resolveManagerAccountIds } from './zalo-access-middleware.js';
+export async function zaloRoutes(app) {
+    app.addHook('preHandler', authMiddleware);
+    // GET /api/v1/zalo-accounts — list accounts (soft-deleted ones are hidden)
+    // Optional ?type=personal|oa filters by account type.
+    // Optional ?includeDisabled=true to include disabled accounts.
+    app.get('/api/v1/zalo-accounts', async (request) => {
+        const user = request.user;
+        const typeFilter = request.query.type;
+        const includeDisabled = request.query.includeDisabled === 'true';
+        let accessibleAccountIds = null;
+        if (user.role === 'manager' || user.role === 'member') {
+            accessibleAccountIds = await resolveManagerAccountIds(user.id);
+        }
+        const accounts = await prisma.channelAccount.findMany({
+            where: {
+                orgId: user.orgId,
+                status: { not: 'archived' },
+                deletedAt: null,
+                ...(!includeDisabled ? { isDisabled: false } : {}),
+                ...(typeFilter ? { platform: typeFilter === 'oa' ? Platform.ZALO_OA : typeFilter === 'personal' ? Platform.ZALO_USER : undefined } : {}),
+                ...(accessibleAccountIds ? { id: { in: Array.from(accessibleAccountIds) } } : {}),
+            },
+            select: {
+                id: true,
+                platform: true,
+                externalUid: true,
+                externalPageId: true,
+                displayName: true,
+                avatarUrl: true,
+                phone: true,
+                status: true,
+                isDisabled: true,
+                lastConnectedAt: true,
+                createdAt: true,
+                owner: { select: { id: true, fullName: true, email: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        const result = accounts.map(a => {
+            const poolEntry = getPoolEntry(a.id);
+            // OA accounts are HTTP-based: if we have tokens (status=connected) we are live.
+            const liveStatus = a.platform === Platform.ZALO_OA ? a.status ?? 'disconnected' : (poolEntry?.status ?? a.status ?? 'disconnected');
+            return { ...a, liveStatus };
+        });
+        // Sort: connected first, then connecting/pending, then disconnected, with disabled at bottom
+        result.sort((a, b) => {
+            const getPriority = (acc) => {
+                if (acc.isDisabled)
+                    return 100;
+                const st = acc.liveStatus || acc.status || 'disconnected';
+                if (st === 'connected')
+                    return 1;
+                if (st === 'connecting' || st === 'qr_pending')
+                    return 2;
+                if (st === 'webhook_pending' || st === 'token_expired')
+                    return 3;
+                return 4; // disconnected
+            };
+            const pA = getPriority(a);
+            const pB = getPriority(b);
+            if (pA !== pB)
+                return pA - pB;
+            return (a.displayName || '').localeCompare(b.displayName || '', 'vi');
+        });
+        return result;
+    });
+    // POST /api/v1/zalo-accounts/connect — QR-first: create temp + trigger QR in 1 call
+    app.post('/api/v1/zalo-accounts/connect', async (request, reply) => {
+        const user = request.user;
+        const { phone } = request.body || {};
+        // Create a temporary placeholder account (will be updated or revived after QR success)
+        const account = await prisma.channelAccount.create({
+            data: {
+                orgId: user.orgId,
+                ownerUserId: user.id,
+                displayName: null,
+                phone: phone || null,
+                status: 'qr_pending',
+            },
+        });
+        // Start QR login in background — QR delivered via Socket.IO
+        loginWithQR(account.id, user.orgId).catch(err => {
+            logger.error(`[zalo-routes] QR login failed for ${account.id}:`, err.message);
+        });
+        return reply.status(201).send({
+            message: 'QR login initiated — watch for zalo:qr Socket.IO event',
+            accountId: account.id,
+        });
+    });
+    // PATCH /api/v1/zalo-accounts/:id — update account display name or toggle disabled
+    app.patch('/api/v1/zalo-accounts/:id', async (request, reply) => {
+        const user = request.user;
+        const { displayName, isDisabled } = request.body ?? {};
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const updated = await prisma.channelAccount.update({
+            where: { id: request.params.id },
+            data: {
+                ...(displayName !== undefined ? { displayName } : {}),
+                ...(isDisabled !== undefined ? { isDisabled } : {}),
+            },
+        });
+        if (isDisabled === true) {
+            await poolDisconnect(request.params.id).catch(() => { });
+        }
+        return updated;
+    });
+    // POST /api/v1/zalo-accounts/:id/login — initiate QR login
+    app.post('/api/v1/zalo-accounts/:id/login', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        // Start QR login in background — QR delivered via Socket.IO
+        loginWithQR(account.id, user.orgId).catch(err => {
+            logger.error(`[zalo-routes] QR login failed for ${account.id}:`, err.message);
+        });
+        return {
+            message: 'QR login initiated — watch for zalo:qr Socket.IO event',
+            accountId: account.id,
+        };
+    });
+    // POST /api/v1/zalo-accounts/:id/reconnect — reconnect with saved session
+    app.post('/api/v1/zalo-accounts/:id/reconnect', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const session = account.sessionData;
+        if (!session?.imei) {
+            return reply.status(400).send({ error: 'No saved session — please login with QR first' });
+        }
+        // Reconnect in background
+        reconnectWithSession(account.id, user.orgId, session).catch(err => {
+            logger.error(`[zalo-routes] Reconnect failed for ${account.id}:`, err.message);
+        });
+        return { message: 'Reconnect initiated — watch for zalo:connected Socket.IO event', accountId: account.id };
+    });
+    // DELETE /api/v1/zalo-accounts/:id — soft-delete: disconnect + mark as deleted.
+    //
+    // We never hard-delete the ZaloAccount row because the schema cascades
+    // would wipe every dependent Conversation (and via Conversation → every
+    // Message, MessageReaction, PinnedConversation), plus all ZaloFriend /
+    // ZaloGroup / ZaloGroupMember / DailyMessageStat / ChannelAccountAccess rows.
+    // Users who hit "remove account" expect to disconnect the Zalo session,
+    // not to lose years of chat history. Conversations + messages stay
+    // accessible (read-only) under their original channelAccountId; the account
+    // is filtered out of the integrations list by the deletedAt-IS-NULL clause.
+    app.delete('/api/v1/zalo-accounts/:id', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        // Soft-delete FIRST: mark as deleted + disabled so the connection watchdog
+        // (which skips deletedAt / isDisabled rows) can't re-establish the session
+        // in the gap before teardown finishes. The `revive on matching externalUid`
+        // path in zalo-pool.ts clears these flags when the user explicitly re-pairs
+        // the same Zalo number.
+        await prisma.channelAccount.update({
+            where: { id: request.params.id },
+            data: {
+                deletedAt: new Date(),
+                status: 'disconnected',
+                isDisabled: true,
+            },
+        });
+        // Then stop the live listener + clean up the in-memory pool entry.
+        await poolDisconnect(request.params.id).catch(() => { });
+        return reply.status(204).send();
+    });
+    // GET /api/v1/zalo-accounts/:id/status — live status
+    app.get('/api/v1/zalo-accounts/:id/status', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+            select: { id: true, status: true },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        return { accountId: request.params.id, liveStatus: account.status };
+    });
+    // ── Zalo Account Access (ACL) ───────────────────────────────────────
+    // GET /api/v1/zalo-accounts/:id/access — list users with access
+    app.get('/api/v1/zalo-accounts/:id/access', async (request, reply) => {
+        const user = request.user;
+        // Only owner/admin can view access list
+        if (user.role !== 'owner' && user.role !== 'admin') {
+            return reply.status(403).send({ error: 'Chỉ owner/admin mới có thể xem danh sách quyền' });
+        }
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const access = await prisma.channelAccountAccess.findMany({
+            where: { channelAccountId: request.params.id },
+            include: { user: { select: { id: true, fullName: true, email: true } } },
+        });
+        return access;
+    });
+    // POST /api/v1/zalo-accounts/:id/access — grant access
+    // Binary access model: presence of a row = full access. The legacy
+    // `permission` column is kept for backward compat and pinned to 'admin'.
+    app.post('/api/v1/zalo-accounts/:id/access', async (request, reply) => {
+        const user = request.user;
+        const { userId } = request.body;
+        // Only owner/admin can manage access
+        if (user.role !== 'owner' && user.role !== 'admin') {
+            return reply.status(403).send({ error: 'Chỉ owner/admin mới có thể quản lý quyền truy cập' });
+        }
+        if (!userId) {
+            return reply.status(400).send({ error: 'userId is required' });
+        }
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        // Verify target user belongs to same org
+        const targetUser = await prisma.user.findFirst({
+            where: { id: userId, orgId: user.orgId },
+            select: { id: true, fullName: true },
+        });
+        if (!targetUser)
+            return reply.status(404).send({ error: 'User not found in org' });
+        const access = await prisma.channelAccountAccess.upsert({
+            where: { channelAccountId_userId: { channelAccountId: request.params.id, userId } },
+            update: { permission: 'admin' },
+            create: { channelAccountId: request.params.id, userId, permission: 'admin' },
+            include: { user: { select: { id: true, fullName: true, email: true } } },
+        });
+        return access;
+    });
+    // DELETE /api/v1/zalo-accounts/:id/access/:userId — revoke access
+    app.delete('/api/v1/zalo-accounts/:id/access/:userId', async (request, reply) => {
+        const user = request.user;
+        // Only owner/admin can revoke access
+        if (user.role !== 'owner' && user.role !== 'admin') {
+            return reply.status(403).send({ error: 'Chỉ owner/admin mới có thể thu hồi quyền' });
+        }
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const deleted = await prisma.channelAccountAccess.deleteMany({
+            where: { channelAccountId: request.params.id, userId: request.params.userId },
+        });
+        if (deleted.count === 0) {
+            return reply.status(404).send({ error: 'Access entry not found' });
+        }
+        return { success: true, message: 'Đã thu hồi quyền truy cập' };
+    });
+    // GET /api/v1/zalo-accounts/:id/rate-status — rate limit remaining quotas
+    app.get('/api/v1/zalo-accounts/:id/rate-status', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        return getRateLimitStatus(request.params.id);
+    });
+    // ═══════════════════════════════════════════════════════════════════════
+    // D9.3 — Zalo Friends
+    // ═══════════════════════════════════════════════════════════════════════
+    // GET /api/v1/zalo-accounts/:id/friends
+    app.get('/api/v1/zalo-accounts/:id/friends', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const { search, limit = '50', cursor, favorites } = request.query;
+        const take = Math.min(parseInt(limit), 100);
+        const friends = await prisma.channelContact.findMany({
+            where: {
+                channelAccountId: request.params.id,
+                orgId: user.orgId,
+                ...(search ? { displayName: { contains: search, mode: 'insensitive' } } : {}),
+                ...(favorites === 'true' ? { isFavorite: true } : {}),
+                ...(cursor ? { id: { gt: cursor } } : {}),
+                isBlocked: false,
+            },
+            take,
+            orderBy: [{ isFavorite: 'desc' }, { displayName: 'asc' }],
+        });
+        return {
+            friends,
+            nextCursor: friends.length === take ? friends[friends.length - 1].id : null,
+            total: friends.length,
+        };
+    });
+    // POST /api/v1/zalo-accounts/:id/friends/sync — sync from Zalo (stub)
+    app.post('/api/v1/zalo-accounts/:id/friends/sync', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        // Try live sync via pool's zca-js API
+        const poolEntry = getPoolEntry(request.params.id);
+        if (poolEntry?.api && poolEntry.status === 'connected') {
+            try {
+                const api = poolEntry.api;
+                if (typeof api.getAllFriends !== 'function') {
+                    return { synced: 0, message: 'zca-js does not expose getAllFriends' };
+                }
+                const friendsResult = await api.getAllFriends();
+                const friends = friendsResult?.data || friendsResult || [];
+                let synced = 0;
+                for (const f of friends) {
+                    const uid = f.userId || f.uid || f.id;
+                    const name = f.displayName || f.zaloName || f.dName || f.name || `Zalo ${String(uid).slice(-4)}`;
+                    if (!uid)
+                        continue;
+                    await prisma.channelContact.upsert({
+                        where: {
+                            channelAccountId_friendUid: { channelAccountId: request.params.id, friendUid: String(uid) },
+                        },
+                        update: {
+                            displayName: name,
+                            avatarUrl: f.avatar || f.avatarUrl || null,
+                        },
+                        create: {
+                            orgId: user.orgId,
+                            channelAccountId: request.params.id,
+                            friendUid: String(uid),
+                            displayName: name,
+                            avatarUrl: f.avatar || f.avatarUrl || null,
+                        },
+                    });
+                    synced++;
+                }
+                return { synced, message: `Đã đồng bộ ${synced} bạn bè từ Zalo` };
+            }
+            catch (err) {
+                logger.warn(`[zalo-routes] Friend sync failed:`, err.message);
+                return reply.status(500).send({ error: `Sync failed: ${err.message}` });
+            }
+        }
+        // Fallback: return current DB count when not connected
+        const count = await prisma.channelContact.count({ where: { channelAccountId: request.params.id } });
+        return { synced: count, message: 'Tài khoản Zalo chưa kết nối — hiển thị dữ liệu đã lưu' };
+    });
+    // PATCH /api/v1/zalo-accounts/:id/friends/:friendId — toggle favorite / blocked
+    app.patch('/api/v1/zalo-accounts/:id/friends/:friendId', async (request, reply) => {
+        const user = request.user;
+        const { isFavorite, isBlocked } = request.body;
+        const friend = await prisma.channelContact.findFirst({
+            where: { id: request.params.friendId, channelAccountId: request.params.id, orgId: user.orgId },
+        });
+        if (!friend)
+            return reply.status(404).send({ error: 'Friend not found' });
+        const updated = await prisma.channelContact.update({
+            where: { id: request.params.friendId },
+            data: {
+                ...(isFavorite !== undefined ? { isFavorite } : {}),
+                ...(isBlocked !== undefined ? { isBlocked } : {}),
+            },
+        });
+        return updated;
+    });
+    // ═══════════════════════════════════════════════════════════════════════
+    // D9.4 — Zalo Groups
+    // ═══════════════════════════════════════════════════════════════════════
+    // GET /api/v1/zalo-accounts/:id/groups
+    app.get('/api/v1/zalo-accounts/:id/groups', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const { search, limit = '50', cursor } = request.query;
+        const take = Math.min(parseInt(limit), 100);
+        const groups = await prisma.channelGroup.findMany({
+            where: {
+                channelAccountId: request.params.id,
+                orgId: user.orgId,
+                ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
+                ...(cursor ? { id: { gt: cursor } } : {}),
+            },
+            take,
+            orderBy: [{ isAdmin: 'desc' }, { memberCount: 'desc' }, { name: 'asc' }],
+        });
+        return {
+            groups,
+            nextCursor: groups.length === take ? groups[groups.length - 1].id : null,
+            total: groups.length,
+        };
+    });
+    // POST /api/v1/zalo-accounts/:id/groups/sync — sync from Zalo (stub)
+    app.post('/api/v1/zalo-accounts/:id/groups/sync', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const count = await prisma.channelGroup.count({ where: { channelAccountId: request.params.id } });
+        return { synced: count, message: 'Live sync requires connected Zalo account (D9.6)' };
+    });
+    // PATCH /api/v1/zalo-accounts/:id/groups/:groupId — toggle muted
+    app.patch('/api/v1/zalo-accounts/:id/groups/:groupId', async (request, reply) => {
+        const user = request.user;
+        const { isMuted } = request.body;
+        const group = await prisma.channelGroup.findFirst({
+            where: { id: request.params.groupId, channelAccountId: request.params.id, orgId: user.orgId },
+        });
+        if (!group)
+            return reply.status(404).send({ error: 'Group not found' });
+        const updated = await prisma.channelGroup.update({
+            where: { id: request.params.groupId },
+            data: { ...(isMuted !== undefined ? { isMuted } : {}) },
+        });
+        return updated;
+    });
+    // ── Debug: in-memory Zalo event log (not persisted, 500 recent) ─────
+    // Admin-only: owner/admin can view event log for auditing.
+    app.get('/api/v1/debug/zalo-events', async (request, reply) => {
+        const user = request.user;
+        if (user.role !== 'owner' && user.role !== 'admin') {
+            return reply.status(403).send({ error: 'Chỉ admin mới có quyền xem nhật ký sự kiện' });
+        }
+        const { search, source = 'all', limit = '100' } = request.query;
+        let entries = getDebugLog();
+        // Filter by source: personal = no 'oa:' prefix, oa = 'oa:' prefix
+        if (source === 'oa') {
+            entries = entries.filter(e => e.accountId.startsWith('oa:'));
+        }
+        else if (source === 'personal') {
+            entries = entries.filter(e => !e.accountId.startsWith('oa:'));
+        }
+        // Search in event name, summary, accountId
+        if (search) {
+            const q = search.toLowerCase();
+            entries = entries.filter(e => e.event.toLowerCase().includes(q) ||
+                e.summary.toLowerCase().includes(q) ||
+                e.accountId.toLowerCase().includes(q));
+        }
+        // Return newest first, capped
+        const take = Math.min(parseInt(limit) || 100, 500);
+        return entries.slice(-take).reverse();
+    });
+    // ── D9.6 — Org-wide pool snapshot for ops monitoring ─────────────────
+    // Returns the live state of every Zalo account in the user's org so admins
+    // can see at a glance which sessions are active / connecting / disconnected.
+    //
+    // SECURITY: must NEVER serialize the full PoolEntry — its `api` field is a
+    // live `ZaloAPI` instance whose nested `listener.ctx` holds the Zalo session
+    // (imei + cookie + secretKey). We project to a safe primitives-only shape.
+    // Also gated to owner/admin/manager — members can't see other staff's
+    // session state across the whole org.
+    app.get('/api/v1/zalo/pool/status', async (request, reply) => {
+        const user = request.user;
+        if (!['owner', 'admin', 'manager'].includes(user.role)) {
+            return reply.status(403).send({ error: 'Bạn không có quyền xem trạng thái pool' });
+        }
+        const entries = await getPoolStatus(user.orgId);
+        const safeEntries = entries.map((e) => ({
+            accountId: e.accountId,
+            orgId: e.orgId,
+            status: e.status,
+            connected: !!e.api,
+            connectedAt: e.connectedAt ?? null,
+        }));
+        const summary = safeEntries.reduce((acc, e) => {
+            const status = e.status ?? 'unknown';
+            acc[status] = (acc[status] ?? 0) + 1;
+            return acc;
+        }, {});
+        return {
+            total: safeEntries.length,
+            summary,
+            entries: safeEntries,
+        };
+    });
+}
+//# sourceMappingURL=zalo-routes.js.map

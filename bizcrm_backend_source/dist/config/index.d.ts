@@ -1,0 +1,23 @@
+export declare const config: {
+    readonly port: number;
+    readonly nodeEnv: string;
+    readonly jwtSecret: string;
+    readonly databaseUrl: string;
+    readonly aiDailyLimit: number;
+    readonly aiTimeoutMs: number;
+    readonly openaiBaseUrl: string;
+    readonly openaiDefaultModel: string;
+    readonly openaiDefaultPlusModel: string;
+    readonly minimaxBaseUrl: string;
+    readonly minimaxDefaultModel: string;
+    readonly minimaxFastModel: string;
+    readonly anthropicBaseUrl: string;
+    readonly anthropicDefaultOpusModel: string;
+    readonly anthropicDefaultSonnetModel: string;
+    readonly anthropicDefaultHaikuModel: string;
+    readonly geminiBaseUrl: string;
+    readonly geminiDefaultProModel: string;
+    readonly geminiDefaultFlashModel: string;
+    readonly zaloCallbackUrl: string;
+};
+export type Config = typeof config;

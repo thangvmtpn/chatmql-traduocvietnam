@@ -1,0 +1,64 @@
+export declare function listProductCategories(orgId: string): Promise<{
+    productCount: number;
+    _count: undefined;
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+    description: string | null;
+    sortOrder: number;
+    parentId: string | null;
+    slug: string;
+    icon: string | null;
+    specSchema: import("@prisma/client/runtime/library").JsonValue;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
+}[]>;
+export declare function getProductCategory(orgId: string, id: string): Promise<{
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+    description: string | null;
+    sortOrder: number;
+    parentId: string | null;
+    slug: string;
+    icon: string | null;
+    specSchema: import("@prisma/client/runtime/library").JsonValue;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
+} | null>;
+export type ProductCategoryInput = {
+    name: string;
+    parentId?: string | null;
+    description?: string | null;
+    icon?: string | null;
+    specSchema?: unknown;
+    importConfig?: unknown;
+    sortOrder?: number;
+};
+export declare function createProductCategory(orgId: string, data: ProductCategoryInput): Promise<{
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+    description: string | null;
+    sortOrder: number;
+    parentId: string | null;
+    slug: string;
+    icon: string | null;
+    specSchema: import("@prisma/client/runtime/library").JsonValue;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
+}>;
+export declare function updateProductCategory(orgId: string, id: string, data: Partial<ProductCategoryInput>): Promise<{
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+    description: string | null;
+    sortOrder: number;
+    parentId: string | null;
+    slug: string;
+    icon: string | null;
+    specSchema: import("@prisma/client/runtime/library").JsonValue;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
+} | null>;
+export declare function deleteProductCategory(orgId: string, id: string): Promise<boolean>;

@@ -120,19 +120,22 @@ export async function sendImageCore(params: SendImageCoreParams): Promise<SendIm
       sentOut = true
     } else if (conv.channelAccount?.platform === Platform.ZALO_OA) {
       return { sent: false, error: 'Kênh Zalo OA chưa hỗ trợ gửi ảnh tự động' }
-    } else if (conv.channelAccountId && conv.contact?.zaloUid) {
-      const entry = getPoolEntry(conv.channelAccountId)
-      if (entry?.status === 'connected') {
-        const rate = checkLimits(conv.channelAccountId, 'message')
-        if (!rate.allowed) return { sent: false, error: rate.reason || 'Vượt hạn mức gửi' }
+    } else if (conv.channelAccountId) {
+      const targetUid = conv.externalThreadId || conv.contact?.zaloUid
+      if (targetUid) {
+        const entry = getPoolEntry(conv.channelAccountId)
+        if (entry?.status === 'connected') {
+          const rate = checkLimits(conv.channelAccountId, 'message')
+          if (!rate.allowed) return { sent: false, error: rate.reason || 'Vượt hạn mức gửi' }
 
-        const r = await sendImageViaPool(
-          conv.channelAccountId, conv.contact.zaloUid, buffer, filename, caption,
-          conv.threadType === 'group' ? 1 : 0,
-        )
-        sentOut = r.sent
-        uploadedContent = r.content
-        if (sentOut) recordAction(conv.channelAccountId, 'message')
+          const r = await sendImageViaPool(
+            conv.channelAccountId, targetUid, buffer, filename, caption,
+            conv.threadType === 'group' ? 1 : 0,
+          )
+          sentOut = r.sent
+          uploadedContent = r.content
+          if (sentOut) recordAction(conv.channelAccountId, 'message')
+        }
       }
     }
   } catch (err: any) {

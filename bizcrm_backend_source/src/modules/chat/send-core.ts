@@ -123,7 +123,7 @@ async function sendChunk(conv: ConvData, text: string, quote?: Record<string, un
   }
 
   const isOa = conv.channelAccount?.platform === Platform.ZALO_OA
-  const recipientUid = isOa ? conv.externalThreadId : conv.contact?.zaloUid
+  const recipientUid = isOa ? conv.externalThreadId : (conv.externalThreadId || conv.contact?.zaloUid)
 
   if (!recipientUid) {
     logger.debug('[send-core] No recipient UID — local message only')
@@ -159,9 +159,15 @@ async function sendChunk(conv: ConvData, text: string, quote?: Record<string, un
     return { sent: false, error: rateCheck.reason || 'Rate limit exceeded' }
   }
 
+  const targetUid = conv.externalThreadId || conv.contact?.zaloUid
+  if (!targetUid) {
+    logger.debug(`[send-core] No target UID for conv ${conv.id} — local only`)
+    return { sent: false }
+  }
+
   const result = await sendViaPool(
     conv.channelAccountId,
-    conv.contact!.zaloUid!,
+    targetUid,
     text,
     conv.id,
     quote,

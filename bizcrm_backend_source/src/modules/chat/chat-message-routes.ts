@@ -107,208 +107,230 @@ export async function chatMessageRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
-  // ── Send image ─────────────────────────────────────────────────────
-  app.post<{ Params: { id: string } }>(
-    '/api/v1/conversations/:id/messages/image',
-    async (request, reply) => {
-      let orgId = 'org-1'; // fallback test
-      let userId = 'user-1';
-      if (request.user) {
-        orgId = (request.user as any).orgId;
-        userId = (request.user as any).id;
+  // ── Send image handler ──────────────────────────────────────────────
+  const handleSendImage = async (request: any, reply: any) => {
+    let orgId = 'org-1'
+    let userId = 'user-1'
+    if (request.user) {
+      orgId = (request.user as any).orgId
+      userId = (request.user as any).id
+    }
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id },
+      select: {
+        id: true, contactId: true, orgId: true,
+        channelAccountId: true, threadType: true, externalThreadId: true,
+        contact: { select: { zaloUid: true } },
+        channelAccount: { select: { platform: true } },
+      },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    // Parse multipart
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ error: 'No file uploaded' })
+
+    const buffer = await data.toBuffer()
+    const filename = data.filename || 'image.jpg'
+    const caption = (data.fields?.caption as any)?.value || ''
+
+    // Validate image MIME type
+    const mime = data.mimetype || ''
+    if (!mime.startsWith('image/')) {
+      return reply.status(400).send({ error: 'File must be an image (jpg, png, gif, webp)' })
+    }
+
+    // Always save local copy so the sent image renders in CRM & chat UI
+    const localMediaUrl = await saveChatMedia(buffer, filename)
+
+    // Rate limit & dispatch to external channel if connected
+    let sentViaZalo = false
+    let uploadedContent: string | undefined
+    if (conv.channelAccount?.platform === Platform.FACEBOOK_PAGE && conv.externalThreadId) {
+      const sendResult = await sendAttachmentViaFb(
+        conv.channelAccountId, conv.externalThreadId, buffer, filename, mime, 'image',
+      )
+      sentViaZalo = sendResult.sent
+    } else {
+      const targetUid = conv.externalThreadId || conv.contact?.zaloUid
+      const poolEntry = conv.channelAccountId ? getPoolEntry(conv.channelAccountId) : undefined
+      if (poolEntry?.status === 'connected' && targetUid) {
+        const rateCheck = checkLimits(conv.channelAccountId, 'message')
+        if (!rateCheck.allowed) {
+          return reply.status(429).send({
+            error: rateCheck.reason || 'Rate limit exceeded',
+            remaining: rateCheck.remaining,
+          })
+        }
+        const sendResult = await sendImageViaPool(
+          conv.channelAccountId, targetUid,
+          buffer, filename, caption,
+          conv.threadType === 'group' ? 1 : 0
+        )
+        sentViaZalo = sendResult.sent
+        uploadedContent = sendResult.content
+        if (sentViaZalo) recordAction(conv.channelAccountId, 'message')
       }
+    }
 
-      const conv = await prisma.conversation.findFirst({
-        where: { id: request.params.id },
-        select: {
-          id: true, contactId: true, orgId: true,
-          channelAccountId: true, threadType: true, externalThreadId: true,
-          contact: { select: { zaloUid: true } },
-          channelAccount: { select: { platform: true } },
-        },
+    // Guarantee content is a JSON object with valid image URLs for the UI
+    if (!uploadedContent) {
+      uploadedContent = JSON.stringify({
+        href: localMediaUrl,
+        thumb: localMediaUrl,
+        hdUrl: localMediaUrl,
+        caption: caption || '',
+        title: filename,
       })
-      if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+    }
 
-      // Parse multipart
-      const data = await request.file()
-      if (!data) return reply.status(400).send({ error: 'No file uploaded' })
+    // Create local message record
+    const message = await prisma.message.create({
+      data: {
+        conversationId: request.params.id,
+        senderType: SenderType.SELF,
+        senderUid: '',
+        senderName: 'Staff',
+        content: uploadedContent,
+        contentType: 'image',
+        sentAt: new Date(),
+        repliedByUserId: userId,
+      },
+    })
 
-      const buffer = await data.toBuffer()
-      const filename = data.filename || 'image.jpg'
-      const caption = (data.fields?.caption as any)?.value || ''
+    await prisma.conversation.update({
+      where: { id: request.params.id },
+      data: { lastMessageAt: new Date(), isReplied: true, unreadCount: 0 },
+    })
 
-      // Validate image MIME type
+    const fePayload = transformMessageForFrontend({
+      ...message, senderType: SenderType.SELF, senderName: 'Staff' as const,
+    })
+    try {
+      emitNewMessage(orgId, request.params.id, fePayload)
+    } catch { /* socket */ }
+
+    return { ...fePayload, sentViaZalo }
+  }
+
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/messages/image', handleSendImage)
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/images', handleSendImage)
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/image', handleSendImage)
+
+  // ── Send file handler ───────────────────────────────────────────────
+  const handleSendFile = async (request: any, reply: any) => {
+    let orgId = 'org-1'
+    let userId = 'user-1'
+    if (request.user) {
+      orgId = (request.user as any).orgId
+      userId = (request.user as any).id
+    }
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: request.params.id },
+      select: {
+        id: true, contactId: true, orgId: true,
+        channelAccountId: true, externalThreadId: true,
+        contact: { select: { zaloUid: true } },
+        channelAccount: { select: { platform: true } },
+      },
+    })
+    if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+
+    // Parse multipart
+    const data = await request.file()
+    if (!data) return reply.status(400).send({ error: 'No file uploaded' })
+
+    const buffer = await data.toBuffer()
+    const filename = data.filename || 'document'
+    const caption = (data.fields?.caption as any)?.value || ''
+
+    // Validate file type — block dangerous extensions
+    const ALLOWED_EXTENSIONS = new Set([
+      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+      '.txt', '.csv', '.zip', '.rar', '.7z',
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
+      '.mp4', '.mp3', '.wav', '.ogg', '.webm',
+    ])
+    const ext = (filename.lastIndexOf('.') > 0 ? filename.slice(filename.lastIndexOf('.')) : '').toLowerCase()
+    if (ext && !ALLOWED_EXTENSIONS.has(ext)) {
+      return reply.status(400).send({ error: `File type "${ext}" is not allowed` })
+    }
+
+    // Always save local copy
+    const localMediaUrl = await saveChatMedia(buffer, filename)
+
+    // Rate limit check
+    let sentViaZalo = false
+    let uploadedContent: string | undefined
+    if (conv.channelAccount?.platform === Platform.FACEBOOK_PAGE && conv.externalThreadId) {
       const mime = data.mimetype || ''
-      if (!mime.startsWith('image/')) {
-        return reply.status(400).send({ error: 'File must be an image (jpg, png, gif, webp)' })
-      }
-
-      // Rate limit check
-      let sentViaZalo = false
-      let uploadedContent: string | undefined
-      if (conv.channelAccount?.platform === Platform.FACEBOOK_PAGE && conv.externalThreadId) {
-        // Facebook Page: upload bytes to Messenger + keep a local copy so the
-        // sent image renders in the CRM timeline (Send API returns no display URL).
-        const url = await saveChatMedia(buffer, filename)
-        const sendResult = await sendAttachmentViaFb(
-          conv.channelAccountId, conv.externalThreadId, buffer, filename, mime, 'image',
-        )
-        sentViaZalo = sendResult.sent
-        uploadedContent = JSON.stringify({ href: url, thumb: url, hdUrl: url })
-      } else {
-        const poolEntry = conv.channelAccountId ? getPoolEntry(conv.channelAccountId) : undefined
-        if (poolEntry?.status === 'connected' && conv.contact?.zaloUid) {
-          const rateCheck = checkLimits(conv.channelAccountId, 'message')
-          if (!rateCheck.allowed) {
-            return reply.status(429).send({
-              error: rateCheck.reason || 'Rate limit exceeded',
-              remaining: rateCheck.remaining,
-            })
-          }
-          const sendResult = await sendImageViaPool(
-            conv.channelAccountId, conv.contact.zaloUid,
-            buffer, filename, caption,
-            conv.threadType === 'group' ? 1 : 0
-          )
-          sentViaZalo = sendResult.sent
-          uploadedContent = sendResult.content
-          if (sentViaZalo) recordAction(conv.channelAccountId, 'message')
+      const sendResult = await sendAttachmentViaFb(
+        conv.channelAccountId, conv.externalThreadId, buffer, filename, mime, fbTypeFromMime(mime),
+      )
+      sentViaZalo = sendResult.sent
+    } else {
+      const targetUid = conv.externalThreadId || conv.contact?.zaloUid
+      const poolEntry = conv.channelAccountId ? getPoolEntry(conv.channelAccountId) : undefined
+      if (poolEntry?.status === 'connected' && targetUid) {
+        const rateCheck = checkLimits(conv.channelAccountId, 'message')
+        if (!rateCheck.allowed) {
+          return reply.status(429).send({
+            error: rateCheck.reason || 'Rate limit exceeded',
+            remaining: rateCheck.remaining,
+          })
         }
-      }
-
-      // Create local message record
-      const message = await prisma.message.create({
-        data: {
-          conversationId: request.params.id,
-          senderType: SenderType.SELF,
-          senderUid: '',
-          senderName: 'Staff',
-          content: uploadedContent || caption || `[📷 ${filename}]`,
-          contentType: 'image',
-          sentAt: new Date(),
-          repliedByUserId: userId,
-        },
-      })
-
-      await prisma.conversation.update({
-        where: { id: request.params.id },
-        data: { lastMessageAt: new Date(), isReplied: true, unreadCount: 0 },
-      })
-
-      const fePayload = transformMessageForFrontend({
-        ...message, senderType: SenderType.SELF, senderName: 'Staff' as const,
-      })
-      try {
-        emitNewMessage(orgId, request.params.id, fePayload)
-      } catch { /* socket */ }
-
-      return { ...fePayload, sentViaZalo }
-    },
-  )
-
-  // ── Send file ──────────────────────────────────────────────────────
-  app.post<{ Params: { id: string } }>(
-    '/api/v1/conversations/:id/messages/file',
-    { preHandler: requireZaloAccess() },
-    async (request, reply) => {
-      const user = request.user as { orgId: string; id: string }
-
-      const conv = await prisma.conversation.findFirst({
-        where: { id: request.params.id, orgId: user.orgId },
-        select: {
-          id: true, contactId: true, orgId: true,
-          channelAccountId: true, externalThreadId: true,
-          contact: { select: { zaloUid: true } },
-          channelAccount: { select: { platform: true } },
-        },
-      })
-      if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
-
-      // Parse multipart
-      const data = await request.file()
-      if (!data) return reply.status(400).send({ error: 'No file uploaded' })
-
-      const buffer = await data.toBuffer()
-      const filename = data.filename || 'document'
-      const caption = (data.fields?.caption as any)?.value || ''
-
-      // Validate file type — block dangerous extensions
-      const ALLOWED_EXTENSIONS = new Set([
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-        '.txt', '.csv', '.zip', '.rar', '.7z',
-        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg',
-        '.mp4', '.mp3', '.wav', '.ogg', '.webm',
-      ])
-      const ext = (filename.lastIndexOf('.') > 0 ? filename.slice(filename.lastIndexOf('.')) : '').toLowerCase()
-      if (ext && !ALLOWED_EXTENSIONS.has(ext)) {
-        return reply.status(400).send({ error: `File type "${ext}" is not allowed` })
-      }
-
-      // Rate limit check
-      let sentViaZalo = false
-      let uploadedContent: string | undefined
-      if (conv.channelAccount?.platform === Platform.FACEBOOK_PAGE && conv.externalThreadId) {
-        // Facebook Page: upload bytes to Messenger + keep a local copy so the file
-        // link renders (parseFileInfo needs title/href/fileExt).
-        const url = await saveChatMedia(buffer, filename)
-        const mime = data.mimetype || ''
-        const sendResult = await sendAttachmentViaFb(
-          conv.channelAccountId, conv.externalThreadId, buffer, filename, mime, fbTypeFromMime(mime),
+        sentViaZalo = await sendFileViaPool(
+          conv.channelAccountId, targetUid,
+          buffer, filename, caption,
         )
-        sentViaZalo = sendResult.sent
-        uploadedContent = JSON.stringify({
-          title: filename,
-          href: url,
-          fileExt: (ext || '').replace(/^\./, '') || 'file',
-          fileSize: String(buffer.length),
-        })
-      } else {
-        const poolEntry = conv.channelAccountId ? getPoolEntry(conv.channelAccountId) : undefined
-        if (poolEntry?.status === 'connected' && conv.contact?.zaloUid) {
-          const rateCheck = checkLimits(conv.channelAccountId, 'message')
-          if (!rateCheck.allowed) {
-            return reply.status(429).send({
-              error: rateCheck.reason || 'Rate limit exceeded',
-              remaining: rateCheck.remaining,
-            })
-          }
-          sentViaZalo = await sendFileViaPool(
-            conv.channelAccountId, conv.contact.zaloUid,
-            buffer, filename, caption,
-          )
-          if (sentViaZalo) recordAction(conv.channelAccountId, 'message')
-        }
+        if (sentViaZalo) recordAction(conv.channelAccountId, 'message')
       }
+    }
 
-      // Create local message record
-      const message = await prisma.message.create({
-        data: {
-          conversationId: request.params.id,
-          senderType: SenderType.SELF,
-          senderUid: '',
-          senderName: 'Staff',
-          content: uploadedContent || caption || `[📎 ${filename}]`,
-          contentType: 'file',
-          sentAt: new Date(),
-          repliedByUserId: user.id,
-        },
+    if (!uploadedContent) {
+      uploadedContent = JSON.stringify({
+        title: filename,
+        href: localMediaUrl,
+        fileExt: (ext || '').replace(/^\./, '') || 'file',
+        fileSize: String(buffer.length),
+        caption: caption || '',
       })
+    }
 
-      await prisma.conversation.update({
-        where: { id: request.params.id },
-        data: { lastMessageAt: new Date(), isReplied: true, unreadCount: 0 },
-      })
+    // Create local message record
+    const message = await prisma.message.create({
+      data: {
+        conversationId: request.params.id,
+        senderType: SenderType.SELF,
+        senderUid: '',
+        senderName: 'Staff',
+        content: uploadedContent,
+        contentType: 'file',
+        sentAt: new Date(),
+        repliedByUserId: userId,
+      },
+    })
 
-      const fePayload = transformMessageForFrontend({
-        ...message, senderType: SenderType.SELF, senderName: 'Staff' as const,
-      })
-      try {
-        emitNewMessage(user.orgId, request.params.id, fePayload)
-      } catch { /* socket */ }
+    await prisma.conversation.update({
+      where: { id: request.params.id },
+      data: { lastMessageAt: new Date(), isReplied: true, unreadCount: 0 },
+    })
 
-      return { ...fePayload, sentViaZalo }
-    },
-  )
+    const fePayload = transformMessageForFrontend({
+      ...message, senderType: SenderType.SELF, senderName: 'Staff' as const,
+    })
+    try {
+      emitNewMessage(orgId, request.params.id, fePayload)
+    } catch { /* socket */ }
+
+    return { ...fePayload, sentViaZalo }
+  }
+
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/messages/file', handleSendFile)
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/files', handleSendFile)
+  app.post<{ Params: { id: string } }>('/api/v1/conversations/:id/file', handleSendFile)
 
   // ── Conversation shared media (images, files, links) ────────────────
   app.get<{ Params: { id: string } }>('/api/v1/conversations/:id/shared-media', { preHandler: requireZaloAccess() }, async (request, reply) => {
