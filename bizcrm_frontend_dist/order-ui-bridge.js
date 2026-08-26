@@ -2349,8 +2349,9 @@
     let provinceId = null;
     let wardId = null;
     let wards = [];
-    let discount = 0;
+    let discountType = 'pct'; // 'pct' | 'vnd'
     let discountPercent = 0;
+    let discountAmount = 0;
     let usedPoints = 0;
     let sellerName = staffCare || 'Trần Trang';
     let pkgWeight = null;
@@ -2427,10 +2428,10 @@
     }
     function calcDiscountAmount() {
       const sub = calcSubtotal();
-      if (discountPercent > 0) {
-        return Math.round((sub * discountPercent) / 100);
+      if (discountType === 'pct') {
+        return Math.round((sub * Math.max(0, Math.min(100, discountPercent || 0))) / 100);
       }
-      return discount || 0;
+      return Math.max(0, discountAmount || 0);
     }
     function calculateTotal() {
       const subtotal = calcSubtotal();
@@ -2445,8 +2446,23 @@
     modalOverlay.className = 'chatmql-modal-overlay';
     modalOverlay.id = 'chatmql-order-modal-root';
 
+    function getScrollContainer() {
+      if (mountEl) return mountEl;
+      const modalBody = modalOverlay.querySelector('.chatmql-modal-body');
+      if (modalBody && modalBody.scrollHeight > modalBody.clientHeight) return modalBody;
+      let p = modalOverlay.parentElement;
+      while (p && p !== document.body) {
+        if (p && p.scrollHeight > p.clientHeight) return p;
+        p = p ? p.parentElement : null;
+      }
+      return document.scrollingElement || document.documentElement;
+    }
+
     function renderModalContent() {
       captureForm();
+      const scrollContainer = getScrollContainer();
+      const savedScroll = scrollContainer ? scrollContainer.scrollTop : 0;
+
       const subtotal = calcSubtotal();
       const total = calculateTotal();
       const totalWeight = pkgWeight != null ? pkgWeight : calcTotalWeight();
@@ -2626,7 +2642,7 @@
                   <div id="prod-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-product" placeholder="Tìm sản phẩm" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
-                  <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
+                  <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:330px; max-width:calc(100vw - 32px); max-height:280px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
                 </div>
 
                 <!-- Input Tìm quà tặng -->
@@ -2634,7 +2650,7 @@
                   <div id="gift-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-gift" placeholder="Tìm quà tặng" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
-                  <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
+                  <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:auto; width:330px; max-width:calc(100vw - 32px); max-height:280px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
                 </div>
               </div>
 
@@ -2793,12 +2809,25 @@
 
               <!-- Chiết khấu -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <span style="font-size:12.5px; font-weight:600; color:#334155;">Chiết khấu</span>
-                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
-                  <input type="number" id="order-discount-pct" value="${discountPercent}" min="0" max="100" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
-                  <span style="font-size:12px; color:#64748b; margin-left:4px;">%</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:12.5px; font-weight:600; color:#334155;">Chiết khấu</span>
+                  <div style="display:inline-flex; background:#e2e8f0; border-radius:6px; padding:2px; gap:2px;">
+                    <button type="button" id="btn-discount-pct" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${discountType === 'pct' ? '#2563eb' : 'transparent'}; color:${discountType === 'pct' ? '#fff' : '#64748b'};">%</button>
+                    <button type="button" id="btn-discount-vnd" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${discountType === 'vnd' ? '#2563eb' : 'transparent'}; color:${discountType === 'vnd' ? '#fff' : '#64748b'};">VNĐ</button>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:140px;">
+                  <input type="number" id="order-discount-val" value="${discountType === 'pct' ? (discountPercent || '') : (discountAmount || '')}" min="0" ${discountType === 'pct' ? 'max="100"' : ''} placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <span id="order-discount-unit" style="font-size:12px; color:#64748b; margin-left:4px;">${discountType === 'pct' ? '%' : 'đ'}</span>
                 </div>
               </div>
+
+              <!-- Tiền chiết khấu (khi dùng %) -->
+              ${discountType === 'pct' && discountPercent > 0 ? `
+              <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin:-4px 0 10px;">
+                <span>Tiền giảm (${discountPercent}%)</span>
+                <span id="summary-discount" style="font-weight:700; color:#dc2626;">-${vnd(calcDiscountAmount())}đ</span>
+              </div>` : ''}
 
               <!-- Mã ưu đãi -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -2819,7 +2848,7 @@
                   <span style="font-size:11px; color:#94a3b8; margin-left:4px;">1 Lá = 1.000đ</span>
                 </div>
                 <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
-                  <input type="number" id="order-points" value="${usedPoints}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <input type="number" id="order-points" value="${usedPoints || ''}" min="0" placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
                   <span style="font-size:12px; color:#64748b; margin-left:4px;">Lá</span>
                 </div>
               </div>
@@ -2827,26 +2856,26 @@
               <!-- Quy đổi Lá -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
                 <span>Quy đổi Lá</span>
-                <span style="font-weight:700; color:#0f172a;">-${vnd(usedPoints * 1000)}đ</span>
+                <span id="summary-points" style="font-weight:700; color:#0f172a;">-${vnd(usedPoints * 1000)}đ</span>
               </div>
 
               <!-- Phí vận chuyển -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:12px;">
                 <span>Phí vận chuyển</span>
-                <span style="font-weight:700; color:#0f172a;">${vnd(selfShipping || promoApplied?.free_shipping ? 0 : shippingFee)}đ</span>
+                <span id="summary-shipping" style="font-weight:700; color:#0f172a;">${vnd(selfShipping || promoApplied?.free_shipping ? 0 : shippingFee)}đ</span>
               </div>
 
               <!-- Highlight Box: Tổng thanh toán -->
               <div style="background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <span style="font-size:13.5px; font-weight:700; color:#1e3a8a;">Tổng thanh toán</span>
-                <span style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}</span>
+                <span id="summary-total" style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}</span>
               </div>
 
               <!-- Chuyển khoản đặt cọc -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <span style="font-size:12.5px; font-weight:600; color:#334155;">Chuyển khoản (đặt cọc)</span>
                 <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:140px;">
-                  <input type="number" id="order-deposit" value="${depositAmount}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <input type="number" id="order-deposit" value="${depositAmount || ''}" min="0" placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
                   <span style="font-size:12px; color:#64748b; margin-left:4px;">đ</span>
                 </div>
               </div>
@@ -2854,19 +2883,19 @@
               <!-- Đã đặt cọc -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
                 <span>Đã đặt cọc</span>
-                <span style="font-weight:700; color:#16a34a;">${vnd(depositAmount)}đ</span>
+                <span id="summary-deposit" style="font-weight:700; color:#16a34a;">${vnd(depositAmount)}đ</span>
               </div>
 
               <!-- Còn phải thu (COD) -->
               <div style="display:flex; justify-content:space-between; font-size:13px; color:#334155; margin-bottom:10px;">
                 <span>Còn phải thu (COD)</span>
-                <span style="font-weight:700; color:#ea580c; font-size:14px;">${vnd(Math.max(0, total - depositAmount))}đ</span>
+                <span id="summary-cod" style="font-weight:700; color:#ea580c; font-size:14px;">${vnd(Math.max(0, total - depositAmount))}đ</span>
               </div>
 
               <!-- Trạng thái thanh toán -->
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:#334155; padding-top:8px; border-top:1px dashed #e2e8f0;">
                 <span>Trạng thái thanh toán</span>
-                <span style="background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:11.5px; font-weight:600;">
+                <span id="summary-pay-status" style="background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:11.5px; font-weight:600;">
                   ${depositAmount >= total && total > 0 ? 'Đã thanh toán' : depositAmount > 0 ? 'Đã cọc một phần' : 'Chưa thanh toán'}
                 </span>
               </div>
@@ -3171,12 +3200,68 @@
       const hEl = modalOverlay.querySelector('#order-pkg-height');
       if (hEl) hEl.oninput = e => { pkgHeight = e.target.value; };
 
-      // Chiết khấu %
-      const discountPctInput = modalOverlay.querySelector('#order-discount-pct');
-      if (discountPctInput) {
-        discountPctInput.oninput = e => {
-          discountPercent = Math.max(0, Math.min(100, Number(e.target.value) || 0));
-          renderModalContent();
+      function updateSummary() {
+        const sub = calcSubtotal();
+        const disc = calcDiscountAmount();
+        const promoOff = promoApplied?.discount_amount || 0;
+        const pointsOff = (usedPoints || 0) * 1000;
+        const ship = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
+        const tot = Math.max(0, sub - disc - promoOff - pointsOff + ship);
+        const cod = Math.max(0, tot - (depositAmount || 0));
+
+        const totEl = modalOverlay.querySelector('#summary-total');
+        if (totEl) totEl.textContent = vnd(tot);
+
+        const discEl = modalOverlay.querySelector('#summary-discount');
+        if (discEl) discEl.textContent = `-${vnd(disc)}đ`;
+
+        const ptsEl = modalOverlay.querySelector('#summary-points');
+        if (ptsEl) ptsEl.textContent = `-${vnd(pointsOff)}đ`;
+
+        const shipEl = modalOverlay.querySelector('#summary-shipping');
+        if (shipEl) shipEl.textContent = `${vnd(ship)}đ`;
+
+        const depEl = modalOverlay.querySelector('#summary-deposit');
+        if (depEl) depEl.textContent = `${vnd(depositAmount)}đ`;
+
+        const codEl = modalOverlay.querySelector('#summary-cod');
+        if (codEl) codEl.textContent = `${vnd(cod)}đ`;
+
+        const payStatusEl = modalOverlay.querySelector('#summary-pay-status');
+        if (payStatusEl) {
+          payStatusEl.textContent = depositAmount >= tot && tot > 0 ? 'Đã thanh toán' : depositAmount > 0 ? 'Đã cọc một phần' : 'Chưa thanh toán';
+        }
+      }
+
+      // Chiết khấu (Giá trị & Toggle Loại)
+      const discValInput = modalOverlay.querySelector('#order-discount-val');
+      if (discValInput) {
+        discValInput.oninput = e => {
+          const val = Math.max(0, Number(e.target.value) || 0);
+          if (discountType === 'pct') {
+            discountPercent = Math.min(100, val);
+          } else {
+            discountAmount = val;
+          }
+          updateSummary();
+        };
+      }
+      const btnPct = modalOverlay.querySelector('#btn-discount-pct');
+      if (btnPct) {
+        btnPct.onclick = () => {
+          if (discountType !== 'pct') {
+            discountType = 'pct';
+            renderModalContent();
+          }
+        };
+      }
+      const btnVnd = modalOverlay.querySelector('#btn-discount-vnd');
+      if (btnVnd) {
+        btnVnd.onclick = () => {
+          if (discountType !== 'vnd') {
+            discountType = 'vnd';
+            renderModalContent();
+          }
         };
       }
 
@@ -3185,7 +3270,7 @@
       if (pointsInput) {
         pointsInput.oninput = e => {
           usedPoints = Math.max(0, Number(e.target.value) || 0);
-          renderModalContent();
+          updateSummary();
         };
       }
 
@@ -3194,7 +3279,7 @@
       if (depEl) {
         depEl.oninput = e => {
           depositAmount = Math.max(0, Number(e.target.value) || 0);
-          renderModalContent();
+          updateSummary();
         };
       }
 
@@ -3203,7 +3288,7 @@
       if (feeInput) {
         feeInput.oninput = e => {
           shippingFee = Number(e.target.value) || 0;
-          renderModalContent();
+          updateSummary();
         };
       }
 
@@ -3458,6 +3543,12 @@
           resetBtn();
         }
       };
+
+      if (scrollContainer && scrollContainer.scrollTop !== undefined) {
+        requestAnimationFrame(() => {
+          scrollContainer.scrollTop = savedScroll;
+        });
+      }
     }
 
     try {
