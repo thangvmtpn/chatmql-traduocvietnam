@@ -20,6 +20,7 @@ import { getAiReplyConfig, resolveConversationMode } from '../ai-config-service.
 import { runHarness } from './reply-generator.js'
 import { deliverSuggestDraft } from './suggest-delivery.js'
 import { sendMessageCore } from '../../chat/send-core.js'
+import { sendImageCore } from '../../chat/send-image-core.js'
 import { applyHandoff } from '../handoff-service.js'
 import { recordStep } from '../observability/trace-recorder.js'
 import { emitAiTyping } from '../../realtime/socket-gateway.js'
@@ -134,7 +135,7 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
     // in suggest mode the customer gets no message, typing would mislead them.
     try { emitAiTyping(convId, true) } catch { /* socket not ready */ }
     if (effectiveMode === 'auto' && conv.channelAccount?.platform === Platform.ZALO_USER) {
-      const recipient = conv.threadType === 'group' ? conv.externalThreadId : conv.contact?.zaloUid
+      const recipient = conv.threadType === 'group' ? conv.externalThreadId : (conv.externalThreadId || conv.contact?.zaloUid)
       if (recipient) {
         sendTypingViaPool(conv.channelAccountId, recipient, conv.threadType as 'user' | 'group')
           .catch(() => { /* cosmetic */ })
@@ -163,20 +164,48 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
           aiReplyRunId: result.runId,
           triggerAutomation: false,
         })
-        // If the reply couldn't actually be delivered (e.g. outside the FB 24h /
-        // OA 7-day window, or a send error) don't silently pretend it was sent —
-        // hand off to a human, which switches the conversation to manual (pauses
-        // AI) and notifies the assignee.
+        // If the reply couldn't actually be delivered due to expired window,
+        // hand off to a human to alert the team.
         if (!sendResult.sentViaZalo) {
           logger.warn(
             { convId, csWindowExpired: sendResult.csWindowExpired, err: sendResult.zaloError },
-            '[orchestrator] AI reply not delivered — handing off to human',
+            '[orchestrator] AI reply not delivered to channel',
           )
-          await applyHandoff(
-            orgId,
-            convId,
-            sendResult.csWindowExpired ? 'Ngoài khung nhắn tin — cần nhân viên trả lời' : 'AI gửi tin thất bại',
-          )
+          if (sendResult.csWindowExpired) {
+            await applyHandoff(
+              orgId,
+              convId,
+              'Ngoài khung nhắn tin — cần nhân viên trả lời',
+            )
+          }
+        } else if (result.images?.length) {
+          // Ảnh gửi SAU khi phần chữ đã thực sự ra kênh. Gửi trước thì khách
+          // nhận được ảnh trơ không lời dẫn khi phần chữ hỏng.
+          //
+          // Ảnh hỏng KHÔNG chuyển nhân viên: khách đã có câu trả lời bằng chữ,
+          // thiếu ảnh là bất tiện chứ không phải hội thoại bị bỏ rơi. Chỉ ghi log.
+          for (const img of result.images) {
+            try {
+              const r = await sendImageCore({
+                orgId,
+                conversationId: convId,
+                imageUrl: img.imageUrl,
+                caption: img.caption,
+                sender: 'ai',
+                aiReplyRunId: result.runId,
+              })
+              if (!r.sent) {
+                logger.warn({ convId, product: img.productName, err: r.error },
+                  '[orchestrator] không gửi được ảnh sản phẩm')
+              } else {
+                logger.info({ convId, product: img.productName },
+                  '[orchestrator] AI đã gửi ảnh sản phẩm')
+              }
+            } catch (err) {
+              logger.error({ err, convId, product: img.productName },
+                '[orchestrator] lỗi khi gửi ảnh sản phẩm')
+            }
+          }
         }
       }
     } finally {

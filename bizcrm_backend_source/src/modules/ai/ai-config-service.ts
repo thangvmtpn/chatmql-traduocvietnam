@@ -434,7 +434,7 @@ export function resolveConversationMode(input: {
 }): string {
   if (!input.autoReplyEnabled) return 'manual'
 
-  if (input.convAiMode === 'manual') return 'manual'
+  if (input.convAiMode === 'off') return 'manual'
 
   if (input.schedule?.enabled) {
     const afterHours = isAfterHours(
@@ -444,9 +444,9 @@ export function resolveConversationMode(input: {
       input.schedule.endHour ?? 8,
     )
     if (afterHours) {
-      return input.convAiMode ?? input.schedule.nighttimeMode ?? 'auto'
+      return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.nighttimeMode ?? 'auto')
     } else {
-      return input.schedule.daytimeMode ?? 'suggest'
+      return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.daytimeMode ?? 'auto')
     }
   }
 

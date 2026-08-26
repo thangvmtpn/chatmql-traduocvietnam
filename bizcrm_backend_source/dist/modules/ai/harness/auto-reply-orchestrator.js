@@ -106,7 +106,7 @@ async function processAiReplyJob(job) {
         }
         catch { /* socket not ready */ }
         if (effectiveMode === 'auto' && conv.channelAccount?.platform === Platform.ZALO_USER) {
-            const recipient = conv.threadType === 'group' ? conv.externalThreadId : conv.contact?.zaloUid;
+            const recipient = conv.threadType === 'group' ? conv.externalThreadId : (conv.externalThreadId || conv.contact?.zaloUid);
             if (recipient) {
                 sendTypingViaPool(conv.channelAccountId, recipient, conv.threadType)
                     .catch(() => { });
@@ -135,13 +135,13 @@ async function processAiReplyJob(job) {
                     aiReplyRunId: result.runId,
                     triggerAutomation: false,
                 });
-                // If the reply couldn't actually be delivered (e.g. outside the FB 24h /
-                // OA 7-day window, or a send error) don't silently pretend it was sent —
-                // hand off to a human, which switches the conversation to manual (pauses
-                // AI) and notifies the assignee.
+                // If the reply couldn't actually be delivered due to expired window,
+                // hand off to a human to alert the team.
                 if (!sendResult.sentViaZalo) {
-                    logger.warn({ convId, csWindowExpired: sendResult.csWindowExpired, err: sendResult.zaloError }, '[orchestrator] AI reply not delivered — handing off to human');
-                    await applyHandoff(orgId, convId, sendResult.csWindowExpired ? 'Ngoài khung nhắn tin — cần nhân viên trả lời' : 'AI gửi tin thất bại');
+                    logger.warn({ convId, csWindowExpired: sendResult.csWindowExpired, err: sendResult.zaloError }, '[orchestrator] AI reply not delivered to channel');
+                    if (sendResult.csWindowExpired) {
+                        await applyHandoff(orgId, convId, 'Ngoài khung nhắn tin — cần nhân viên trả lời');
+                    }
                 }
                 else if (result.images?.length) {
                     // Ảnh gửi SAU khi phần chữ đã thực sự ra kênh. Gửi trước thì khách

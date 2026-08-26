@@ -340,15 +340,15 @@ export async function getAiReplyConfig(orgId) {
 export function resolveConversationMode(input) {
     if (!input.autoReplyEnabled)
         return 'manual';
-    if (input.convAiMode === 'manual')
+    if (input.convAiMode === 'off')
         return 'manual';
     if (input.schedule?.enabled) {
         const afterHours = isAfterHours(input.currentTime, input.schedule.timezone || 'Asia/Ho_Chi_Minh', input.schedule.startHour ?? 18, input.schedule.endHour ?? 8);
         if (afterHours) {
-            return input.convAiMode ?? input.schedule.nighttimeMode ?? 'auto';
+            return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.nighttimeMode ?? 'auto');
         }
         else {
-            return input.schedule.daytimeMode ?? 'suggest';
+            return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.daytimeMode ?? 'auto');
         }
     }
     return input.convAiMode ?? input.defaultAiMode;
