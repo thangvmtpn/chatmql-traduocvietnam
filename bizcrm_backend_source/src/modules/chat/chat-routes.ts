@@ -14,7 +14,7 @@ import { requireZaloAccess, resolveManagerAccountIds } from '../zalo/zalo-access
 import { forwardReactionToZalo, isSupportedEmoji } from '../zalo/zalo-reactions.js'
 import multipart from '@fastify/multipart'
 import { logger } from '../../shared/logger.js'
-import { deriveActorKind, type ActorKindValue } from '../../shared/constants.js'
+import { deriveActorKind, type ActorKindValue, Platform } from '../../shared/constants.js'
 
 type QueryParams = Record<string, string>
 
@@ -60,14 +60,41 @@ export function buildReplyQuote(message: {
  * Apply at every place a message is returned to the client (HTTP response + socket emit)
  * so the quote box appears live, not just after a /messages refetch on reload.
  */
-export function transformMessageForFrontend<T extends { quote?: unknown }>(message: T): Omit<T, 'quote'> & {
+export function transformMessageForFrontend<T extends { quote?: unknown; contentType?: string; content?: string | null }>(message: T): Omit<T, 'quote'> & {
   reply: { msgId: string; cliMsgId?: string; content: string; msgType: string; uidFrom: string; ts: string } | null
   actorKind: ActorKindValue
 } {
   const { quote, ...rest } = message
-  // Derived role of this item (khách / hệ thống / AI / nhân viên / ZNS) — single
-  // source of truth so the chat UI can group & filter without scattered checks.
   const actorKind = deriveActorKind(message as Record<string, unknown>)
+  
+  // Sanitize content for image/file to guarantee frontend parsing never fails
+  let safeContent = rest.content ?? ''
+  if (rest.contentType === 'image') {
+    if (!safeContent || !safeContent.trim().startsWith('{')) {
+      safeContent = JSON.stringify({
+        href: safeContent.startsWith('http') ? safeContent : 'https://tracrm-api.bizino.ai/uploads/chat-media/placeholder.png',
+        thumb: safeContent.startsWith('http') ? safeContent : 'https://tracrm-api.bizino.ai/uploads/chat-media/placeholder.png',
+        caption: safeContent || 'Hình ảnh',
+        title: 'image.png'
+      })
+    } else {
+      const publicBase = (process.env.PUBLIC_API_URL || '').replace(/\/$/, '')
+      if (publicBase && safeContent.includes('http://localhost:4520/uploads/')) {
+        safeContent = safeContent.replaceAll('http://localhost:4520/uploads/', `${publicBase}/uploads/`)
+      }
+    }
+  } else if (rest.contentType === 'file') {
+    if (!safeContent || !safeContent.trim().startsWith('{')) {
+      safeContent = JSON.stringify({
+        title: safeContent || 'Tài liệu',
+        href: safeContent.startsWith('http') ? safeContent : '#',
+        fileExt: 'file',
+        fileSize: '0'
+      })
+    }
+  }
+  (rest as any).content = safeContent
+
   const q = quote as Record<string, unknown> | null | undefined
   if (!q || typeof q !== 'object') return { ...rest, reply: null, actorKind }
   return {
@@ -97,8 +124,17 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
     const user = request.user as { orgId: string; id: string; role: string }
     const { accountId = '', tab = '' } = request.query as QueryParams
 
-    const baseWhere: any = { orgId: user.orgId }
-    if (accountId) baseWhere.channelAccountId = accountId
+    const baseWhere: any = {
+      orgId: user.orgId,
+      channelAccount: {
+        isDisabled: false,
+        deletedAt: null,
+      },
+    }
+    if (accountId) {
+      baseWhere.channelAccountId = accountId
+      delete baseWhere.channelAccount
+    }
     if (tab) baseWhere.tab = tab
 
     // Members can only see conversations from accessible Zalo accounts
@@ -151,12 +187,29 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       from = '',
       to = '',
       tab = '',
-    } = request.query as QueryParams
+      aiMode = '',
+      assignedTo = '',
+      platform = '',
+    } = request.query as QueryParams & { platform?: string }
 
-    const where: any = { orgId: user.orgId }
+    const where: any = {
+      orgId: user.orgId,
+      channelAccount: {
+        isDisabled: false,
+        deletedAt: null,
+      },
+    }
     if (contactId) where.contactId = contactId
     if (tab) where.tab = tab
-    if (accountId) where.channelAccountId = accountId
+    if (accountId) {
+      where.channelAccountId = accountId
+      delete where.channelAccount
+    }
+    if (platform === 'oa' || platform === '1' || platform === 'zalo_oa') {
+      where.channelAccount = { ...(where.channelAccount || {}), platform: Platform.ZALO_OA }
+    } else if (platform === 'personal' || platform === '2' || platform === 'user' || platform === 'zalo_user') {
+      where.channelAccount = { ...(where.channelAccount || {}), platform: Platform.ZALO_USER }
+    }
     if (search) {
       where.OR = [
         { displayName: { contains: search, mode: 'insensitive' } },
@@ -170,6 +223,12 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
     // Advanced filters
     if (unread === 'true') where.unreadCount = { gt: 0 }
     if (unreplied === 'true') where.isReplied = false
+    // Cột lọc bên trái: chế độ AI đang bật và hội thoại được giao cho mình.
+    // Hai trường này đã có trong bảng nhưng trước đây chưa lọc được qua API,
+    // nên các nút "Auto" và "Được gán cho tôi" bấm vào không đổi danh sách.
+    if (aiMode) where.aiMode = aiMode
+    if (assignedTo === 'me') where.assignedUserId = user.id
+    else if (assignedTo) where.assignedUserId = assignedTo
     if (from || to) {
       where.lastMessageAt = {}
       if (from) { const d = new Date(from); if (!isNaN(d.getTime())) where.lastMessageAt.gte = d }

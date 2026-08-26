@@ -3750,8 +3750,8 @@
 .chat-list__action-btn:hover{background:var(--gray-100);}
 .search-input{display:flex; align-items:center; gap:8px; background:var(--gray-100); border-radius:8px; padding:0 10px;}
 .search-input__field{border:none; background:none; outline:none; font-size:13px; padding:8px 0; width:100%; font-family:inherit;}
-.filter-bar{display:flex; gap:6px; margin:10px 0;}
-.filter-bar__btn{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:12px; padding:4px 12px; border-radius:14px; cursor:pointer;}
+.filter-bar{display:flex; gap:5px; margin:10px 0; overflow-x:auto; flex-wrap:wrap;}
+.filter-bar__btn{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:12px; padding:4px 10px; border-radius:14px; cursor:pointer; white-space:nowrap; transition:all .15s ease;}
 .filter-bar__btn--active{background:var(--primary); border-color:var(--primary); color:#fff; font-weight:600;}
 .chat-list__account-filter{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--gray-200); border-radius:8px; cursor:pointer; margin-bottom:10px; font-size:12.5px;}
 .chat-list__account-avatar{width:20px; height:20px; border-radius:6px; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
@@ -4832,6 +4832,9 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   const ICON_FILTERS = {
     'Chat':             { kind: 'app', btn: 'Tất cả' },
     'Chưa đọc':         { kind: 'app', btn: 'Chưa đọc' },
+    'Của tôi':          { kind: 'app', btn: 'Của tôi' },
+    'Cá nhân':          { kind: 'app', btn: 'Cá nhân' },
+    'Zalo OA':          { kind: 'app', btn: 'Zalo OA' },
     'Được gán cho tôi': { kind: 'api', param: 'assignedTo=me',  label: 'được gán cho tôi' },
     'Auto':             { kind: 'api', param: 'aiMode=auto',    label: 'AI đang tự trả lời' },
     'Chờ':              { kind: 'api', param: 'unreplied=true', label: 'chờ nhân viên trả lời' },

@@ -6,7 +6,7 @@ import { chatGroupRoutes } from './chat-group-routes.js';
 import { requireZaloAccess, resolveManagerAccountIds } from '../zalo/zalo-access-middleware.js';
 import multipart from '@fastify/multipart';
 import { logger } from '../../shared/logger.js';
-import { deriveActorKind } from '../../shared/constants.js';
+import { deriveActorKind, Platform } from '../../shared/constants.js';
 // ── Quote helpers (ported from ZaloCRM) ───────────────────────────────────────
 /** Map BizCRM contentType → Zalo internal msgType for quote references */
 function mapReplyMsgType(contentType) {
@@ -159,7 +159,7 @@ export async function chatRoutes(app) {
     // ── List conversations (paginated, filterable) ──────────────────────
     app.get('/api/v1/conversations', async (request) => {
         const user = request.user;
-        const { page = '1', limit = '50', search = '', contactId = '', accountId = '', unread = '', unreplied = '', from = '', to = '', tab = '', aiMode = '', assignedTo = '', } = request.query;
+        const { page = '1', limit = '50', search = '', contactId = '', accountId = '', unread = '', unreplied = '', from = '', to = '', tab = '', aiMode = '', assignedTo = '', platform = '', } = request.query;
         const where = {
             orgId: user.orgId,
             channelAccount: {
@@ -174,6 +174,12 @@ export async function chatRoutes(app) {
         if (accountId) {
             where.channelAccountId = accountId;
             delete where.channelAccount;
+        }
+        if (platform === 'oa' || platform === '1' || platform === 'zalo_oa') {
+            where.channelAccount = { ...(where.channelAccount || {}), platform: Platform.ZALO_OA };
+        }
+        else if (platform === 'personal' || platform === '2' || platform === 'user' || platform === 'zalo_user') {
+            where.channelAccount = { ...(where.channelAccount || {}), platform: Platform.ZALO_USER };
         }
         if (search) {
             where.OR = [
