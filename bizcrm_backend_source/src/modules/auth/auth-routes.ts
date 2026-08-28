@@ -14,6 +14,23 @@ import {
 } from './token-service.js'
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  // Fastify ném 400 khi POST có Content-Type: application/json mà body rỗng.
+  // impersonate và stop-impersonation đều không cần body, nhưng client dùng
+  // header dùng chung nên vẫn đính Content-Type — coi body rỗng là {}.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body: string, done) => {
+      if (!body) return done(null, {})
+      try {
+        done(null, JSON.parse(body))
+      } catch (err: any) {
+        err.statusCode = 400
+        done(err, undefined)
+      }
+    },
+  )
+
   // C2-FIX: Rate limit auth endpoints — 10 attempts per minute per IP.
   // /auth/me is a frequent profile fetch (page loads, tab opens) — excluded.
   // The global rate-limiter (1000 dev / 200 prod per minute) still covers it.
@@ -177,6 +194,32 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         impersonatedBy: actor.id,
       }
       const accessToken = app.jwt.sign(payload, { expiresIn: '4h' })
+
+      // Kiểm toán BẮT BUỘC: từ lúc này mọi thao tác mang danh tính người khác,
+      // nên phải có dấu vết ai thực sự đứng sau. Thiếu log thì sau này không
+      // trả lời được câu "ai đã sửa đơn của khách này".
+      prisma.activityLog.create({
+        data: {
+          orgId: actor.orgId,
+          userId: actor.id,
+          action: 'auth.impersonation_started',
+          entityType: 'User',
+          entityId: target.id,
+          details: {
+            actorRole: actor.role,
+            targetEmail: target.email,
+            targetName: target.fullName,
+            targetRole: target.role,
+            expiresInHours: 4,
+          },
+        },
+      }).catch(err => app.log.error({ err }, '[auth] không ghi được log xem dưới quyền'))
+
+      app.log.warn(
+        { actorId: actor.id, targetId: target.id, targetEmail: target.email },
+        '[auth] Bắt đầu xem dưới quyền nhân viên khác',
+      )
+
       return { token: accessToken, user: payload }
     },
   )
@@ -205,6 +248,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       orgId: admin.orgId,
     }
     const { accessToken, refreshToken } = await issueTokenPair(payload)
+
+    prisma.activityLog.create({
+      data: {
+        orgId: admin.orgId,
+        userId: admin.id,
+        action: 'auth.impersonation_ended',
+        entityType: 'User',
+        entityId: current.id,
+        details: { returnedTo: admin.email },
+      },
+    }).catch(err => app.log.error({ err }, '[auth] không ghi được log thoát xem dưới quyền'))
     return { token: accessToken, refreshToken, user: payload }
   })
 

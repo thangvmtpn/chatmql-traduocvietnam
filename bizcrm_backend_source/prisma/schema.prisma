@@ -846,6 +846,11 @@ model KnowledgeEntry {
   content    String
   keywords   String? // cách hỏi / tên gọi khác — tăng recall RAG
   status     String // active | pending | rejected | archived
+  /// Ảnh/video đính kèm. Chỉ mục có status='active' mới được gửi ra ngoài
+  /// cho khách — xem thư viện tài liệu ở library-routes.ts.
+  mediaUrls  String[] @default([]) @map("media_urls")
+  /// 'image' | 'video' | null (mục chỉ có chữ)
+  mediaType  String?  @db.VarChar(16) @map("media_type")
   risk       String // low | sensitive
   source     String // ai_extracted | staff_manual | feedback | gap_resolved
   confidence Float?                       @default(0)
@@ -1354,6 +1359,9 @@ model Note {
   conversationId  String?  @map("conversation_id")
   createdByUserId String   @map("created_by_user_id")
   content         String
+  /// Kết quả tương tác của lần liên hệ này. Null = ghi chú thường, không gắn
+  /// với cuộc gọi/trao đổi nào. Giá trị hợp lệ xem NOTE_STATUSES ở note-routes.ts.
+  status          String?  @db.VarChar(32)
   isPinned        Boolean  @default(false) @map("is_pinned")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")

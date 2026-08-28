@@ -1,0 +1,632 @@
+<title>Bản đồ tính năng ChatMQL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  /* Bảng màu lấy từ thế giới của chủ đề: nước trà shan tuyết ủ đậm, hổ phách
+     lá khô, men sứ ấm chén. Neutral lệch nhẹ sang xanh trà, không phải xám thuần. */
+  :root {
+    --ground:      #F6F8F5;
+    --surface:     #FFFFFF;
+    --surface-alt: #EDF1EC;
+    --line:        #D8E0D6;
+    --line-soft:   #E7ECE5;
+    --ink:         #16201C;
+    --ink-soft:    #4E5C55;
+    --ink-faint:   #7C8A83;
+    --accent:      #1F5D4C;
+    --accent-soft: #DCEBE4;
+    --ready:       #1F5D4C;
+    --ready-bg:    #DCEBE4;
+    --partial:     #96601C;
+    --partial-bg:  #F6E9D4;
+    --missing:     #97372E;
+    --missing-bg:  #F7DFDC;
+    --shadow:      0 1px 2px rgba(22,32,28,.06), 0 8px 24px -16px rgba(22,32,28,.28);
+
+    --step--1: clamp(.78rem, .76rem + .1vw, .84rem);
+    --step-0:  clamp(.95rem, .92rem + .16vw, 1.03rem);
+    --step-1:  clamp(1.16rem, 1.1rem + .3vw, 1.35rem);
+    --step-2:  clamp(1.5rem, 1.35rem + .7vw, 2rem);
+    --step-3:  clamp(2rem, 1.7rem + 1.4vw, 3rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #101614;
+      --surface:     #17201D;
+      --surface-alt: #1D2725;
+      --line:        #2C3A35;
+      --line-soft:   #232E2B;
+      --ink:         #E8EEEA;
+      --ink-soft:    #A9B7B0;
+      --ink-faint:   #7A8880;
+      --accent:      #6BBFA2;
+      --accent-soft: #1B2E28;
+      --ready:       #6BBFA2;
+      --ready-bg:    #172E27;
+      --partial:     #DFAE66;
+      --partial-bg:  #2E2617;
+      --missing:     #E28B80;
+      --missing-bg:  #2E1D1B;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #101614;
+    --surface:     #17201D;
+    --surface-alt: #1D2725;
+    --line:        #2C3A35;
+    --line-soft:   #232E2B;
+    --ink:         #E8EEEA;
+    --ink-soft:    #A9B7B0;
+    --ink-faint:   #7A8880;
+    --accent:      #6BBFA2;
+    --accent-soft: #1B2E28;
+    --ready:       #6BBFA2;
+    --ready-bg:    #172E27;
+    --partial:     #DFAE66;
+    --partial-bg:  #2E2617;
+    --missing:     #E28B80;
+    --missing-bg:  #2E1D1B;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+    font-size: var(--step-0);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 3rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.12;
+    letter-spacing: -.015em;
+  }
+  h1 { font-size: var(--step-3); font-weight: 700; }
+  h2 { font-size: var(--step-2); font-weight: 700; }
+  h3 { font-size: var(--step-1); font-weight: 600; letter-spacing: -.008em; }
+  p  { margin: 0; max-width: 68ch; }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: var(--step--1);
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  header.masthead { display: flex; flex-direction: column; gap: 1rem; }
+  header.masthead p.lede {
+    font-size: var(--step-1);
+    color: var(--ink-soft);
+    max-width: 60ch;
+  }
+  .meta {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.6rem;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.4rem; }
+  .section-head { display: flex; flex-direction: column; gap: .5rem; }
+
+  /* Ô số liệu tóm tắt */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1rem;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    box-shadow: var(--shadow);
+  }
+  .tile .num {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-size: var(--step-2);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .tile .lbl { font-size: var(--step--1); color: var(--ink-soft); }
+  .tile.is-ready   .num { color: var(--ready); }
+  .tile.is-partial .num { color: var(--partial); }
+  .tile.is-missing .num { color: var(--missing); }
+
+  /* Chip trạng thái dữ liệu */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: .18rem .5rem;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .chip::before {
+    content: "";
+    width: .45rem; height: .45rem;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+  .chip.ready   { color: var(--ready);   background: var(--ready-bg); }
+  .chip.partial { color: var(--partial); background: var(--partial-bg); }
+  .chip.missing { color: var(--missing); background: var(--missing-bg); }
+
+  /* Bảng đối chiếu */
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 46rem; }
+  thead th {
+    text-align: left;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: .8rem 1rem;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    font-size: var(--step--1);
+    line-height: 1.55;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-weight: 600; color: var(--ink); min-width: 12rem; }
+  td .where {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .72rem;
+    color: var(--ink-faint);
+    display: block;
+    margin-top: .2rem;
+  }
+  .group-row td {
+    background: var(--accent-soft);
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: var(--step--1);
+    letter-spacing: .01em;
+    color: var(--accent);
+    padding: .55rem 1rem;
+  }
+
+  /* Khối cảnh báo */
+  .flags { display: flex; flex-direction: column; gap: 1rem; }
+  .flag {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--missing);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.1rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    box-shadow: var(--shadow);
+  }
+  .flag.warn { border-left-color: var(--partial); }
+  .flag h3 { font-size: var(--step-0); }
+  .flag p { font-size: var(--step--1); color: var(--ink-soft); }
+  .flag code, .inline-code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .82em;
+    background: var(--surface-alt);
+    padding: .1rem .35rem;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+
+  /* Lộ trình */
+  ol.phases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; counter-reset: ph; }
+  ol.phases li {
+    counter-increment: ph;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.2rem 1.3rem 1.2rem 3.6rem;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  ol.phases li::before {
+    content: "Đợt " counter(ph);
+    position: absolute;
+    left: 1.2rem; top: 1.25rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--accent);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+  ol.phases h3 { margin-bottom: .35rem; }
+  ol.phases p { font-size: var(--step--1); color: var(--ink-soft); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 1.4rem;
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    max-width: 68ch;
+  }
+  strong { font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="eyebrow">Đối chiếu thiết kế · 21/08/2026</span>
+    <h1>Bản đồ tính năng ChatMQL</h1>
+    <p class="lede">
+      Thiết kế <code class="inline-code">chat-mql.html</code> mô tả một hệ thống rộng hơn
+      bản đang chạy khá nhiều. Tin tốt: phần lớn dữ liệu cần thiết <strong>đã nằm sẵn
+      trong CRM và FM</strong> — cái thiếu chủ yếu là đường dẫn để ChatMQL với tới.
+    </p>
+    <div class="meta">
+      <span>2.957 dòng HTML</span>
+      <span>Mockup tĩnh · 0 lời gọi API</span>
+      <span>7 tab hồ sơ · 36 ô nhập ở form đơn</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Mức độ sẵn sàng của dữ liệu</h2>
+      <p>
+        Tôi phân loại 22 tính năng theo dữ liệu đã có hay chưa, vì đó là thứ quyết
+        định thứ tự làm — không phải độ khó của giao diện.
+      </p>
+    </div>
+    <div class="tiles">
+      <div class="tile is-ready">
+        <span class="num">11</span>
+        <span class="lbl">Dữ liệu đã sẵn — chỉ cần nối endpoint và dựng giao diện</span>
+      </div>
+      <div class="tile is-partial">
+        <span class="num">6</span>
+        <span class="lbl">Có một phần — cần bổ sung trường hoặc làm sạch dữ liệu</span>
+      </div>
+      <div class="tile is-missing">
+        <span class="num">5</span>
+        <span class="lbl">Chưa có gì — phải dựng cả bảng, backend lẫn giao diện</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Đối chiếu từng tính năng</h2>
+      <p>
+        Cột "Nguồn dữ liệu" ghi chính xác bảng hoặc endpoint tôi đã kiểm chứng
+        trên máy bạn, kèm số liệu thật.
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Tính năng trong thiết kế</th>
+            <th>Hiện trạng</th>
+            <th>Nguồn dữ liệu</th>
+            <th>Dữ liệu</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr class="group-row"><td colspan="4">Form tạo đơn — mở rộng lớn nhất</td></tr>
+          <tr>
+            <td>Trạng thái đơn (12 mức)</td>
+            <td>Chưa có. Đơn luôn tạo ở "Chờ giao".</td>
+            <td>FM <span class="where">/api/invoice/all_status — đã test, trả 12 trạng thái</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Chọn kho xuất</td>
+            <td>Chưa có.</td>
+            <td>FM <span class="where">warehouses (2 kho), products.id_warehouse</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Tồn kho theo sản phẩm</td>
+            <td>Chưa có. Danh mục hiện chỉ có tên và giá.</td>
+            <td>FM <span class="where">products.inventory — proxy đã trả về sẵn</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Mã SKU, đơn vị, khối lượng, ghi chú VAT</td>
+            <td>Chưa hiển thị.</td>
+            <td>FM <span class="where">products.code_product / unit / weight / name_vat</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Địa chỉ 3 cấp (tỉnh → phường → chi tiết)</td>
+            <td>Chỉ có một ô địa chỉ tự do.</td>
+            <td>FM <span class="where">/api/address/provinces, /api/address/wards</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Nguồn đơn &amp; loại đơn (lẻ / buôn / mẫu)</td>
+            <td>Chưa có. Nguồn cứng là "ChatMQL Zalo".</td>
+            <td>CRM <span class="where">hoa_don.nguon_ban — cần thêm cột loại đơn</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Sản phẩm quà tặng (0đ, không tính tiền)</td>
+            <td>Chưa có.</td>
+            <td>Cần cờ đánh dấu dòng quà tặng<span class="where">FM invoice_detail chưa có cột phân biệt</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Đặt cọc chuyển khoản + COD còn lại</td>
+            <td>Chưa có. Chỉ chọn COD hoặc VietQR.</td>
+            <td>FM <span class="where">invoice.cod_need_payment đã có; thiếu cột tiền cọc</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Tự vận chuyển, hàng dễ vỡ, đơn đổi trả</td>
+            <td>Chưa có.</td>
+            <td>FM <span class="where">delivery_information — cần thêm cột</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Mã ưu đãi &amp; chiết khấu %</td>
+            <td>Chỉ có ô nhập số tiền giảm.</td>
+            <td>Không có bảng khuyến mãi ở bất kỳ đâu</td>
+            <td><span class="chip missing">Chưa có</span></td>
+          </tr>
+          <tr>
+            <td>Tiêu điểm "Lá" (1 Lá = 1.000đ)</td>
+            <td>Chưa có.</td>
+            <td>CRM <span class="where">lich_su_tichdiem — xem cảnh báo bên dưới</span></td>
+            <td><span class="chip missing">Chưa có</span></td>
+          </tr>
+
+          <tr class="group-row"><td colspan="4">Hồ sơ khách hàng — drawer 7 tab</td></tr>
+          <tr>
+            <td>Mã KH, nghề nghiệp, địa chỉ 2, SĐT phụ</td>
+            <td>Chưa hiển thị.</td>
+            <td>CRM <span class="where">khach_hang.ma_kh / nghe_nghiep / dia_chi2 / sdt2</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Lịch sử mua hàng</td>
+            <td>Đã có ở sidebar, chưa có dạng bảng đầy đủ.</td>
+            <td>CRM <span class="where">/customer/orders — proxy đang chạy</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Lịch bán hàng &amp; lịch chăm sóc kế tiếp</td>
+            <td>Chưa có ô nhập.</td>
+            <td>CRM <span class="where">khach_hang.ngay_hen_banhang / thoi_gian_cs_lai / type_hen</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Đặc thù sản phẩm &amp; nhu cầu sử dụng</td>
+            <td>Đã hiện trong "Thông tin tùy chỉnh".</td>
+            <td>CRM <span class="where">khach_hang.dac_thu_sp / nhu_cau_sd</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Dòng thời gian hoạt động (có tìm kiếm &amp; lọc)</td>
+            <td>Có dữ liệu nhưng chưa có màn hình này.</td>
+            <td>ChatMQL <span class="where">ActivityLog, CdpEvent</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Sản phẩm đã mua (gộp từ lịch sử)</td>
+            <td>Chưa có.</td>
+            <td>FM <span class="where">invoice_detail — cần truy vấn gộp mới</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Lịch sử tích điểm (sổ cái ra/vào)</td>
+            <td>Chưa có.</td>
+            <td>CRM <span class="where">lich_su_tichdiem — 6.243 dòng, xem cảnh báo</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Ưu đãi đang có (riêng khách + toàn hệ thống)</td>
+            <td>Chưa có.</td>
+            <td>Không tồn tại bảng khuyến mãi nào</td>
+            <td><span class="chip missing">Chưa có</span></td>
+          </tr>
+
+          <tr class="group-row"><td colspan="4">Hội thoại &amp; nội dung</td></tr>
+          <tr>
+            <td>Xem dưới quyền nhân viên khác</td>
+            <td>Backend đã có cơ chế, giao diện chat chưa dùng.</td>
+            <td>ChatMQL <span class="where">auth-routes.ts, platform/enter-company-routes.ts</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Thư viện hội thoại (Ảnh/Video · Files · Links)</td>
+            <td>Có tab "File" đơn giản, chưa nhóm theo ngày/loại.</td>
+            <td>ChatMQL <span class="where">Message.attachments — cần truy vấn gom nhóm</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Phân tích khách hàng bằng AI</td>
+            <td>Đã có nút, chưa có modal 4 mục như thiết kế.</td>
+            <td>ChatMQL <span class="where">module ai — aiSummary, harness</span></td>
+            <td><span class="chip ready">Đã sẵn</span></td>
+          </tr>
+          <tr>
+            <td>Ghi chú kèm trạng thái tương tác (7 mức)</td>
+            <td>Có ghi chú nhưng <strong>không có trường trạng thái</strong>.</td>
+            <td>ChatMQL <span class="where">model Note — cần thêm cột</span></td>
+            <td><span class="chip partial">Một phần</span></td>
+          </tr>
+          <tr>
+            <td>Thư viện tài liệu đã duyệt (gửi thẳng vào chat)</td>
+            <td>Chưa có.</td>
+            <td>ChatMQL <span class="where">KnowledgeEntry có status duyệt, thiếu ảnh/video</span></td>
+            <td><span class="chip missing">Chưa có</span></td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Bốn điểm cần quyết trước khi viết code</h2>
+      <p>Đây là những chỗ tôi không tự quyết được, và nếu bỏ qua sẽ phải làm lại.</p>
+    </div>
+
+    <div class="flags">
+      <div class="flag">
+        <h3>Điểm thưởng "Lá" chưa có số dư dùng được</h3>
+        <p>
+          Bảng <code>lich_su_tichdiem</code> có 6.243 dòng, nhưng chỉ
+          <strong>1.830 dòng (29%) có số điện thoại</strong> để nối với khách. Nghiêm
+          trọng hơn: cột <code>khach_hang.diem_khach_hang</code> đang
+          <strong>rỗng ở cả 39.327 khách</strong>. Nghĩa là hiện không có nguồn nào
+          cho biết một khách còn bao nhiêu điểm — mà cả tab "Lịch sử tích điểm" lẫn
+          ô "Tiêu Lá" trong form đơn đều phụ thuộc vào con số đó. Cần chốt: điểm
+          được tính lại từ sổ cái, hay có hệ thống khác đang giữ số dư thật?
+        </p>
+      </div>
+
+      <div class="flag">
+        <h3>Ưu đãi không có nhà ở đâu cả</h3>
+        <p>
+          Thiết kế hiện 8 ưu đãi với điều kiện áp dụng, thời hạn, và phân biệt
+          "riêng khách này" với "toàn hệ thống". Tôi tìm khắp ba database —
+          <strong>không có bảng khuyến mãi nào</strong>. Đây là phần lớn nhất phải
+          dựng từ số không: bảng dữ liệu, luật áp dụng, màn hình quản trị, rồi mới
+          tới giao diện hiển thị. Nên tách thành dự án riêng.
+        </p>
+      </div>
+
+      <div class="flag warn">
+        <h3>Tên kho trong thiết kế không khớp thực tế</h3>
+        <p>
+          Thiết kế ghi "Kho Hà Nội" và "Kho HCM", nhưng FM chỉ có hai kho tên là
+          <strong>"Kho xưởng"</strong> và <strong>"Kho văn phòng"</strong>. Cần biết
+          đây là dữ liệu mẫu tùy tiện, hay bạn thật sự định tách kho theo vùng —
+          nếu là vế sau thì phải sửa dữ liệu FM trước.
+        </p>
+      </div>
+
+      <div class="flag warn">
+        <h3>Thiết kế là mockup tĩnh, chưa có logic nào</h3>
+        <p>
+          File không chứa một lời gọi API nào, mọi con số đều là dữ liệu mẫu viết
+          cứng. Nó cho biết <em>trông thế nào</em>, không cho biết
+          <em>hoạt động ra sao</em>: điều gì xảy ra khi tồn kho về 0, khi khách
+          không có địa chỉ, khi mã ưu đãi hết hạn giữa lúc đang tạo đơn. Những
+          quy tắc đó cần chốt trước, nếu không sẽ lộ ra lúc đang code và làm vỡ tiến độ.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Thứ tự tôi đề xuất</h2>
+      <p>
+        Xếp theo nguyên tắc: làm trước những thứ dữ liệu đã sẵn để thấy kết quả
+        sớm, đẩy phần phải dựng từ đầu ra sau cùng.
+      </p>
+    </div>
+
+    <ol class="phases">
+      <li>
+        <h3>Làm giàu form tạo đơn</h3>
+        <p>
+          Trạng thái đơn, chọn kho, tồn kho, SKU và đơn vị, địa chỉ 3 cấp. Toàn bộ
+          dữ liệu đã có trong FM và proxy đã chạy — đây là phần đổi nhiều nhất cho
+          nhân viên bán hàng với công sức thấp nhất. Làm được ngay.
+        </p>
+      </li>
+      <li>
+        <h3>Dựng drawer hồ sơ khách hàng</h3>
+        <p>
+          Các trường CRM còn thiếu (mã KH, nghề nghiệp, địa chỉ 2, SĐT phụ), lịch
+          bán hàng và lịch chăm sóc kế tiếp, bảng lịch sử mua hàng. Cần thêm vài
+          endpoint proxy nhưng không đụng schema.
+        </p>
+      </li>
+      <li>
+        <h3>Bổ sung trường còn thiếu</h3>
+        <p>
+          Trạng thái tương tác cho ghi chú, cờ quà tặng, tiền đặt cọc, hàng dễ vỡ,
+          loại đơn. Mỗi thứ là một cột mới — nhỏ lẻ nhưng phải sửa cả ba tầng, nên
+          gom lại làm một đợt cho gọn.
+        </p>
+      </li>
+      <li>
+        <h3>Thư viện tài liệu &amp; dòng thời gian hoạt động</h3>
+        <p>
+          Thư viện cần bổ sung ảnh/video vào <code>KnowledgeEntry</code> và luồng
+          duyệt nội dung. Dòng thời gian gom từ <code>ActivityLog</code> và
+          <code>CdpEvent</code> đã có sẵn dữ liệu.
+        </p>
+      </li>
+      <li>
+        <h3>Điểm thưởng và ưu đãi</h3>
+        <p>
+          Để cuối vì cả hai đều cần quyết định nghiệp vụ trước, không phải quyết
+          định kỹ thuật. Làm sớm mà chưa chốt luật tính điểm và luật áp ưu đãi thì
+          gần như chắc chắn phải viết lại.
+        </p>
+      </li>
+    </ol>
+  </section>
+
+  <footer>
+    Mọi con số trong tài liệu này lấy từ database đang chạy trên máy bạn
+    (<code>bizcrm2</code>, <code>crm_tdvn</code>, <code>fm_tdvn</code>) và từ các
+    endpoint tôi đã gọi thử, không phải ước lượng. Tôi chưa sửa dòng code nào cho
+    thiết kế mới — đang chờ bạn duyệt hướng đi và trả lời bốn điểm ở trên.
+  </footer>
+
+</div>

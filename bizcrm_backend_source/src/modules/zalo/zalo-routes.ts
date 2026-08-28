@@ -17,9 +17,11 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /api/v1/zalo-accounts — list accounts (soft-deleted ones are hidden)
   // Optional ?type=personal|oa filters by account type.
-  app.get<{ Querystring: { type?: 'personal' | 'oa' } }>('/api/v1/zalo-accounts', async (request) => {
+  // Optional ?includeDisabled=true to include disabled accounts.
+  app.get<{ Querystring: { type?: 'personal' | 'oa'; includeDisabled?: string } }>('/api/v1/zalo-accounts', async (request) => {
     const user = request.user as { orgId: string; id: string; role: string }
     const typeFilter = request.query.type
+    const includeDisabled = request.query.includeDisabled === 'true'
     
     let accessibleAccountIds: Set<string> | null = null
     if (user.role === 'manager' || user.role === 'member') {
@@ -31,6 +33,7 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
         orgId: user.orgId,
         status: { not: 'archived' },
         deletedAt: null,
+        ...(!includeDisabled ? { isDisabled: false } : {}),
         ...(typeFilter ? { platform: typeFilter === 'oa' ? Platform.ZALO_OA : typeFilter === 'personal' ? Platform.ZALO_USER : undefined } : {}),
         ...(accessibleAccountIds ? { id: { in: Array.from(accessibleAccountIds) } } : {}),
       },

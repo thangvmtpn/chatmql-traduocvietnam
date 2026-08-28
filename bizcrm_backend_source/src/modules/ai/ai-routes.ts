@@ -4,6 +4,7 @@
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { authMiddleware } from '../auth/auth-middleware.js'
+import { analyzeCustomer360 } from './customer360-service.js'
 import { prisma } from '../../shared/prisma-client.js'
 import {
   getAiConfig,
@@ -405,6 +406,48 @@ export async function aiRoutes(app: FastifyInstance): Promise<void> {
   //
   // Response includes the contact's CURRENT lifecycle stage + tags so the panel can
   // compute "Apply" suggestions (e.g. stage change, tag append) without a second round-trip.
+  // ── Customer 360: phân tích 4 mục cho modal trong khung chat ────────
+  //
+  // Chân dung dựng từ dữ liệu thật (không hỏi AI), ba mục còn lại do AI.
+  // AI hỏng thì vẫn trả về chân dung — modal không trắng trơn.
+  app.post<{ Body: { conversationId?: string; forceFresh?: boolean } }>(
+    '/api/v1/ai/customer-360',
+    async (request, reply) => {
+      const user = request.user as { id: string; role: string; orgId: string }
+      const conversationId = request.body?.conversationId?.trim()
+      if (!conversationId) return reply.status(400).send({ error: 'Thiếu conversationId' })
+
+      const conv = await prisma.conversation.findFirst({
+        where: { id: conversationId, orgId: user.orgId },
+        select: { id: true, channelAccountId: true },
+      })
+      if (!conv) return reply.status(404).send({ error: 'Không tìm thấy hội thoại' })
+
+      // Cùng luật quyền với contact-analyze: nhân viên thường phải được cấp
+      // quyền trên tài khoản Zalo này mới xem được.
+      if (!['owner', 'admin', 'manager'].includes(user.role)) {
+        const access = await prisma.channelAccountAccess.findFirst({
+          where: { channelAccountId: conv.channelAccountId, userId: user.id },
+          select: { id: true },
+        })
+        if (!access) {
+          return reply.status(403).send({ error: 'Không có quyền truy cập tài khoản Zalo này' })
+        }
+      }
+
+      try {
+        return await analyzeCustomer360({
+          orgId: user.orgId,
+          conversationId: conv.id,
+          forceFresh: !!request.body?.forceFresh,
+        })
+      } catch (err: any) {
+        app.log.error({ err }, '[ai] customer-360 failed')
+        return reply.status(500).send({ error: err?.message || 'Không phân tích được' })
+      }
+    },
+  )
+
   app.post<{ Body: { contactId: string; forceFresh?: boolean } }>('/api/v1/ai/contact-analyze', async (request, reply) => {
     try {
       const user = request.user as { id: string; role: string; orgId: string }

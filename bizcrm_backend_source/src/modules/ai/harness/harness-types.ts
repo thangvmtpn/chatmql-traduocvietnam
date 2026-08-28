@@ -109,6 +109,15 @@ export interface RouterDecision {
 }
 
 /** Result returned by runHarness. */
+/** Ảnh sản phẩm AI muốn gửi kèm câu trả lời. */
+export interface ReplyImage {
+  productId: string
+  productName: string
+  /** URL do máy chủ phân giải từ catalog — không phải do mô hình sinh ra. */
+  imageUrl: string
+  caption?: string
+}
+
 export interface HarnessResult {
   /** Generated reply text, or null (no reply / handoff / skipped). */
   reply: string | null
@@ -116,4 +125,6 @@ export interface HarnessResult {
   routerDecision: RouterDecision
   /** AiReplyRun row id for linking AiUsage rows. */
   runId: string
+  /** Ảnh gửi kèm; orchestrator gửi sau khi phần chữ đã ra kênh. */
+  images?: ReplyImage[]
 }

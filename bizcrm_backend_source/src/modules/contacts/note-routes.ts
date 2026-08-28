@@ -8,19 +8,53 @@ import { prisma } from '../../shared/prisma-client.js'
 import { runAutomationRules } from '../automation/automation-engine.js'
 import { logger } from '../../shared/logger.js'
 
+/**
+ * Kết quả tương tác của một lần liên hệ. Lưu bằng mã tiếng Anh để nhãn hiển thị
+ * đổi được mà không phải sửa dữ liệu cũ; nhãn tiếng Việt gửi kèm cho giao diện.
+ */
+export const NOTE_STATUSES = [
+  { value: 'no_contact',  label: 'Không kết nối',   tone: 'muted'   },
+  { value: 'consulting',  label: 'Đang tư vấn',     tone: 'info'    },
+  { value: 'callback',    label: 'Hẹn gọi lại',     tone: 'warning' },
+  { value: 'opportunity', label: 'Cơ hội',          tone: 'info'    },
+  { value: 'won',         label: 'Chốt thành công', tone: 'success' },
+  { value: 'at_risk',     label: 'Nguy cơ rời bỏ',  tone: 'danger'  },
+] as const
+
+const VALID_STATUSES = new Set(NOTE_STATUSES.map(s => s.value))
+
+/** '' hoặc null -> null (ghi chú thường). Giá trị lạ -> ném lỗi để client biết. */
+function normalizeStatus(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null
+  const v = String(raw).trim()
+  if (!v) return null
+  if (!VALID_STATUSES.has(v as any)) {
+    const err: any = new Error(
+      `Trạng thái "${v}" không hợp lệ. Chỉ nhận: ${[...VALID_STATUSES].join(', ')}`
+    )
+    err.statusCode = 400
+    throw err
+  }
+  return v
+}
+
 export async function noteRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware)
 
+  // GET /api/v1/notes/statuses — danh sách trạng thái cho ô chọn
+  app.get('/api/v1/notes/statuses', async () => ({ statuses: NOTE_STATUSES }))
+
   // GET /api/v1/notes — list notes by contactId or conversationId
   app.get<{
-    Querystring: { contactId?: string; conversationId?: string }
+    Querystring: { contactId?: string; conversationId?: string; status?: string }
   }>('/api/v1/notes', async (request) => {
     const user = request.user as { orgId: string }
-    const { contactId, conversationId } = request.query
+    const { contactId, conversationId, status } = request.query
 
     const where: any = { orgId: user.orgId }
     if (contactId) where.contactId = contactId
     if (conversationId) where.conversationId = conversationId
+    if (status?.trim()) where.status = status.trim()
 
     const notes = await prisma.note.findMany({
       where,
@@ -35,13 +69,20 @@ export async function noteRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /api/v1/notes — create note
   app.post<{
-    Body: { contactId?: string; conversationId?: string; content: string; isPinned?: boolean }
+    Body: { contactId?: string; conversationId?: string; content: string; isPinned?: boolean; status?: string }
   }>('/api/v1/notes', async (request, reply) => {
     const user = request.user as { id: string; orgId: string }
     const { contactId, conversationId, content, isPinned } = request.body
 
     if (!content?.trim()) {
       return reply.status(400).send({ error: 'Nội dung ghi chú không được để trống' })
+    }
+
+    let status: string | null
+    try {
+      status = normalizeStatus(request.body.status)
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message })
     }
 
     const note = await prisma.note.create({
@@ -51,6 +92,7 @@ export async function noteRoutes(app: FastifyInstance): Promise<void> {
         conversationId: conversationId || null,
         createdByUserId: user.id,
         content: content.trim(),
+        status,
         isPinned: isPinned ?? false,
       },
       include: {
@@ -73,7 +115,7 @@ export async function noteRoutes(app: FastifyInstance): Promise<void> {
   // PUT /api/v1/notes/:id — update note
   app.put<{
     Params: { id: string }
-    Body: Partial<{ content: string; isPinned: boolean }>
+    Body: Partial<{ content: string; isPinned: boolean; status: string | null }>
   }>('/api/v1/notes/:id', async (request, reply) => {
     const user = request.user as { orgId: string }
     const existing = await prisma.note.findFirst({
@@ -89,6 +131,13 @@ export async function noteRoutes(app: FastifyInstance): Promise<void> {
       data.content = request.body.content.trim()
     }
     if (request.body.isPinned !== undefined) data.isPinned = request.body.isPinned
+    if (request.body.status !== undefined) {
+      try {
+        data.status = normalizeStatus(request.body.status)
+      } catch (err: any) {
+        return reply.status(400).send({ error: err.message })
+      }
+    }
 
     const updated = await prisma.note.update({
       where: { id: request.params.id },

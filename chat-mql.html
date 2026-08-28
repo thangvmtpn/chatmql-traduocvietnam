@@ -1,0 +1,2957 @@
+<!DOCTYPE html>
+<html lang="vi" style="--primary-color:#0D6838;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trà Dược Việt Nam — Hội thoại (MQL)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --primary: var(--primary-color, #0D6838);
+    --primary-500:#2563eb;
+    --gray-50:#f8fafc; --gray-100:#f1f5f9; --gray-200:#e2e8f0; --gray-300:#cbd5e1;
+    --gray-400:#94a3b8; --gray-500:#64748b; --gray-600:#475569; --gray-700:#334155;
+    --gray-800:#1e293b; --gray-900:#0f172a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-size:14px; color:var(--gray-800); background:#fff;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  button{font-family:inherit;}
+  svg{flex-shrink:0;}
+
+  /* ===== Banner giả lập quyền ===== */
+  .impersonate-banner{
+    background:linear-gradient(90deg,#f59e0b 0%,#ef4444 100%);
+    color:#fff; padding:8px 20px; font-size:13px; font-weight:500;
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    position:sticky; top:0; z-index:100; flex-shrink:0;
+  }
+  .impersonate-banner button{
+    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.4);
+    color:#fff; padding:4px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;
+  }
+
+  /* ===== Topnav ===== */
+  .topnav{
+    display:flex; align-items:center; gap:20px; padding:0 20px; height:56px;
+    border-bottom:1px solid var(--gray-200); background:#fff; flex-shrink:0;
+  }
+  .topnav__logo-img{height:34px; display:block;}
+  .topnav__tabs{display:flex; gap:4px;}
+  .topnav__tab{
+    display:flex; align-items:center; gap:6px; padding:8px 14px; border:none; background:none;
+    border-radius:8px; font-size:13.5px; font-weight:500; color:var(--gray-600); cursor:pointer;
+  }
+  .topnav__tab:hover{background:var(--gray-100);}
+  .topnav__tab--active{background:color-mix(in srgb, var(--primary) 10%, white); color:var(--primary); font-weight:600;}
+  .topnav__right{margin-left:auto; display:flex; align-items:center; gap:8px;}
+  .topnav__search{
+    display:flex; align-items:center; gap:8px; background:var(--gray-100);
+    border-radius:8px; padding:7px 12px; font-size:12.5px; color:var(--gray-400); min-width:230px;
+  }
+  .topnav__search kbd{
+    margin-left:auto; background:#fff; border:1px solid var(--gray-200); border-radius:4px;
+    padding:1px 5px; font-size:10.5px; color:var(--gray-500); font-family:inherit;
+  }
+  .topnav__icon-btn{
+    background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  .topnav__icon-btn:hover{background:var(--gray-100);}
+  .topnav__badge{
+    position:absolute; top:2px; right:0; background:#ef4444; color:#fff;
+    font-size:9px; font-weight:700; border-radius:8px; padding:1px 4px; line-height:1.2;
+  }
+  .topnav__user{display:flex; align-items:center; gap:8px; cursor:pointer; padding:4px 6px; border-radius:8px;}
+  .topnav__user:hover{background:var(--gray-100);}
+  .topnav__user-avatar{
+    width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;
+  }
+  .topnav__user-info{display:flex; flex-direction:column; line-height:1.25;}
+  .topnav__user-name{font-size:12.5px; font-weight:600; color:var(--gray-800);}
+  .topnav__user-role{font-size:11px; color:var(--gray-500);}
+
+  /* ===== Layout ===== */
+  .layout{flex:1; display:flex; overflow:hidden;}
+  .chat-layout{flex:1; display:flex; overflow:hidden;}
+
+  /* ===== Icon bar ===== */
+  .chat-icon-bar{
+    width:52px; border-right:1px solid var(--gray-200); background:var(--gray-50);
+    display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:6px; flex-shrink:0;
+  }
+  .chat-icon-bar__item{
+    width:38px; height:38px; border:none; background:none; border-radius:10px; cursor:pointer;
+    color:var(--gray-500); display:flex; align-items:center; justify-content:center; position:relative;
+  }
+  .chat-icon-bar__item:hover{background:var(--gray-200);}
+  .chat-icon-bar__item--active{background:color-mix(in srgb, var(--primary) 12%, white); color:var(--primary);}
+  .chat-icon-bar__badge{
+    position:absolute; top:-2px; right:-4px; background:#ef4444; color:#fff;
+    font-size:9px; font-weight:700; border-radius:8px; padding:1px 4px; line-height:1.3;
+  }
+  .chat-icon-bar__divider{width:26px; height:1px; background:var(--gray-200); margin:4px 0;}
+  .chat-icon-bar__spacer{flex:1;}
+
+  /* Tooltip icon bar */
+  .icon-tip{
+    position:fixed; z-index:300; background:#0f172a; color:#fff; border-radius:10px;
+    padding:9px 13px; max-width:230px; pointer-events:none;
+    opacity:0; transform:translateX(-4px); transition:opacity .12s, transform .12s;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .icon-tip.show{opacity:1; transform:none;}
+  .icon-tip__title{font-size:13px; font-weight:700; line-height:1.35;}
+  .icon-tip__desc{font-size:12px; opacity:.75; line-height:1.4; margin-top:1px;}
+  .icon-tip::before{
+    content:''; position:absolute; left:-5px; top:50%; margin-top:-5px;
+    border-top:5px solid transparent; border-bottom:5px solid transparent;
+    border-right:5px solid #0f172a;
+  }
+
+  /* ===== Danh sách hội thoại ===== */
+  .chat-list{
+    width:308px; border-right:1px solid var(--gray-200); display:flex; flex-direction:column;
+    flex-shrink:0; background:#fff;
+  }
+  .chat-list__header{padding:14px 16px 0;}
+  .chat-list__title-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .chat-list__title{font-size:16px; font-weight:700;}
+  .chat-list__actions{display:flex; gap:4px;}
+  .chat-list__action-btn{
+    background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+  }
+  .chat-list__action-btn:hover{background:var(--gray-100);}
+  .search-input{
+    display:flex; align-items:center; gap:8px; background:var(--gray-100); border-radius:8px; padding:0 10px;
+  }
+  .search-input__icon{color:var(--gray-400);}
+  .search-input__field{
+    border:none; background:none; outline:none; font-size:13px; padding:8px 0; width:100%; font-family:inherit;
+  }
+  .filter-bar{display:flex; gap:6px; margin:10px 0;}
+  .filter-bar__btn{
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);
+    font-size:12px; padding:4px 12px; border-radius:14px; cursor:pointer;
+  }
+  .filter-bar__btn--active{background:var(--primary); border-color:var(--primary); color:#fff; font-weight:600;}
+  .chat-list__account-filter{
+    display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--gray-200);
+    border-radius:8px; cursor:pointer; margin-bottom:10px; font-size:12.5px;
+  }
+  .chat-list__account-avatar{
+    width:20px; height:20px; border-radius:6px; color:#fff; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .chat-list__account-name{font-weight:500; color:var(--gray-700);}
+  .chat-list__account-count{
+    margin-left:auto; background:var(--gray-100); border-radius:10px; padding:1px 7px;
+    font-size:11px; color:var(--gray-500); font-weight:600;
+  }
+  .tab-bar{display:flex; border-bottom:1px solid var(--gray-200); padding:0 16px; gap:18px;}
+  .tab-bar__btn{
+    border:none; background:none; cursor:pointer; font-size:13px; color:var(--gray-500);
+    padding:8px 0; border-bottom:2px solid transparent;
+  }
+  .tab-bar__btn--active{color:var(--primary); font-weight:600; border-bottom-color:var(--primary);}
+  .chat-list__items{flex:1; overflow-y:auto;}
+
+  .conv-item{
+    display:flex; gap:10px; padding:10px 16px; cursor:pointer; position:relative; align-items:flex-start;
+  }
+  .conv-item:hover{background:var(--gray-50);}
+  .conv-item--active{background:color-mix(in srgb, var(--primary) 7%, white);}
+  .conv-item__avatar{
+    position:relative; width:40px; height:40px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; color:#fff; font-size:13px; font-weight:600; flex-shrink:0; overflow:hidden;
+  }
+  .conv-item__body{flex:1; min-width:0;}
+  .conv-item__top{display:flex; align-items:baseline; gap:8px;}
+  .conv-item__name{
+    font-size:13px; font-weight:600; color:var(--gray-800); flex:1;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .conv-item__time{font-size:11px; color:var(--gray-400); flex-shrink:0;}
+  .conv-item__preview{
+    font-size:12px; color:var(--gray-500); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .conv-item__source{display:flex; align-items:center; gap:4px; margin-top:4px; font-size:11px; color:var(--gray-500);}
+  .conv-item__source span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .conv-item__unread-badge{
+    position:absolute; right:14px; bottom:12px; background:#ef4444; color:#fff;
+    font-size:10px; font-weight:700; border-radius:9px; min-width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center; padding:0 5px;
+  }
+  .zalo-ic{
+    width:12px; height:12px; border-radius:3px; background:#0068ff; color:#fff; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:8px; font-weight:800; letter-spacing:-.3px;
+  }
+  .chat-messages__load-more-btn{
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:12.5px;
+    padding:7px 14px; border-radius:8px; cursor:pointer;
+  }
+  .chat-messages__load-more-btn:hover{background:var(--gray-50);}
+
+  /* ===== Khung chat chính ===== */
+  .chat-main{flex:1; display:flex; flex-direction:column; min-width:0; background:#fff;}
+  .chat-main__header{
+    display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--gray-100);
+  }
+  .chat-back-btn{display:none; background:none; border:none; cursor:pointer; color:var(--gray-500);}
+  .chat-main__info{min-width:0;}
+  .chat-main__name{display:flex; align-items:center; font-size:14.5px; font-weight:700;}
+  .pipeline-dropdown__trigger{
+    background:rgba(37,99,235,.094); color:#2563eb; border:1px solid rgba(37,99,235,.25);
+    border-radius:12px; padding:2px 10px 2px 7px; font-size:11px; font-weight:600; cursor:pointer;
+    display:inline-flex; align-items:center; gap:4px; margin-left:8px; vertical-align:middle;
+  }
+  .pipeline-dropdown__dot{width:6px; height:6px; border-radius:50%; background:#2563eb;}
+  .chat-main__meta{font-size:12px; color:var(--gray-500); margin-top:2px; display:flex; align-items:center; flex-wrap:wrap;}
+  .chat-main__header-actions{margin-left:auto; display:flex; align-items:center; gap:6px;}
+  .ai-mode-dd__trigger{
+    display:inline-flex; align-items:center; gap:6px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px; cursor:pointer;
+  }
+  .chat-main__header-btn{
+    background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center;
+  }
+  .chat-main__header-btn:hover{background:var(--gray-100);}
+  .chat-main__subheader{
+    display:flex; align-items:center; gap:8px; padding:7px 16px; font-size:12px; color:var(--gray-500);
+    border-bottom:1px solid var(--gray-100);
+  }
+  .chat-scope-bar{
+    display:flex; gap:6px; padding:6px 16px; flex-wrap:wrap;
+    border-bottom:1px solid var(--gray-100); background:var(--gray-50);
+  }
+  .chat-scope-bar button{
+    font-size:12px; padding:3px 10px; border-radius:14px; cursor:pointer;
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);
+  }
+  .chat-scope-bar button.is-active{
+    border-color:var(--primary-500); background:var(--primary-500); color:#fff; font-weight:600;
+  }
+
+  .chat-messages{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:4px; background:var(--gray-50);}
+  .msg-wrapper{display:flex; flex-direction:column;}
+  .chat-messages__date{
+    align-self:center; font-size:11px; font-weight:600; color:var(--gray-400); text-align:center;
+    margin:10px 0; text-transform:uppercase; letter-spacing:.4px;
+  }
+  .msg{display:flex; gap:8px; max-width:78%;}
+  .msg--received{align-self:flex-start;}
+  .msg--sent{align-self:flex-end; flex-direction:row-reverse;}
+  .msg__avatar{
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:10px; font-weight:600; flex-shrink:0;
+  }
+  .msg__image{
+    max-width:280px; background:#fff; border:1px solid var(--gray-200); border-radius:8px; padding:22px 16px;
+    text-align:center;
+  }
+  .msg__image span{color:var(--gray-400); font-size:12px;}
+  .msg__time{
+    font-size:10.5px; color:var(--gray-400); margin-top:3px; display:flex; align-items:center; gap:3px;
+  }
+  .msg--sent .msg__time{justify-content:flex-end;}
+  .msg__actions{display:none;}
+
+  /* Thiệp sinh nhật */
+  .bday-card{width:280px; border-radius:14px; overflow:hidden; box-shadow:0 2px 16px rgba(251,146,60,.18); background:#fff;}
+  .bday-card__head{
+    background:linear-gradient(135deg,#fb923c 0%,#f472b6 50%,#a78bfa 100%);
+    padding:16px 18px 12px; text-align:center;
+  }
+  .bday-card__avatar{
+    width:56px; height:56px; border-radius:50%; border:3px solid rgba(255,255,255,.7); margin:0 auto 8px;
+    background:#9333ea; color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:700;
+  }
+  .bday-card__name{
+    color:#fff; font-size:14px; font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,.15);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .bday-card__body{padding:12px 16px; background:#fffbeb; display:flex; flex-direction:column; align-items:center; gap:4px;}
+  .bday-card__date{font-size:12px; font-weight:600; color:#f59e0b; letter-spacing:.5px;}
+  .bday-card__hint{font-size:13px; color:#78350f; font-weight:500;}
+  .bday-card__art{font-size:34px; margin-top:4px;}
+
+  /* Tag bar + input */
+  .chat-tag-bar{
+    display:flex; align-items:center; gap:8px; padding:7px 16px; border-top:1px solid var(--gray-100);
+    font-size:12px; color:var(--gray-500);
+  }
+  .chat-tag-bar__label{display:inline-flex; align-items:center; gap:4px; font-weight:500;}
+  .chat-tag-bar__add{
+    border:1px dashed var(--gray-300); background:none; color:var(--gray-500); font-size:11.5px;
+    padding:2px 10px; border-radius:12px; cursor:pointer;
+  }
+  .chat-input{border-top:1px solid var(--gray-100); padding:8px 16px 12px;}
+  .chat-input__toolbar{display:flex; gap:6px; margin-bottom:8px;}
+  .chat-input__tool-btn{
+    display:inline-flex; align-items:center; gap:5px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); font-size:12px; padding:4px 10px; border-radius:14px; cursor:pointer;
+  }
+  .chat-input__tool-btn--active{
+    background:color-mix(in srgb, var(--primary) 10%, white); border-color:var(--primary); color:var(--primary); font-weight:600;
+  }
+  .chat-input__textarea{
+    width:100%; border:none; outline:none; resize:none; font-family:inherit; font-size:13.5px;
+    padding:6px 0; min-height:34px;
+  }
+  .chat-input__footer{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .chat-input__sender{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--gray-500); cursor:pointer;}
+  .chat-input__sender-avatar{
+    width:22px; height:22px; border-radius:50%; background:var(--primary); color:#fff;
+    font-size:9px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  }
+  .chat-input__send-row{display:flex; align-items:center; gap:4px;}
+  .chat-input__attach-btn,.chat-input__sticker-btn{
+    background:none; border:none; cursor:pointer; padding:4px 8px; color:var(--gray-500);
+    display:flex; align-items:center; gap:4px; font-size:12px; border-radius:6px;
+  }
+  .chat-input__shortcut{font-size:11px; color:var(--gray-400); margin:0 6px;}
+  .chat-input__send-btn{
+    display:inline-flex; align-items:center; gap:5px; background:var(--primary); color:#fff; border:none;
+    font-size:12.5px; font-weight:600; padding:7px 16px; border-radius:8px; cursor:pointer;
+  }
+
+  /* ===== Panel chi tiết ===== */
+  .chat-detail{
+    width:320px; border-left:1px solid var(--gray-200); overflow-y:auto; flex-shrink:0; background:#fff;
+    position:relative; min-width:320px;
+  }
+  /* Thanh kéo giãn giữa khung chat và panel phải: kéo trái chiếm màn chat, tối đa 50% màn hình */
+  .chat-resizer{
+    width:6px; flex-shrink:0; cursor:col-resize; background:transparent;
+    transition:background .12s; position:relative; z-index:30;
+  }
+  .chat-resizer:hover, .chat-resizer.dragging{
+    background:color-mix(in srgb, var(--primary) 40%, transparent);
+  }
+  /* Núm kéo có mũi tên ⟷ ở giữa thanh — báo cho người dùng biết kéo được */
+  .chat-resizer__grip{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:20px; height:38px; border-radius:10px; background:#fff;
+    border:1px solid var(--gray-300); box-shadow:0 2px 8px rgba(15,23,42,.14);
+    display:flex; align-items:center; justify-content:center; color:var(--gray-500);
+    cursor:col-resize;
+  }
+  .chat-resizer:hover .chat-resizer__grip, .chat-resizer.dragging .chat-resizer__grip{
+    border-color:var(--primary); color:var(--primary);
+  }
+  body.resizing-detail{cursor:col-resize; user-select:none;}
+  .chat-detail__tabs{
+    display:flex; border-bottom:1px solid var(--gray-200); padding:0 14px; gap:12px;
+    position:sticky; top:62px; background:#fff; z-index:10;
+  }
+  .chat-detail__tab{
+    border:none; background:none; cursor:pointer; font-size:12.5px; color:var(--gray-500);
+    padding:11px 0; border-bottom:2px solid transparent; white-space:nowrap;
+  }
+  .chat-detail__tab--active{color:var(--primary); font-weight:600; border-bottom-color:var(--primary);}
+  .chat-detail__section{padding:14px 16px; border-bottom:1px solid var(--gray-100);}
+  .chat-detail__section-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .chat-detail__section-title{
+    font-size:11.5px; font-weight:700; color:var(--gray-500); letter-spacing:.4px;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .chat-detail__section-action{
+    font-size:11.5px; color:var(--primary); font-weight:600; display:inline-flex; align-items:center; gap:3px; cursor:pointer;
+  }
+  .contact-ai{background:linear-gradient(135deg,#faf5ff 0%, #eff6ff 100%);}
+  .contact-ai__title{color:#7c3aed;}
+  .contact-ai__idle-hint{font-size:12px; color:var(--gray-500); margin:8px 0 10px;}
+  .contact-ai__idle-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:linear-gradient(90deg,#8b5cf6,#6366f1); color:#fff; border:none; font-size:12.5px; font-weight:600;
+    padding:8px 12px; border-radius:8px; cursor:pointer;
+  }
+  .chat-detail__profile-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-700); font-size:12.5px; font-weight:500;
+    padding:8px 12px; border-radius:8px; cursor:pointer;
+  }
+  .chat-detail__profile-btn:hover{background:var(--gray-50);}
+  .chat-detail__order-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--primary); color:#fff; border:none; font-size:12.5px; font-weight:700;
+    padding:9px 12px; border-radius:8px; cursor:pointer; margin-top:8px;
+    box-shadow:0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+  .chat-detail__order-btn:hover{filter:brightness(1.08);}
+  .chat-detail__info-row{display:flex; align-items:center; gap:8px; padding:5px 0; min-height:32px;}
+  .chat-detail__info-icon{color:var(--gray-400);}
+  .chat-detail__label{font-size:12.5px; color:var(--gray-600);}
+  .chat-detail__value{margin-left:auto; font-size:12px; padding:2px 6px; border-radius:4px; cursor:pointer;}
+  .chat-detail__value--set{color:#2563eb;}
+  .chat-detail__value--dark{color:var(--gray-700);}
+  .chat-detail__value--empty{color:var(--gray-400);}
+  .cf-group{margin-bottom:12px;}
+  .cf-group__title{
+    display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:var(--gray-500);
+    text-transform:uppercase; padding:4px 0 6px; letter-spacing:.3px;
+    border-bottom:1px solid var(--gray-100); margin-bottom:4px;
+  }
+  .chat-detail__quick-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    border:1px dashed var(--gray-300); background:none; color:var(--gray-600); font-size:12px;
+    padding:7px 12px; border-radius:8px; cursor:pointer;
+  }
+  .chat-detail__empty{font-size:12px; color:var(--gray-400); margin-bottom:8px;}
+  .chat-detail__panel{display:none;}
+  .chat-detail__panel--active{display:block;}
+
+  /* ===== Form Tạo đơn (panel phải) ===== */
+  .of{padding:14px 14px 0; display:flex; flex-direction:column;}
+  .of__section-title{
+    font-size:13px; font-weight:700; color:var(--gray-800);
+    border-left:3px solid #ef4444; padding-left:8px; margin:14px 0 10px;
+  }
+  .of__section-title:first-child{margin-top:0;}
+  .of__row{display:flex; gap:8px;}
+  .of__row > *{flex:1; min-width:0;}
+  .of__group{margin-bottom:10px;}
+  .of__label{
+    display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+    color:var(--gray-700); margin-bottom:5px;
+  }
+  .of__label svg{color:var(--gray-400);}
+  .of__select-wrap{position:relative;}
+  .of__select-wrap::after{
+    content:''; position:absolute; right:10px; top:50%; margin-top:-2px;
+    border-left:4px solid transparent; border-right:4px solid transparent;
+    border-top:5px solid var(--gray-400); pointer-events:none;
+  }
+  .of__select, .of__input, .of__textarea{
+    width:100%; border:none; background:#eef1f6; border-radius:8px;
+    font-family:inherit; font-size:12.5px; color:var(--gray-700);
+    padding:8px 10px; outline:none; appearance:none;
+  }
+  .of__select{padding-right:26px; cursor:pointer;}
+  .of__select:disabled{color:var(--gray-400); cursor:not-allowed; opacity:.7;}
+  .of__input::placeholder, .of__textarea::placeholder{color:var(--gray-400);}
+  .of__textarea{resize:vertical; min-height:52px;}
+  .of__input--num{text-align:right;}
+  .of__select--accent{color:var(--primary-500); font-weight:600;}
+
+  /* Toggle switch */
+  .of-toggle{display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:10px; user-select:none;}
+  .of-toggle__track{
+    width:32px; height:18px; border-radius:9px; background:var(--gray-300); position:relative;
+    transition:background .15s; flex-shrink:0;
+  }
+  .of-toggle__track::after{
+    content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:left .15s;
+  }
+  .of-toggle--on .of-toggle__track{background:var(--primary);}
+  .of-toggle--on .of-toggle__track::after{left:16px;}
+  .of-toggle__label{font-size:12px; font-weight:600; color:var(--gray-700);}
+
+  /* Bảng sản phẩm */
+  .of__prod-head{
+    display:flex; justify-content:space-between; font-size:12px; font-weight:600; color:var(--gray-700);
+    padding:6px 0; border-bottom:1px solid var(--gray-100);
+  }
+  .of__prod-empty{text-align:center; padding:22px 0 10px; color:var(--gray-400);}
+  .of__prod-empty-icon{font-size:30px; margin-bottom:6px; opacity:.8;}
+  .of__prod-empty-text{font-size:13px; font-weight:500;}
+
+  /* Tổng kết */
+  .of__summary{border-top:1px solid var(--gray-100); margin-top:12px; padding-top:4px;}
+  .of__sum-row{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12.5px;}
+  .of__sum-label{font-weight:600; color:var(--gray-700); flex-shrink:0;}
+  .of__sum-value{margin-left:auto; font-weight:700; color:var(--gray-800);}
+  .of__sum-value--danger{color:#ef4444;}
+  .of-check{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--gray-700); cursor:pointer;}
+  .of-check input{accent-color:var(--primary); width:14px; height:14px; cursor:pointer;}
+  .of__head-row{display:flex; align-items:center; justify-content:space-between;}
+  .of__info{font-size:12px; color:var(--gray-500); margin:2px 0 6px; line-height:1.5;}
+  .of__dim-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .of__unit-input{margin-left:auto; display:flex; width:110px;}
+  .of__unit-input input{
+    width:100%; min-width:0; border:none; background:#eef1f6; border-radius:8px 0 0 8px;
+    padding:7px 8px; font-family:inherit; font-size:12.5px; text-align:right; outline:none; color:var(--gray-700);
+  }
+  .of__unit-input i{
+    font-style:normal; background:#e2e8f0; border-radius:0 8px 8px 0; padding:7px 9px;
+    font-size:12px; color:var(--gray-600); font-weight:600; white-space:nowrap;
+  }
+  .of__code-input{margin-left:auto; display:flex; width:156px;}
+  .of__code-input input{
+    width:100%; min-width:0; border:none; background:#eef1f6; border-radius:8px 0 0 8px;
+    padding:7px 9px; font-family:inherit; font-size:12.5px; outline:none; color:var(--gray-700);
+  }
+  .of__code-input button{
+    background:var(--primary-500); color:#fff; border:none; border-radius:0 8px 8px 0;
+    font-size:12px; font-weight:600; padding:0 10px; cursor:pointer; white-space:nowrap;
+  }
+  .of__sum-label em{font-style:normal; font-weight:400; font-size:11px; color:var(--gray-400); margin-left:3px;}
+  .of__total-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:9px 12px;
+    margin:8px 0; font-size:13px; font-weight:700;
+  }
+  .of__total-row b{color:var(--primary-500); font-size:16px;}
+  .of__pay-badge{
+    margin-left:auto; background:var(--gray-100); border:1px solid var(--gray-200); color:var(--gray-600);
+    font-size:11.5px; font-weight:600; border-radius:14px; padding:3px 10px;
+  }
+  .of__gear{color:var(--primary-500); cursor:pointer; display:flex;}
+  .of__return-note{
+    display:none; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c;
+    font-size:12.5px; font-weight:700; border-radius:8px; padding:9px 12px; margin-top:10px;
+  }
+  .of__return-note--show{display:block;}
+
+  /* Dòng sản phẩm trong đơn */
+  .op-item{border:1px solid var(--gray-100); border-radius:10px; padding:10px; margin-top:8px;}
+  .op-item--gift{background:#fffbeb; border-color:#fde68a;}
+  .op-item__top{display:flex; align-items:center; gap:6px;}
+  .op-item__code{
+    font-size:12.5px; font-weight:700; flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .op-gift-tag{
+    background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:4px;
+    padding:0 5px; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;
+  }
+  .op-item__del{
+    width:26px; height:26px; border:1px solid #f3c6c6; background:#fff5f5; border-radius:6px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; color:#dc2626; flex-shrink:0;
+  }
+  .op-item__del:hover{background:#fee2e2;}
+  .op-item__name{font-size:12px; color:var(--gray-500); margin:2px 0 6px;}
+  .op-item__row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:2px 0; font-size:12px; color:var(--gray-600);
+  }
+  .op-item__kl{font-style:normal; color:var(--gray-400);}
+  .op-qty{
+    display:flex; align-items:center; height:26px; border:1px solid var(--gray-200);
+    border-radius:6px; overflow:hidden; background:#fff;
+  }
+  .op-qty button{width:24px; height:100%; border:0; background:var(--gray-50); cursor:pointer; font-size:14px; color:var(--gray-700); line-height:1;}
+  .op-qty button:hover{background:var(--gray-100);}
+  .op-qty input{width:34px; height:100%; border:0; outline:0; text-align:center; font-weight:700; font-size:12px;}
+  .op-item--over .op-qty{border-color:#dc2626; box-shadow:0 0 0 2px rgba(220,38,38,.12);}
+  .op-item--over .op-item__stock{color:#dc2626; font-weight:700;}
+  .op-item__sum{font-size:12.5px; color:var(--gray-800);}
+  .op-total{
+    display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:600;
+    color:var(--gray-700); padding:9px 2px; border-top:1px solid var(--gray-100); margin-top:8px;
+  }
+  .op-total b{font-size:13.5px;}
+
+  /* Trạng thái thanh toán */
+  .of__pay-badge--orange{background:#fff7ed; border-color:#fed7aa; color:#c2410c;}
+  .of__pay-badge--green{background:#ecfdf3; border-color:#bbf7d0; color:#15803d;}
+  .of__pay-badge--red{background:#fef2f2; border-color:#fecaca; color:#b91c1c;}
+
+  /* ===== Tab Tài liệu bán hàng (panel phải) ===== */
+  .sd{padding:12px 16px; display:flex; flex-direction:column; min-height:100%;}
+  .sd__tabs{display:flex; gap:16px; border-bottom:1px solid var(--gray-200); margin-bottom:10px;}
+  .sd__tab{
+    border:none; background:none; cursor:pointer; font-size:12.5px; font-weight:500;
+    color:var(--gray-600); padding:8px 0; border-bottom:2px solid transparent;
+  }
+  .sd__tab--active{color:var(--primary); font-weight:700; border-bottom-color:var(--primary);}
+  .sd__panel{display:none;}
+  .sd__panel--active{display:block;}
+  .sd__note{font-size:11px; color:var(--gray-500); background:var(--gray-50); border-radius:8px; padding:6px 10px; margin-bottom:10px; line-height:1.45;}
+  .sd__group{font-size:12px; font-weight:700; color:var(--gray-800); margin:12px 0 6px; display:flex; align-items:center; gap:6px;}
+  .sd__group:first-of-type{margin-top:2px;}
+  .sd__grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .sd-tile{
+    position:relative; aspect-ratio:1; border-radius:8px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    border:2px solid transparent; transition:border-color .12s, box-shadow .12s;
+  }
+  .sd-tile:has(input:checked){border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);}
+  .sd-tile input{
+    position:absolute; top:5px; left:5px; width:15px; height:15px;
+    accent-color:var(--primary); cursor:pointer; margin:0;
+  }
+  .sd-tile__emoji{font-size:22px; line-height:1;}
+  .sd-tile__name{
+    font-size:9.5px; font-weight:600; color:var(--gray-700); text-align:center;
+    padding:0 4px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .sd-tile__dur{
+    position:absolute; right:4px; bottom:4px; background:rgba(0,0,0,.65); color:#fff;
+    font-size:9.5px; border-radius:4px; padding:1px 4px; font-weight:600;
+  }
+  .sd__send-wrap{
+    position:sticky; bottom:0; padding:10px 0 4px; margin-top:12px;
+    background:linear-gradient(to top, #fff 72%, rgba(255,255,255,0));
+  }
+  .sd__send-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--primary); color:#fff; border:none; font-size:12.5px; font-weight:700;
+    padding:9px 12px; border-radius:8px; cursor:pointer;
+  }
+  .sd__send-btn:disabled{background:var(--gray-200); color:var(--gray-400); cursor:default;}
+  .sd-content{border:1px solid var(--gray-100); border-radius:10px; padding:10px 12px; margin-bottom:8px;}
+  .sd-content__head{display:flex; align-items:center; gap:8px; margin-bottom:5px;}
+  .sd-content__title{font-size:12.5px; font-weight:700; color:var(--gray-800); flex:1; min-width:0;}
+  .sd-content__copy{
+    display:inline-flex; align-items:center; gap:4px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px;
+    cursor:pointer; flex-shrink:0; white-space:nowrap;
+  }
+  .sd-content__copy:hover{background:var(--gray-50);}
+  .sd-content__copy--done{border-color:#bbf7d0; background:#ecfdf3; color:#15803d;}
+  .sd-content__text{font-size:12px; color:var(--gray-600); line-height:1.55; white-space:pre-line;}
+
+  /* ===== Nút AI nổi + modal phân tích khách hàng ===== */
+  .ai-fab-wrap{
+    position:sticky; bottom:0; z-index:9; padding:10px 16px 14px;
+    background:linear-gradient(to top, #fff 72%, rgba(255,255,255,0));
+  }
+  .ai-fab-wrap .contact-ai__idle-btn{box-shadow:0 6px 18px rgba(99,102,241,.35);}
+  .ai-modal-bg{
+    position:fixed; inset:0; background:rgba(15,23,42,.45);
+    display:none; align-items:center; justify-content:center; z-index:400;
+  }
+  .ai-modal-bg.open{display:flex;}
+  .ai-modal{
+    width:540px; max-width:92%; max-height:86vh; background:#fff; border-radius:14px;
+    box-shadow:0 24px 80px rgba(0,0,0,.3); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .ai-modal__head{
+    display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--gray-100);
+    font-weight:700; font-size:14px; color:#7c3aed; background:linear-gradient(135deg,#faf5ff,#eff6ff);
+  }
+  .ai-modal__close{
+    margin-left:auto; background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+  }
+  .ai-modal__close:hover{background:rgba(124,58,237,.1);}
+  .ai-modal__body{padding:16px 18px; overflow-y:auto; font-size:13px; color:var(--gray-700); line-height:1.6;}
+  .ai-modal__foot{display:flex; justify-content:flex-end; gap:8px; padding:12px 18px; border-top:1px solid var(--gray-100);}
+  .ai-loading{display:flex; align-items:center; gap:10px; color:var(--gray-500); font-size:13px; padding:14px 0;}
+  .ai-spinner{
+    width:18px; height:18px; border:3px solid #e9d5ff; border-top-color:#8b5cf6; border-radius:50%;
+    animation:aispin .8s linear infinite; flex-shrink:0;
+  }
+  @keyframes aispin{to{transform:rotate(360deg);}}
+  .ai-block{margin-bottom:12px;}
+  .ai-block__title{font-weight:700; font-size:12.5px; color:var(--gray-800); margin-bottom:3px;}
+  .ai-modal__time{font-size:11.5px; color:var(--gray-400); margin-top:6px;}
+  .ai-btn-note{
+    display:inline-flex; align-items:center; gap:6px; background:linear-gradient(90deg,#8b5cf6,#6366f1);
+    color:#fff; border:none; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;
+  }
+  .ai-btn-note:disabled{opacity:.55; cursor:default;}
+  .ai-btn-ghost{
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);
+    font-size:12.5px; font-weight:500; padding:8px 14px; border-radius:8px; cursor:pointer;
+  }
+  /* Thẻ ghi chú (tab Ghi chú nhanh) */
+  .note-item{border:1px solid var(--gray-100); border-radius:10px; padding:10px; margin-bottom:8px; background:#fff;}
+  .note-item--ai{background:#faf5ff; border-color:#e9d5ff;}
+  .note-item__head{display:flex; align-items:center; gap:6px; margin-bottom:5px;}
+  .note-item__tag{background:#f3e8ff; color:#7c3aed; font-size:10.5px; font-weight:700; border-radius:4px; padding:1px 6px;}
+  .note-item__time{font-size:11px; color:var(--gray-400); margin-left:auto;}
+  .note-item__body{font-size:12px; color:var(--gray-700); line-height:1.55; white-space:pre-line;}
+
+  /* ===== Cột Thư viện (ô thứ 4 của màn hình) ===== */
+  .chat-library{
+    width:300px; border-left:1px solid var(--gray-200); background:#fff;
+    display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0;
+  }
+  .chat-library[hidden]{display:none;}
+  .chat-library__header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; border-bottom:1px solid var(--gray-200);
+    position:sticky; top:0; background:#fff; z-index:5;
+  }
+  .chat-library__title{font-size:14px; font-weight:700; display:flex; align-items:center; gap:7px;}
+  .chat-library__close{
+    background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+  }
+  .chat-library__close:hover{background:var(--gray-100);}
+  .chat-main__header-btn--active{background:color-mix(in srgb, var(--primary) 12%, white); color:var(--primary);}
+
+  /* Menu "..." trên header chat (Xóa hội thoại) */
+  .chat-header-more{position:relative;}
+  .chat-more-menu{
+    position:absolute; top:calc(100% + 6px); right:0; background:#fff;
+    border:1px solid var(--gray-200); border-radius:10px; box-shadow:0 10px 30px rgba(15,23,42,.15);
+    padding:6px; min-width:170px; z-index:150;
+  }
+  .chat-more-menu[hidden]{display:none;}
+  .chat-more-menu__item{
+    display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:none;
+    background:none; border-radius:7px; font-size:13px; color:var(--gray-700); cursor:pointer; text-align:left;
+  }
+  .chat-more-menu__item:hover{background:var(--gray-50);}
+  .chat-more-menu__item--danger{color:#ef4444;}
+  .chat-more-menu__item--danger:hover{background:#fef2f2;}
+
+  /* Header khách hàng trên panel chi tiết */
+  .chat-detail__customer{
+    display:flex; align-items:center; gap:10px; padding:12px 16px; height:62px;
+    border-bottom:1px solid var(--gray-100); background:#fff;
+    position:sticky; top:0; z-index:11;
+  }
+  .chat-detail__customer-avatar{
+    width:38px; height:38px; border-radius:50%; background:#ec4899; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; flex-shrink:0;
+  }
+  .chat-detail__customer-name{
+    font-size:13.5px; font-weight:700; color:var(--gray-800);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .chat-detail__customer-meta{font-size:11.5px; color:var(--gray-500); margin-top:2px;}
+
+  /* Khối thông tin lấy từ CRM */
+  .crm-stats{
+    display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--gray-200);
+    border:1px solid var(--gray-200); border-radius:10px; overflow:hidden; margin-bottom:12px;
+  }
+  .crm-stat{background:#fff; padding:9px 12px;}
+  .crm-stat span{font-size:11px; color:var(--gray-500); font-weight:600; display:block;}
+  .crm-stat b{font-size:13.5px; color:var(--gray-800); display:block; margin-top:2px;}
+  .crm-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 12px;}
+  .crm-field span{font-size:11px; color:var(--gray-500); font-weight:600; display:block;}
+  .crm-field b{
+    font-size:12.5px; font-weight:600; color:var(--gray-800); display:block; margin-top:1px;
+    word-break:break-word;
+  }
+  .crm-field--full{grid-column:1/-1;}
+
+  /* ===== Thư viện (Kho lưu trữ) ===== */
+  .lib{padding:12px 16px;}
+  .lib__tabs{display:flex; gap:16px; border-bottom:1px solid var(--gray-200); margin-bottom:10px;}
+  .lib__tab{
+    border:none; background:none; cursor:pointer; font-size:12.5px; font-weight:500;
+    color:var(--gray-600); padding:8px 0; border-bottom:2px solid transparent;
+  }
+  .lib__tab--active{color:var(--primary); font-weight:700; border-bottom-color:var(--primary);}
+  .lib__panel{display:none;}
+  .lib__panel--active{display:block;}
+  .lib__search{margin-bottom:8px;}
+  .lib__filters{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;}
+  .lib__chip{
+    display:inline-flex; align-items:center; gap:5px; background:var(--gray-100); border:none;
+    border-radius:14px; padding:5px 12px; font-size:12px; color:var(--gray-700); cursor:pointer; font-weight:500;
+  }
+  .lib__chip svg{color:var(--gray-500);}
+  .lib__date{font-size:12px; font-weight:700; color:var(--gray-800); margin:12px 0 6px;}
+  .lib__date:first-of-type{margin-top:4px;}
+  .lib__grid{display:grid; grid-template-columns:repeat(3,1fr); gap:4px;}
+  .lib__tile{
+    aspect-ratio:1; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-size:22px; position:relative; cursor:pointer;
+  }
+  .lib__tile-dur{
+    position:absolute; right:4px; bottom:4px; background:rgba(0,0,0,.65); color:#fff;
+    font-size:10px; border-radius:4px; padding:1px 4px; font-weight:600;
+  }
+  .lib__file,.lib__link{display:flex; align-items:center; gap:9px; padding:7px 0; cursor:pointer;}
+  .lib__file:hover .lib__file-name,.lib__link:hover .lib__link-title{color:var(--primary);}
+  .lib__file-ic{
+    width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-size:9.5px; font-weight:800; color:#fff; flex-shrink:0; letter-spacing:.3px;
+  }
+  .lib__file-body,.lib__link-body{min-width:0; flex:1;}
+  .lib__file-name,.lib__link-title{
+    font-size:12.5px; font-weight:600; color:var(--gray-800);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .lib__file-meta{font-size:11px; color:var(--gray-400); margin-top:1px;}
+  .lib__link-ic{
+    width:34px; height:34px; border-radius:8px; background:var(--gray-100);
+    display:flex; align-items:center; justify-content:center; color:var(--gray-500); flex-shrink:0;
+  }
+  .lib__link-domain{
+    font-size:11.5px; color:#2563eb; margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  /* Footer nút */
+  .of__footer{
+    position:sticky; bottom:0; background:#fff; display:flex; gap:8px;
+    padding:12px 0 14px; margin-top:8px; border-top:1px solid var(--gray-100);
+  }
+  .of__btn-reset{
+    flex:0 0 32%; display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    border:1px solid #fecaca; background:#fff; color:#ef4444;
+    font-size:12.5px; font-weight:600; padding:9px 10px; border-radius:8px; cursor:pointer;
+  }
+  .of__btn-submit{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:none; background:var(--primary); color:#fff;
+    font-size:12.5px; font-weight:700; padding:9px 10px; border-radius:8px; cursor:pointer;
+  }
+  .of__btn-submit:hover{filter:brightness(1.08);}
+
+  /* ===== Drawer hồ sơ khách hàng (trượt từ phải) ===== */
+  .pd-backdrop{
+    position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:200;
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .pd-backdrop.open{opacity:1; pointer-events:auto;}
+  .pd-drawer{
+    position:fixed; top:0; right:0; bottom:0; width:min(940px,94vw); background:#fff; z-index:201;
+    transform:translateX(105%); transition:transform .3s ease; display:flex; flex-direction:column;
+    box-shadow:-10px 0 34px rgba(0,0,0,.18);
+  }
+  .pd-drawer.open{transform:none;}
+  .pd-header{display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--gray-200);}
+  .pd-avatar{
+    width:44px; height:44px; border-radius:50%; background:#ec4899; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; flex-shrink:0;
+  }
+  .pd-title{font-size:16px; font-weight:700;}
+  .pd-id{font-size:12px; color:var(--gray-400); margin-top:2px;}
+  .pd-close{
+    margin-left:auto; background:none; border:none; cursor:pointer; color:var(--gray-500);
+    width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+  }
+  .pd-close:hover{background:var(--gray-100);}
+  .pd-body{flex:1; overflow-y:auto; padding:0 20px 24px;}
+  .pd-body > .pd-section:first-child{padding-top:16px;}
+  .pd-footer{display:flex; gap:8px; padding:12px 20px; border-top:1px solid var(--gray-200); background:#fff;}
+  .pd-btn{
+    display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+    padding:9px 18px; border-radius:8px; cursor:pointer; border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);
+  }
+  .pd-btn--danger{border-color:#fecaca; color:#ef4444; margin-right:auto;}
+  .pd-btn--primary{background:var(--primary-500); border-color:var(--primary-500); color:#fff;}
+
+  .pd-section{margin-bottom:18px;}
+  .pd-section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .pd-section-title{font-size:11.5px; font-weight:700; color:var(--gray-500); letter-spacing:.5px;}
+  .pd-basic{display:grid; grid-template-columns:1fr 1fr; gap:10px 14px;}
+  .pd-basic .of__group{margin-bottom:0;}
+  .pd-basic--full{grid-column:1 / -1;}
+  .pd-zns-btn{
+    display:inline-flex; align-items:center; gap:5px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-500); font-size:12px; font-weight:500; padding:6px 12px; border-radius:8px; cursor:pointer;
+  }
+
+  /* Tab CRM trong drawer */
+  .pd-tabs{
+    display:flex; gap:2px; border-bottom:1px solid var(--gray-200); overflow-x:auto;
+    position:sticky; top:0; background:#fff; z-index:5;
+    margin:0 -20px; padding:0 20px;
+  }
+  .pd-tab{
+    border:none; background:none; cursor:pointer; font-size:13px; font-weight:500; color:var(--gray-500);
+    padding:10px 13px; border-bottom:2px solid transparent; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .pd-tab.active{color:var(--primary-500); font-weight:700; border-bottom-color:var(--primary-500);}
+  .pd-tab-count{
+    background:var(--gray-100); color:var(--gray-500); font-size:11px; font-weight:600;
+    border-radius:9px; padding:1px 7px;
+  }
+  .pd-tab.active .pd-tab-count{background:rgba(37,99,235,.1); color:var(--primary-500);}
+  .pd-panel{display:none; padding-top:14px;}
+  .pd-panel.active{display:block;}
+
+  /* Ô thêm ghi chú */
+  .pd-note{border:1px solid var(--gray-200); border-radius:12px; padding:14px; margin-bottom:14px;}
+  .pd-note-title{
+    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; margin-bottom:10px;
+  }
+  .pd-note select, .pd-note textarea{
+    width:100%; border:1px solid var(--gray-200); border-radius:8px; font-family:inherit;
+    font-size:12.5px; color:var(--gray-700); padding:8px 10px; outline:none; margin-bottom:8px; background:#fff;
+  }
+  .pd-note textarea{resize:vertical;}
+  .pd-note-submit{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--gray-500); color:#fff; border:none; font-size:12.5px; font-weight:600;
+    padding:9px 12px; border-radius:8px; cursor:not-allowed; opacity:.85;
+  }
+
+  /* Thanh tìm kiếm + lọc hoạt động */
+  .pd-act-bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;}
+  .pd-act-search{flex:1; min-width:200px;}
+  .pd-filters{display:flex; gap:6px; flex-wrap:wrap;}
+  .pd-filter{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:500;
+    padding:5px 12px; border-radius:16px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); cursor:pointer;
+  }
+  .pd-filter span{background:var(--gray-100); border-radius:8px; padding:0 6px; font-size:11px; font-weight:700;}
+  .pd-filter.active{background:var(--primary-500); border-color:var(--primary-500); color:#fff; font-weight:600;}
+  .pd-filter.active span{background:rgba(255,255,255,.25); color:#fff;}
+
+  /* Dòng thời gian hoạt động */
+  .pd-tl{list-style:none;}
+  .pd-act{display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--gray-100);}
+  .pd-act-avatar{
+    width:32px; height:32px; border-radius:50%; background:#1d4ed8; color:#fff; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;
+  }
+  .pd-act-body{flex:1; min-width:0;}
+  .pd-act-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px;}
+  .pd-act-actor{font-weight:700;}
+  .pd-act-verb{color:var(--gray-500);}
+  .pd-act-time{margin-left:auto; font-size:11.5px; color:var(--gray-400);}
+  .pd-act-chip{
+    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+    padding:2px 9px; border-radius:12px; color:#fff;
+  }
+  .pd-chip-ghi-chu{background:#64748b;}
+  .pd-chip-don-hang{background:#2563eb;}
+  .pd-chip-lich-hen{background:#15803d;}
+  .pd-act-card{
+    background:var(--gray-50); border:1px solid var(--gray-100); border-radius:8px;
+    padding:10px 12px; margin-top:8px; font-size:12.5px;
+  }
+  .pd-kv{display:flex; gap:10px; padding:2px 0;}
+  .pd-kv span{color:var(--gray-500); min-width:80px;}
+  .pd-money{color:#16a34a;}
+  .pd-note-text{color:var(--gray-700); line-height:1.5;}
+  .pd-note-tag{
+    display:inline-block; margin-top:6px; font-size:11px; font-weight:600;
+    background:#dcfce7; color:#15803d; border-radius:10px; padding:2px 9px;
+  }
+  .pd-time-pill{
+    display:inline-flex; align-items:center; gap:4px; background:var(--primary-500); color:#fff;
+    font-size:11.5px; font-weight:600; border-radius:12px; padding:2px 10px;
+  }
+  .pd-no-act{font-size:12.5px; color:var(--gray-400); padding:14px 0;}
+
+  /* Bảng */
+  .pd-table-wrap{overflow-x:auto; border:1px solid var(--gray-100); border-radius:10px;}
+  .pd-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .pd-table th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.3px;
+    color:var(--gray-500); background:var(--gray-50); padding:9px 12px; border-bottom:1px solid var(--gray-200);
+    white-space:nowrap;
+  }
+  .pd-table td{padding:9px 12px; border-bottom:1px solid var(--gray-100); vertical-align:top;}
+  .pd-table tr:last-child td{border-bottom:none;}
+  .pd-td-code{font-weight:600; color:var(--gray-700); white-space:nowrap;}
+  .pd-td-date{white-space:nowrap; color:var(--gray-500);}
+  .pd-td-money{white-space:nowrap; font-weight:700;}
+  .pd-badge{display:inline-block; font-size:11px; font-weight:600; border-radius:10px; padding:2px 9px; white-space:nowrap;}
+  .pd-badge--done{background:#dcfce7; color:#15803d;}
+  .pd-badge--return{background:#ffedd5; color:#c2410c;}
+  .pd-badge--cancel{background:#fee2e2; color:#b91c1c;}
+  .pd-panel-note{font-size:12px; color:var(--gray-500); margin-bottom:10px;}
+
+  /* Tích điểm */
+  .pd-pt-summary{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;}
+  .pd-pt-sum{border:1px solid var(--gray-100); border-radius:10px; padding:12px; text-align:center;}
+  .pd-pt-sum span{display:block; font-size:11.5px; color:var(--gray-500); margin-bottom:4px;}
+  .pd-pt-sum strong{font-size:17px;}
+  .pd-pt-in strong{color:#16a34a;}
+  .pd-pt-out strong{color:#ef4444;}
+  .pd-pt-bal{background:var(--gray-50);}
+  .pd-pt-point{font-weight:700; white-space:nowrap;}
+  .pd-pt-point.in{color:#16a34a;}
+  .pd-pt-point.out{color:#ef4444;}
+
+  /* Subtab */
+  .pd-subtabs{display:flex; gap:6px; margin-bottom:12px;}
+  .pd-subtab{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:500;
+    padding:5px 13px; border-radius:16px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); cursor:pointer;
+  }
+  .pd-subtab span{background:var(--gray-100); border-radius:8px; padding:0 6px; font-size:11px; font-weight:700;}
+  .pd-subtab.active{background:var(--primary-500); border-color:var(--primary-500); color:#fff; font-weight:600;}
+  .pd-subtab.active span{background:rgba(255,255,255,.25); color:#fff;}
+  .pd-subpanel{display:none;}
+  .pd-subpanel.active{display:block;}
+
+  /* Ưu đãi */
+  .pd-offers{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .pd-offer{border:1px solid var(--gray-200); border-radius:10px; padding:12px;}
+  .pd-offer--ok{border-left:3px solid #16a34a;}
+  .pd-offer--soon{border-left:3px solid #f59e0b;}
+  .pd-offer-head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:6px;}
+  .pd-offer-head h4{font-size:13px; font-weight:700;}
+  .pd-offer-state{font-size:10.5px; font-weight:700; border-radius:10px; padding:2px 8px; white-space:nowrap;}
+  .pd-offer-state--ok{background:#dcfce7; color:#15803d;}
+  .pd-offer-state--soon{background:#fef3c7; color:#b45309;}
+  .pd-offer p{font-size:12px; color:var(--gray-500); display:flex; align-items:center; gap:5px; padding:2px 0;}
+
+  /* Lịch & nhắc */
+  .pd-sched-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .pd-sched{border:1px solid var(--gray-200); border-radius:12px; padding:14px;}
+  .pd-sched h4{font-size:13px; font-weight:700; margin-bottom:10px;}
+  .pd-sched input[type="datetime-local"]{
+    width:100%; border:1px solid var(--gray-200); border-radius:8px; font-family:inherit;
+    font-size:12.5px; color:var(--gray-700); padding:8px 10px; outline:none; margin-bottom:8px;
+  }
+  .pd-sched-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--gray-500); color:#fff; border:none; font-size:12.5px; font-weight:600;
+    padding:8px 12px; border-radius:8px; cursor:not-allowed; opacity:.85; margin-bottom:10px;
+  }
+  .pd-sched-current{
+    font-size:12px; background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d;
+    border-radius:8px; padding:8px 10px; margin-bottom:8px;
+  }
+  .pd-sched .pd-hint{font-size:11.5px; color:var(--gray-400);}
+
+  /* Đặc thù & nhu cầu */
+  .pd-doc{border:1px solid var(--gray-200); border-radius:12px; padding:14px; margin-bottom:12px;}
+  .pd-doc h4{font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+  .pd-doc-text{font-size:12.5px; color:var(--gray-600); line-height:1.6;}
+</style>
+</head>
+<body>
+
+  <!-- Banner xem dưới quyền -->
+  <div class="impersonate-banner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+    <span>Bạn đang xem dưới quyền <strong>Lộc Thị Hạnh</strong> (hanhlt@traduoc.ai)</span>
+    <button>Quay lại tài khoản gốc</button>
+  </div>
+
+  <!-- Topnav -->
+  <nav class="topnav">
+    <div class="topnav__logo"><img class="topnav__logo-img" alt="Trà Dược Việt Nam" src="assets/logo-tdvn.png"></div>
+    <div class="topnav__tabs">
+      <button class="topnav__tab">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        <span>Tổng quan</span>
+      </button>
+      <button class="topnav__tab topnav__tab--active">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+        <span>Hội thoại</span>
+      </button>
+      <button class="topnav__tab">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Cài đặt</span>
+      </button>
+    </div>
+    <div class="topnav__right">
+      <div class="topnav__search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        <span>Tìm kiếm khách hàng, tin nhắn...</span>
+        <kbd>⌘K</kbd>
+      </div>
+      <button class="topnav__icon-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      </button>
+      <button class="topnav__icon-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+        <span class="topnav__badge">9+</span>
+      </button>
+      <button class="topnav__icon-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
+      </button>
+      <div class="topnav__user">
+        <div class="topnav__user-avatar">LT</div>
+        <div class="topnav__user-info">
+          <span class="topnav__user-name">Lộc Thị Hạnh</span>
+          <span class="topnav__user-role">Trà Dược Việt Nam · member</span>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+  </nav>
+
+  <div class="layout">
+    <div class="chat-layout">
+
+      <!-- Thanh icon lọc -->
+      <div class="chat-icon-bar">
+        <button class="chat-icon-bar__item chat-icon-bar__item--active" data-tip-title="Tất cả hội thoại" data-tip-desc="Đang hiển thị: 30 hội thoại">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+          <span class="chat-icon-bar__badge">30</span>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Chưa đọc" data-tip-desc="4 hội thoại có tin nhắn mới chưa xem">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+          <span class="chat-icon-bar__badge">4</span>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Được gán cho tôi" data-tip-desc="Hội thoại bạn đang phụ trách chăm sóc">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Chưa trả lời" data-tip-desc="Khách đã nhắn nhưng chưa được phản hồi">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          <span class="chat-icon-bar__badge">6</span>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="AI tự động" data-tip-desc="Hội thoại đang để AI trả lời tự động">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Đang chờ" data-tip-desc="Hội thoại chờ phản hồi từ khách hàng">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Phân phối hội thoại" data-tip-desc="Chia hội thoại mới cho nhân viên phụ trách">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Cuộc gọi nhỡ" data-tip-desc="Hội thoại có cuộc gọi nhỡ cần gọi lại">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/><line x1="16" x2="22" y1="2" y2="8"/><line x1="22" x2="16" y1="2" y2="8"/></svg>
+          <span class="chat-icon-bar__badge">1</span>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Lịch hẹn" data-tip-desc="Hội thoại có lịch hẹn với khách hàng">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+        </button>
+        <button class="chat-icon-bar__item" data-tip-title="Bộ lọc khác" data-tip-desc="Xem thêm các bộ lọc hội thoại">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+        <div class="chat-icon-bar__divider"></div>
+        <div class="chat-icon-bar__spacer"></div>
+        <button class="chat-icon-bar__item" data-tip-title="Cá nhân" data-tip-desc="Ghi chú và hội thoại của riêng tôi">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+      </div>
+
+      <!-- Danh sách hội thoại -->
+      <div class="chat-list">
+        <div class="chat-list__header">
+          <div class="chat-list__title-row">
+            <span class="chat-list__title">Tin nhắn</span>
+            <div class="chat-list__actions">
+              <button class="chat-list__action-btn" title="Đánh dấu đã đọc">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              </button>
+              <button class="chat-list__action-btn" title="Bộ lọc">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div class="search-input">
+              <svg class="search-input__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+              <input class="search-input__field" placeholder="Tìm cuộc trò chuyện...">
+            </div>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-bar__btn filter-bar__btn--active">Tất cả</button>
+            <button class="filter-bar__btn">Chưa đọc</button>
+            <button class="filter-bar__btn">Của tôi</button>
+          </div>
+          <div class="chat-list__account-filter">
+            <span class="chat-list__account-avatar" style="background:#3b82f6;">Z</span>
+            <span class="chat-list__account-name">Tất cả tài khoản</span>
+            <span class="chat-list__account-count">9</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="tab-bar">
+          <button class="tab-bar__btn tab-bar__btn--active">Tất cả</button>
+          <button class="tab-bar__btn">Cá nhân</button>
+          <button class="tab-bar__btn">Nhóm</button>
+        </div>
+        <div class="chat-list__items" id="convList"></div>
+      </div>
+
+      <!-- Khung chat chính -->
+      <div class="chat-main">
+        <div class="chat-main__header">
+          <button class="chat-back-btn" title="Quay lại danh sách">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div style="font-size:12px;font-weight:600;width:36px;height:36px;border-radius:50%;background:#ec4899;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">KV</div>
+          <div class="chat-main__info">
+            <div class="chat-main__name">
+              <span class="chat-main__name-text">Kd Vanhoa 0348302234</span>
+              <button class="pipeline-dropdown__trigger">
+                <span class="pipeline-dropdown__dot"></span>Đăng ký
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+            <div class="chat-main__meta">
+              <span style="display:inline-flex;align-items:center;gap:4px;">qua <span class="zalo-ic" style="width:13px;height:13px;font-size:9px;">Z</span> Vận Đơn Trà Dược Việt Nam - 0325173345</span>
+              <span style="margin-left:8px;font-size:11px;color:var(--gray-400);">· Lead <span style="color:#3b82f6;font-weight:600;">0</span>/100</span>
+            </div>
+          </div>
+          <div class="chat-main__header-actions">
+            <button class="ai-mode-dd__trigger" title="Đổi chế độ AI trả lời">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+              <span>Thủ công</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button class="chat-main__header-btn" title="Ghim hội thoại">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg);"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+            </button>
+            <button class="chat-main__header-btn" title="AI gợi ý trả lời">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+            </button>
+            <button class="chat-main__header-btn" title="Thư viện hội thoại" id="btnChatLibrary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/></svg>
+            </button>
+            <div class="chat-header-more">
+              <button class="chat-main__header-btn" title="Tùy chọn khác" id="btnChatMore" aria-haspopup="menu" aria-expanded="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </button>
+              <div class="chat-more-menu" id="chatMoreMenu" hidden>
+                <button class="chat-more-menu__item chat-more-menu__item--danger" id="btnDeleteConv">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  Xóa hội thoại
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-main__subheader">
+          <span>Đang chat:</span>
+          <span style="color:#3b82f6;font-weight:500;cursor:pointer;">Vận Đơn Trà Dược Việt Nam - 0325173345 ▾</span>
+          <span style="color:#3b82f6;cursor:pointer;display:flex;align-items:center;gap:4px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+            Thêm nhân viên
+          </span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+            <button class="chat-main__header-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+            </button>
+            <button class="chat-main__header-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17H5"/><path d="M19 7h-9"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+            </button>
+          </span>
+        </div>
+
+        <div class="chat-scope-bar">
+          <button class="is-active">Tất cả</button>
+          <button>Khách</button>
+          <button>Nhân viên</button>
+        </div>
+
+        <div class="chat-messages">
+          <div class="msg-wrapper">
+            <div class="chat-messages__date">Thứ Bảy, 13/06/2026</div>
+            <div class="msg msg--sent">
+              <div class="msg__avatar" style="background:#16a34a;">VĐ</div>
+              <div>
+                <div class="msg__image"><span>📷 Hình ảnh (không tải được)</span></div>
+                <div class="msg__time">
+                  09:58
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg-wrapper">
+            <div class="chat-messages__date">HÔM NAY</div>
+            <div class="msg msg--received">
+              <div class="msg__avatar" style="background:#9333ea;">KV</div>
+              <div>
+                <div class="bday-card">
+                  <div class="bday-card__head">
+                    <div class="bday-card__avatar">KV</div>
+                    <div class="bday-card__name">Ks Văn Hóa</div>
+                  </div>
+                  <div class="bday-card__body">
+                    <div class="bday-card__date">18/08</div>
+                    <div class="bday-card__hint">Hãy gửi lời chúc tốt đẹp!</div>
+                    <div class="bday-card__art">🎂🎉🎈</div>
+                  </div>
+                </div>
+                <div class="msg__time">10:16</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-tag-bar">
+          <span class="chat-tag-bar__label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+            Tag:
+          </span>
+          <button class="chat-tag-bar__add">+ Thêm tag +</button>
+        </div>
+
+        <div class="chat-input">
+          <div class="chat-input__toolbar">
+            <button class="chat-input__tool-btn chat-input__tool-btn--active">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+              AI Gợi ý
+            </button>
+            <button class="chat-input__tool-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
+              Tin nhanh
+            </button>
+          </div>
+          <div class="chat-input__area">
+            <textarea class="chat-input__textarea" placeholder="Nhập tin nhắn... (Shift+Enter = xuống dòng)" rows="1"></textarea>
+          </div>
+          <div class="chat-input__footer">
+            <div class="chat-input__sender">
+              <div class="chat-input__sender-avatar">SH</div>
+              Vận Đơn Trà Dược Việt Nam - 0325173345 ▾
+            </div>
+            <div class="chat-input__send-row">
+              <button class="chat-input__attach-btn" title="Đính kèm ảnh/file">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+                File
+              </button>
+              <button class="chat-input__sticker-btn" title="Gửi sticker">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="M15 3v5a1 1 0 0 0 1 1h5"/><path d="M8 13h.01"/><path d="M16 13h.01"/><path d="M10 16s.8 1 2 1c1.3 0 2-1 2-1"/></svg>
+                Sticker
+              </button>
+              <span class="chat-input__shortcut">⏎ Enter = Gửi</span>
+              <button class="chat-input__send-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+                Gửi
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thanh kéo giãn panel chi tiết -->
+      <div class="chat-resizer" id="detailResizer" title="Kéo để giãn/thu panel (nhấp đúp để về mặc định)">
+        <span class="chat-resizer__grip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 7-5 5 5 5"/><path d="m15 7 5 5-5 5"/></svg>
+        </span>
+      </div>
+
+      <!-- Panel chi tiết -->
+      <div class="chat-detail" id="chatDetail">
+        <!-- Header khách hàng — luôn trên cùng, phía trên thanh tab -->
+        <div class="chat-detail__customer">
+          <div class="chat-detail__customer-avatar">KV</div>
+          <div style="min-width:0;">
+            <div class="chat-detail__customer-name">Kd Vanhoa 0348302234</div>
+            <div class="chat-detail__customer-meta">ID: e216ee7f · SĐT: 0348302234</div>
+          </div>
+        </div>
+
+        <div class="chat-detail__tabs">
+          <button class="chat-detail__tab chat-detail__tab--active" data-tab="info">Thông tin</button>
+          <button class="chat-detail__tab" data-tab="notes">Ghi chú nhanh</button>
+          <button class="chat-detail__tab" data-tab="order">Tạo đơn</button>
+          <button class="chat-detail__tab" data-tab="sales" title="Tài liệu bán hàng">Tài liệu</button>
+        </div>
+
+        <div class="chat-detail__panel chat-detail__panel--active" id="panel-info">
+        <!-- Khối thông tin lấy từ CRM — trường nào không có dữ liệu thì để trống -->
+        <div class="chat-detail__section">
+          <div class="chat-detail__section-header">
+            <span class="chat-detail__section-title">THÔNG TIN TỪ CRM</span>
+            <button class="chat-list__action-btn" title="Đồng bộ từ CRM">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            </button>
+          </div>
+          <div class="crm-stats">
+            <div class="crm-stat"><span>Lịch bán hàng</span><b>—</b></div>
+            <div class="crm-stat"><span>Lịch chăm sóc</span><b>—</b></div>
+            <div class="crm-stat"><span>Số đơn</span><b>0</b></div>
+            <div class="crm-stat"><span>Ghi chú</span><b>0</b></div>
+          </div>
+          <div class="crm-grid">
+            <div class="crm-field"><span>Mã khách hàng</span><b>KH031245</b></div>
+            <div class="crm-field"><span>Số điện thoại</span><b>0348302234</b></div>
+            <div class="crm-field"><span>SĐT liên hệ khác</span><b>—</b></div>
+            <div class="crm-field"><span>Người phụ trách</span><b style="color:#2563eb;">Lộc Thị Hạnh</b></div>
+            <div class="crm-field"><span>Điểm</span><b style="color:#16a34a;">0</b></div>
+            <div class="crm-field"><span>Nghề nghiệp</span><b>—</b></div>
+            <div class="crm-field crm-field--full"><span>Nguồn khách hàng</span><b>Zalo cá nhân</b></div>
+            <div class="crm-field crm-field--full"><span>Địa chỉ</span><b>—</b></div>
+            <div class="crm-field crm-field--full"><span>Địa chỉ 2</span><b>—</b></div>
+          </div>
+        </div>
+
+        <div style="padding:16px; border-bottom:1px solid var(--gray-100);">
+          <button class="chat-detail__profile-btn" id="btnViewProfile">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            Xem hồ sơ lịch sử mua hàng
+          </button>
+          <button class="chat-detail__order-btn" id="btnGoOrder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            Tạo đơn hàng
+          </button>
+        </div>
+
+        <div class="chat-detail__section">
+          <div class="chat-detail__section-header" style="cursor:pointer;">
+            <span class="chat-detail__section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+              THÔNG TIN TÙY CHỈNH<span style="font-weight:400;color:var(--gray-400);margin-left:4px;">(3)</span>
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+          </div>
+
+          <div class="cf-group">
+            <div class="cf-group__title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7;"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+              Trà Info
+            </div>
+            <div class="chat-detail__info-row"><span class="chat-detail__label">Thích dùng hàng</span><span class="chat-detail__value chat-detail__value--empty" title="Nhấn để nhập">Chưa có</span></div>
+          </div>
+
+          <div class="cf-group">
+            <div class="cf-group__title">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7;"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+              Zalo
+            </div>
+            <div class="chat-detail__info-row"><span class="chat-detail__label">Bạn bè Zalo</span><span class="chat-detail__value chat-detail__value--empty" title="Nhấn để nhập">Chưa có</span></div>
+            <div class="chat-detail__info-row"><span class="chat-detail__label">Ngày sinh nhật</span><span class="chat-detail__value chat-detail__value--dark" title="2000-08-18">18/8/2000</span></div>
+          </div>
+        </div>
+
+        <!-- Nút AI phân tích — nổi, ghim ở chân panel Thông tin -->
+        <div class="ai-fab-wrap">
+          <button class="contact-ai__idle-btn" id="btnAiAnalyze">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+            Phân tích khách hàng (AI)
+          </button>
+        </div>
+
+        </div><!-- /panel-info -->
+
+        <div class="chat-detail__panel" id="panel-notes">
+          <div class="chat-detail__section">
+            <div class="pd-note" style="margin-bottom:10px;">
+              <div class="pd-note-title">📝 Thêm ghi chú mới</div>
+              <select>
+                <option value="">-- Chọn trạng thái cuộc gọi/tương tác --</option>
+                <option>Không kết nối</option>
+                <option>Đang tư vấn</option>
+                <option>Hẹn gọi lại</option>
+                <option>Cơ hội</option>
+                <option>Chốt thành công</option>
+                <option>Nguy cơ rời bỏ</option>
+              </select>
+              <textarea rows="3" placeholder="Nhập ghi chú về cuộc gọi, gặp mặt, nhu cầu khách hàng..."></textarea>
+              <button class="pd-note-submit" disabled>⊕ Thêm ghi chú</button>
+            </div>
+            <div id="notesList"></div>
+            <div class="chat-detail__empty" id="notesEmpty">Chưa có ghi chú nào.</div>
+          </div>
+        </div>
+
+        <!-- ===== Panel Tài liệu bán hàng ===== -->
+        <div class="chat-detail__panel" id="panel-sales">
+          <div class="sd">
+            <div class="sd__tabs">
+              <button class="sd__tab sd__tab--active" data-sd="images">Hình ảnh</button>
+              <button class="sd__tab" data-sd="content">Content</button>
+              <button class="sd__tab" data-sd="video">Video</button>
+            </div>
+            <div class="sd__note">🔒 Chỉ hiển thị tài liệu <b>đã duyệt</b> — được phép gửi ra ngoài cho khách.</div>
+
+            <!-- Tab Hình ảnh: nhóm theo danh mục sản phẩm, tick chọn để gửi vào chat -->
+            <div class="sd__panel sd__panel--active" id="sd-images">
+              <div class="sd__group">🍵 Trà Đinh Ngọc</div>
+              <div class="sd__grid">
+                <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">
+                  <input type="checkbox" data-name="Đinh Ngọc 100g" data-emoji="🍵">
+                  <span class="sd-tile__emoji">🍵</span><span class="sd-tile__name">Đinh Ngọc 100g</span>
+                </label>
+                <label class="sd-tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">
+                  <input type="checkbox" data-name="Hộp thiếc VIP" data-emoji="📦">
+                  <span class="sd-tile__emoji">📦</span><span class="sd-tile__name">Hộp thiếc VIP</span>
+                </label>
+                <label class="sd-tile" style="background:linear-gradient(135deg,#fef3c7,#fde68a);">
+                  <input type="checkbox" data-name="Set quà biếu" data-emoji="🎁">
+                  <span class="sd-tile__emoji">🎁</span><span class="sd-tile__name">Set quà biếu</span>
+                </label>
+              </div>
+              <div class="sd__group">🏔️ Trà Shan Tuyết</div>
+              <div class="sd__grid">
+                <label class="sd-tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">
+                  <input type="checkbox" data-name="Shan Tuyết cổ thụ" data-emoji="🏔️">
+                  <span class="sd-tile__emoji">🏔️</span><span class="sd-tile__name">Shan Tuyết cổ thụ</span>
+                </label>
+                <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#a7f3d0);">
+                  <input type="checkbox" data-name="Hồng trà Shan" data-emoji="🍃">
+                  <span class="sd-tile__emoji">🍃</span><span class="sd-tile__name">Hồng trà Shan</span>
+                </label>
+              </div>
+              <div class="sd__group">🫖 Ấm chén &amp; phụ kiện</div>
+              <div class="sd__grid">
+                <label class="sd-tile" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);">
+                  <input type="checkbox" data-name="Bộ ấm Cúc cổ" data-emoji="🫖">
+                  <span class="sd-tile__emoji">🫖</span><span class="sd-tile__name">Bộ ấm Cúc cổ</span>
+                </label>
+                <label class="sd-tile" style="background:linear-gradient(135deg,#ffedd5,#fed7aa);">
+                  <input type="checkbox" data-name="Chén khải sứ" data-emoji="☕">
+                  <span class="sd-tile__emoji">☕</span><span class="sd-tile__name">Chén khải sứ</span>
+                </label>
+              </div>
+              <div class="sd__send-wrap">
+                <button class="sd__send-btn" data-send="sd-images" disabled>📤 Gửi vào chat (0)</button>
+              </div>
+            </div>
+
+            <!-- Tab Content: giới thiệu sản phẩm, nút copy -->
+            <div class="sd__panel" id="sd-content">
+              <div class="sd-content">
+                <div class="sd-content__head">
+                  <div class="sd-content__title">Trà Đinh Ngọc — Túi thiếc VIP 100g</div>
+                  <button class="sd-content__copy">📋 Copy</button>
+                </div>
+                <div class="sd-content__text">🍵 TRÀ ĐINH NGỌC — phẩm trà thượng hạng của Trà Dược Việt Nam. Hái 1 tôm duy nhất lúc sớm mai, sao suốt bằng chảo gang. Nước xanh ngọc, hương cốm non, hậu ngọt sâu. Hộp thiếc VIP 100g — sang trọng để biếu tặng. Inbox để được tư vấn ngay ạ! 🌿</div>
+              </div>
+              <div class="sd-content">
+                <div class="sd-content__head">
+                  <div class="sd-content__title">Trà Shan Tuyết cổ thụ</div>
+                  <button class="sd-content__copy">📋 Copy</button>
+                </div>
+                <div class="sd-content__text">🏔️ SHAN TUYẾT CỔ THỤ — thu hái từ những cây trà trăm tuổi trên độ cao 1.400m. Búp trà phủ tuyết trắng, vị chát dịu chuyển ngọt, pha được 7-8 nước vẫn đượm hương. Món quà từ núi rừng cho người sành trà. 🍃</div>
+              </div>
+              <div class="sd-content">
+                <div class="sd-content__head">
+                  <div class="sd-content__title">Combo quà biếu sinh nhật</div>
+                  <button class="sd-content__copy">📋 Copy</button>
+                </div>
+                <div class="sd-content__text">🎂 Sinh nhật tháng này — TDVN gửi tặng ưu đãi đặc biệt: Combo Trà Đinh Ngọc 100g + hộp kẹo vừng ta + thiệp chúc mừng viết tay. Miễn phí gói quà &amp; giao hàng. Nhắn em để giữ ưu đãi nhé ạ! 🎁</div>
+              </div>
+            </div>
+
+            <!-- Tab Video: như hình ảnh -->
+            <div class="sd__panel" id="sd-video">
+              <div class="sd__group">🍵 Trà Đinh Ngọc</div>
+              <div class="sd__grid">
+                <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">
+                  <input type="checkbox" data-name="Review Đinh Ngọc" data-emoji="🎬">
+                  <span class="sd-tile__emoji">🎬</span><span class="sd-tile__name">Review Đinh Ngọc</span>
+                  <span class="sd-tile__dur">▶ 1:25</span>
+                </label>
+                <label class="sd-tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">
+                  <input type="checkbox" data-name="Cách pha Đinh Ngọc" data-emoji="🫖">
+                  <span class="sd-tile__emoji">🫖</span><span class="sd-tile__name">Cách pha chuẩn</span>
+                  <span class="sd-tile__dur">▶ 0:58</span>
+                </label>
+              </div>
+              <div class="sd__group">🏭 Thương hiệu</div>
+              <div class="sd__grid">
+                <label class="sd-tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">
+                  <input type="checkbox" data-name="Xưởng trà TDVN" data-emoji="🏭">
+                  <span class="sd-tile__emoji">🏭</span><span class="sd-tile__name">Xưởng trà TDVN</span>
+                  <span class="sd-tile__dur">▶ 2:10</span>
+                </label>
+              </div>
+              <div class="sd__send-wrap">
+                <button class="sd__send-btn" data-send="sd-video" disabled>📤 Gửi vào chat (0)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Khối Thư viện soạn tại đây trong holder ẩn; khi tải trang JS chuyển #libRoot vào cột #chatLibrary (ô thứ 4) -->
+        <div hidden>
+        <div class="lib" id="libRoot">
+            <div class="lib__tabs">
+              <button class="lib__tab lib__tab--active" data-lib="media">Ảnh/Video</button>
+              <button class="lib__tab" data-lib="files">Files</button>
+              <button class="lib__tab" data-lib="links">Links</button>
+            </div>
+
+            <!-- Tab Ảnh/Video -->
+            <div class="lib__panel lib__panel--active" id="lib-media">
+              <div class="lib__filters">
+                <button class="lib__chip">Người gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="lib__chip">Ngày gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+              <div class="lib__date">Ngày 18 Tháng 8</div>
+              <div class="lib__grid">
+                <div class="lib__tile" style="background:linear-gradient(135deg,#fef3c7,#fde68a);">🎂</div>
+                <div class="lib__tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">🍵</div>
+                <div class="lib__tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">📦<span class="lib__tile-dur">▶ 0:35</span></div>
+              </div>
+              <div class="lib__date">Ngày 13 Tháng 6</div>
+              <div class="lib__grid">
+                <div class="lib__tile" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);">🏷️</div>
+                <div class="lib__tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">🚚</div>
+              </div>
+            </div>
+
+            <!-- Tab Files -->
+            <div class="lib__panel" id="lib-files">
+              <div class="search-input lib__search">
+                <svg class="search-input__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+                <input class="search-input__field" placeholder="Tìm kiếm File">
+              </div>
+              <div class="lib__filters">
+                <button class="lib__chip">Loại <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="lib__chip">Người gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="lib__chip">Ngày gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+              <div class="lib__date">Ngày 14 Tháng 8</div>
+              <div class="lib__file">
+                <span class="lib__file-ic" style="background:#16a34a;">XLS</span>
+                <div class="lib__file-body">
+                  <div class="lib__file-name">Bảng giá sỉ TDVN T8-2026.xlsx</div>
+                  <div class="lib__file-meta">128 KB · Lộc Hạnh</div>
+                </div>
+              </div>
+              <div class="lib__file">
+                <span class="lib__file-ic" style="background:#2563eb;">DOC</span>
+                <div class="lib__file-body">
+                  <div class="lib__file-name">Mẫu hợp đồng đại lý 2026.docx</div>
+                  <div class="lib__file-meta">84 KB · Lộc Hạnh</div>
+                </div>
+              </div>
+              <div class="lib__date">Ngày 12 Tháng 8</div>
+              <div class="lib__file">
+                <span class="lib__file-ic" style="background:#ef4444;">PDF</span>
+                <div class="lib__file-body">
+                  <div class="lib__file-name">Phiếu giao J&amp;T 802802916652.pdf</div>
+                  <div class="lib__file-meta">312 KB · Thủy Anna</div>
+                </div>
+              </div>
+              <div class="lib__date">Ngày 5 Tháng 8</div>
+              <div class="lib__file">
+                <span class="lib__file-ic" style="background:#ef4444;">PDF</span>
+                <div class="lib__file-body">
+                  <div class="lib__file-name">Catalogue Trà Đinh Ngọc.pdf</div>
+                  <div class="lib__file-meta">2,4 MB · Ngọc Thảo</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab Links -->
+            <div class="lib__panel" id="lib-links">
+              <div class="search-input lib__search">
+                <svg class="search-input__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+                <input class="search-input__field" placeholder="Tìm kiếm link">
+              </div>
+              <div class="lib__filters">
+                <button class="lib__chip">Người gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+                <button class="lib__chip">Ngày gửi <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+              <div class="lib__date">Ngày 14 Tháng 8</div>
+              <div class="lib__link">
+                <span class="lib__link-ic">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <div class="lib__link-body">
+                  <div class="lib__link-title">Ảnh mẫu bao bì Tết 2027 (Drive)</div>
+                  <div class="lib__link-domain">drive.google.com</div>
+                </div>
+              </div>
+              <div class="lib__date">Ngày 12 Tháng 8</div>
+              <div class="lib__link">
+                <span class="lib__link-ic">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <div class="lib__link-body">
+                  <div class="lib__link-title">Bảng giá đại lý T8 — Google Sheets</div>
+                  <div class="lib__link-domain">docs.google.com</div>
+                </div>
+              </div>
+              <div class="lib__date">Ngày 11 Tháng 8</div>
+              <div class="lib__link">
+                <span class="lib__link-ic">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <div class="lib__link-body">
+                  <div class="lib__link-title">Trà Đinh Ngọc - Túi thiếc VIP 100g</div>
+                  <div class="lib__link-domain">traduocvietnam.vn</div>
+                </div>
+              </div>
+              <div class="lib__date">Ngày 10 Tháng 8</div>
+              <div class="lib__link">
+                <span class="lib__link-ic">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <div class="lib__link-body">
+                  <div class="lib__link-title">Tra cứu vận đơn J&amp;T Express</div>
+                  <div class="lib__link-domain">jtexpress.vn</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Panel Tạo đơn ===== -->
+        <div class="chat-detail__panel" id="panel-order">
+          <div class="of">
+
+            <div class="of__section-title">Thông tin đơn hàng</div>
+            <div class="of__row">
+              <div class="of__group">
+                <label class="of__label">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+                  Chọn trạng thái
+                </label>
+                <div class="of__select-wrap">
+                  <select class="of__select of__select--accent">
+                    <option value="">-- Chọn trạng thái --</option>
+                    <option>Chờ xử lý</option>
+                    <option selected>Đang lấy hàng</option>
+                    <option>Chờ lấy lại</option>
+                    <option>Đã lấy hàng</option>
+                    <option>Đang giao hàng</option>
+                    <option>Chờ giao lại</option>
+                    <option>Giao thành công</option>
+                    <option>Chờ chuyển hoàn</option>
+                    <option>Đang chuyển hoàn</option>
+                    <option>Chờ chuyển hoàn lại</option>
+                    <option>Đã chuyển hoàn</option>
+                    <option>Đã hủy</option>
+                  </select>
+                </div>
+              </div>
+              <div class="of__group">
+                <label class="of__label">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Chọn nhân viên
+                </label>
+                <div class="of__select-wrap">
+                  <select class="of__select">
+                    <option value="" selected>Chọn nhân viên</option>
+                    <option>Lộc Thị Hạnh</option>
+                    <option>Ngọc Thảo</option>
+                    <option>Tuấn Anh Đỗ</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="of__group">
+              <label class="of__label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+                Tỉnh/Thành phố
+              </label>
+              <div class="of__select-wrap">
+                <select class="of__select">
+                  <option value="" selected>Chọn tỉnh/thành phố</option>
+                  <option>Hà Nội</option>
+                  <option>TP. Hồ Chí Minh</option>
+                  <option>Đà Nẵng</option>
+                  <option>Hải Phòng</option>
+                  <option>Hưng Yên</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="of__group">
+              <label class="of__label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+                Phường/Xã
+              </label>
+              <div class="of__select-wrap">
+                <select class="of__select">
+                  <option value="" selected>Chọn phường/xã</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="of__group">
+              <label class="of__label">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+                Địa chỉ chi tiết
+              </label>
+              <input class="of__input" placeholder="Điền địa chỉ chi tiết...">
+            </div>
+
+            <div class="of__section-title">Thông tin khác</div>
+            <div class="of__row">
+              <div class="of__group">
+                <label class="of__label">Chọn nguồn đơn hàng</label>
+                <div class="of__select-wrap">
+                  <select class="of__select">
+                    <option value="" selected>Chọn nguồn đơn hàng</option>
+                    <option>Zalo</option>
+                    <option>Facebook</option>
+                    <option>Website</option>
+                    <option>Hotline</option>
+                  </select>
+                </div>
+              </div>
+              <div class="of__group">
+                <label class="of__label">Chọn loại đơn hàng</label>
+                <div class="of__select-wrap">
+                  <select class="of__select">
+                    <option value="" selected>Chọn loại đơn hàng</option>
+                    <option>Bán lẻ</option>
+                    <option>Bán buôn</option>
+                    <option>Đơn mẫu</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="of__group">
+              <label class="of__label">Ghi chú</label>
+              <textarea class="of__textarea" id="ofOrderNote" placeholder="Nhập ghi chú đơn hàng..."></textarea>
+            </div>
+
+            <div class="of__section-title">Sản phẩm</div>
+            <div class="of__row">
+              <div class="of__group" style="flex:0 0 82px;">
+                <div class="of__select-wrap">
+                  <select class="of__select" title="Chọn kho hàng">
+                    <option value="" selected>Kho</option>
+                    <option>Kho Hà Nội</option>
+                    <option>Kho HCM</option>
+                  </select>
+                </div>
+              </div>
+              <div class="of__group">
+                <input class="of__input" placeholder="Tìm sản phẩm">
+              </div>
+              <div class="of__group">
+                <input class="of__input" placeholder="Tìm quà tặng">
+              </div>
+            </div>
+            <div class="of__prod-head"><span>Sản phẩm</span><span>Giá tiền</span></div>
+            <!-- data-gia = đơn giá, data-kl = KL 1 đơn vị (gram), data-ton = tồn kho —
+                 logic tính đọc từ data-*, không đọc lại số đã format (theo CRM/tao-don.html) -->
+            <div id="ofProdList">
+              <div class="op-item" data-gia="87000" data-kl="100" data-ton="770">
+                <div class="op-item__top">
+                  <span class="op-item__code">FX/TP-CC05-100/KR</span>
+                  <button type="button" class="op-item__del" title="Xoá sản phẩm">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+                <div class="op-item__name">Vạn Thọ Trà - Túi Kraft 100g · Đã có VAT 8%</div>
+                <div class="op-item__row">
+                  <span>87.000 đ/Túi · <i class="op-item__kl">100g</i></span>
+                  <div class="op-qty">
+                    <button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button>
+                  </div>
+                </div>
+                <div class="op-item__row">
+                  <span class="op-item__stock">Tồn: 770</span>
+                  <b class="op-item__sum">87.000</b>
+                </div>
+              </div>
+
+              <div class="op-item" data-gia="500000" data-kl="100" data-ton="527">
+                <div class="op-item__top">
+                  <span class="op-item__code">FX/TP-CC09-100/KR</span>
+                  <button type="button" class="op-item__del" title="Xoá sản phẩm">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+                <div class="op-item__name">Trà Đinh Ngọc - Túi thiếc VIP - 100g · Đã có VAT 8%</div>
+                <div class="op-item__row">
+                  <span>500.000 đ/Hộp · <i class="op-item__kl">100g</i></span>
+                  <div class="op-qty">
+                    <button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button>
+                  </div>
+                </div>
+                <div class="op-item__row">
+                  <span class="op-item__stock">Tồn: 527</span>
+                  <b class="op-item__sum">500.000</b>
+                </div>
+              </div>
+
+              <div class="op-item op-item--gift" data-gia="0" data-kl="250" data-ton="120">
+                <div class="op-item__top">
+                  <span class="op-item__code">QT/CL-MC-250</span>
+                  <span class="op-gift-tag">🎁 Quà tặng</span>
+                  <button type="button" class="op-item__del" title="Xoá quà tặng">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>
+                <div class="op-item__name">Chè lam matcha - 250g · Quà tặng — không tính tiền</div>
+                <div class="op-item__row">
+                  <span>0 đ/Gói · <i class="op-item__kl">250g</i></span>
+                  <div class="op-qty">
+                    <button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button>
+                  </div>
+                </div>
+                <div class="op-item__row">
+                  <span class="op-item__stock">Tồn: 120</span>
+                  <b class="op-item__sum">0</b>
+                </div>
+              </div>
+            </div>
+            <div class="of__prod-empty" id="ofProdEmpty" hidden>
+              <div class="of__prod-empty-icon">🔍</div>
+              <div class="of__prod-empty-text">Chưa có sản phẩm nào</div>
+            </div>
+            <div class="op-total" id="ofProdTotal"></div>
+
+            <div class="of__summary">
+              <div class="of__head-row" style="margin-bottom:10px;">
+                <div class="of__section-title" style="margin:0;">Vận chuyển</div>
+                <label class="of-check"><input type="checkbox" id="ofSelfShip"> Tự vận chuyển</label>
+              </div>
+              <div class="of__group">
+                <label class="of__label">🚚 Chọn đơn vị vận chuyển</label>
+                <div class="of__select-wrap">
+                  <select class="of__select" id="ofShipUnit">
+                    <option data-fee="25000" data-info="J&amp;T Express - Chuyển phát nhanh chuyên nghiệp" selected>J&amp;T Express - 25.000đ</option>
+                    <option data-fee="25000" data-info="VN Post - Mạng lưới bưu cục phủ khắp toàn quốc">VN Post - 25.000đ</option>
+                    <option data-fee="25000" data-info="Viettel Post - Chuyển phát nhanh trong ngày nội tỉnh">Viettel Post - 25.000đ</option>
+                  </select>
+                </div>
+              </div>
+              <div class="of__group">
+                <label class="of__label" id="ofShipCostLabel">Chi phí vận chuyển</label>
+                <input class="of__input" id="ofShipCost" value="25.000" disabled>
+              </div>
+              <div class="of__info" id="ofShipInfo">ⓘ <b>Thông tin:</b> J&amp;T Express - Chuyển phát nhanh chuyên nghiệp</div>
+              <label class="of-check" style="margin-bottom:8px;"><input type="checkbox"> Hàng dễ vỡ ⓘ</label>
+              <div class="of__dim-grid">
+                <input class="of__input" id="ofShipWeight" value="450" title="KL (gram) — tự điền theo tổng KL bảng sản phẩm, sửa tay được">
+                <input class="of__input" placeholder="Dài (cm)">
+                <input class="of__input" placeholder="Rộng (cm)">
+                <input class="of__input" placeholder="Cao (cm)">
+              </div>
+              <div class="of__return-note" id="ofReturnNote">Ghi chú đơn đổi: Thu hàng cũ đổi đơn mới &amp; thu cod chênh lệch</div>
+              <div class="of__head-row" style="margin-top:10px;">
+                <span style="font-size:12.5px; font-weight:700;" id="ofShipBrand">J&amp;T EXPRESS</span>
+                <label class="of-check"><input type="checkbox" id="ofReturnCheck"> Đơn đổi trả</label>
+              </div>
+            </div>
+
+            <div class="of__summary">
+              <div class="of__head-row" style="margin-bottom:4px;">
+                <div class="of__section-title" style="margin:0;">Thanh toán</div>
+                <span class="of__gear" title="Cài đặt thanh toán">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+                </span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Chiết khấu</span>
+                <span class="of__unit-input"><input id="ofDiscount" value="0" inputmode="numeric"><i>%</i></span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Mã ưu đãi</span>
+                <span class="of__code-input"><input placeholder="Nhập mã"><button>Áp dụng</button></span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Tiêu "Lá"<em>1 Lá = 1.000đ</em></span>
+                <span class="of__unit-input"><input id="ofPoints" value="0" inputmode="numeric"><i>Lá</i></span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Quy đổi Lá</span>
+                <span class="of__sum-value" id="ofLaMoney">0đ</span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Phí vận chuyển</span>
+                <span class="of__sum-value" id="ofPayShip">25.000đ</span>
+              </div>
+              <div class="of__total-row">
+                <span>Tổng thanh toán</span>
+                <b id="ofPayTotal">612.000</b>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Chuyển khoản (đặt cọc)</span>
+                <span class="of__unit-input"><input id="ofTransfer" value="0" inputmode="numeric" placeholder="0"><i>đ</i></span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Đã đặt cọc</span>
+                <span class="of__sum-value" style="color:#16a34a;" id="ofDeposit">0đ</span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Còn phải thu (COD)</span>
+                <span class="of__sum-value" style="color:#ea580c;" id="ofPayCod">612.000đ</span>
+              </div>
+              <div class="of__sum-row">
+                <span class="of__sum-label">Trạng thái thanh toán</span>
+                <span class="of__pay-badge" id="ofPayStatus">Chưa thanh toán</span>
+              </div>
+            </div>
+
+            <div class="of__footer">
+              <button class="of__btn-reset">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Tạo lại
+              </button>
+              <button class="of__btn-submit" id="ofSubmit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                Đặt hàng
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Cột Thư viện (ô thứ 4) — mở bằng icon Thư viện trên header chat ===== -->
+      <div class="chat-library" id="chatLibrary" hidden>
+        <div class="chat-library__header">
+          <span class="chat-library__title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/></svg>
+            Thư viện
+          </span>
+          <button class="chat-library__close" id="chatLibraryClose" title="Đóng thư viện">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <!-- JS chuyển #libRoot vào đây khi tải trang -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== Modal AI phân tích khách hàng ===== -->
+  <div class="ai-modal-bg" id="aiModalBg">
+    <div class="ai-modal">
+      <div class="ai-modal__head">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+        Customer 360 — Phân tích khách hàng
+        <button class="ai-modal__close" id="aiModalClose" title="Đóng">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="ai-modal__body">
+        <div class="ai-loading" id="aiLoading">
+          <span class="ai-spinner"></span>
+          Đang phân tích cuộc trò chuyện gần nhất...
+        </div>
+        <div id="aiResult" hidden>
+          <div class="ai-block">
+            <div class="ai-block__title">👤 Chân dung khách hàng</div>
+            Khách mới từ Zalo cá nhân (kênh Vận Đơn TDVN), pipeline <b>Đăng ký</b>, Lead 0/100. Hôm nay là <b>sinh nhật khách (18/08)</b>.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">💬 Tóm tắt hội thoại</div>
+            Shop gửi 1 ảnh (13/06), hệ thống vừa gửi thiệp sinh nhật hôm nay. Khách <b>chưa phản hồi</b> — chưa rõ nhu cầu cụ thể.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">🎯 Cơ hội</div>
+            Sinh nhật là cớ tự nhiên để mở lại hội thoại. Tiềm năng chuyển <b>Đăng ký → Lead</b> nếu khách phản hồi lời chúc.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">✅ Đề xuất hành động</div>
+            1. Gửi lời chúc sinh nhật cá nhân hoá kèm ảnh thiệp.<br>
+            2. Tặng mã ưu đãi sinh nhật (hạn 7 ngày) để tạo lý do mua.<br>
+            3. Nếu khách phản hồi — giới thiệu Trà Đinh Ngọc bản dùng thử 100g.
+          </div>
+          <div class="ai-modal__time" id="aiTime">Lượt phân tích gần nhất: —</div>
+        </div>
+      </div>
+      <div class="ai-modal__foot">
+        <button class="ai-btn-ghost" id="aiModalClose2">Đóng</button>
+        <button class="ai-btn-note" id="btnAiToNote" disabled>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>
+          Ghi vào ghi chú
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Drawer hồ sơ khách hàng ===== -->
+  <div class="pd-backdrop" id="pdBackdrop"></div>
+  <div class="pd-drawer" id="pdDrawer">
+    <div class="pd-header">
+      <div class="pd-avatar">KV</div>
+      <div>
+        <div class="pd-title">Chi tiết khách hàng</div>
+        <div class="pd-id">Kd Vanhoa 0348302234 · ID: e216ee7f</div>
+      </div>
+      <button class="pd-close" id="pdClose" title="Đóng">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="pd-body">
+
+      <!-- Thông tin cơ bản -->
+      <div class="pd-section">
+        <div class="pd-section-head"><span class="pd-section-title">THÔNG TIN CƠ BẢN</span></div>
+        <div class="pd-basic">
+          <div class="of__group">
+            <label class="of__label">Tên CRM (tên thật)</label>
+            <input class="of__input" placeholder="Tên thật dùng cho automation">
+          </div>
+          <div class="of__group">
+            <label class="of__label">Tên hiển thị Zalo</label>
+            <input class="of__input" value="Kd Vanhoa 0348302234">
+          </div>
+          <div class="of__group">
+            <label class="of__label">Số điện thoại</label>
+            <input class="of__input" value="0348302234">
+          </div>
+          <div class="of__group">
+            <label class="of__label">Email</label>
+            <input class="of__input" placeholder="email@example.com">
+          </div>
+          <div class="of__group">
+            <button class="pd-zns-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+              Gửi ZNS
+            </button>
+          </div>
+          <div class="of__group"></div>
+          <div class="of__group pd-basic--full">
+            <label class="of__label">Công ty</label>
+            <input class="of__input" placeholder="Chưa có">
+          </div>
+          <div class="of__group pd-basic--full">
+            <label class="of__label">Nguồn</label>
+            <div class="of__select-wrap">
+              <select class="of__select">
+                <option selected>Zalo</option>
+                <option>Facebook</option>
+                <option>Website</option>
+                <option>Giới thiệu</option>
+                <option>Khác</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab CRM -->
+      <div class="pd-tabs" id="pdTabs">
+        <button class="pd-tab active" data-pd="hoat-dong">Hoạt động<span class="pd-tab-count">12</span></button>
+        <button class="pd-tab" data-pd="mua-hang">Lịch sử mua hàng<span class="pd-tab-count">12</span></button>
+        <button class="pd-tab" data-pd="san-pham">Sản phẩm đã mua<span class="pd-tab-count">10</span></button>
+        <button class="pd-tab" data-pd="diem">Lịch sử tích điểm</button>
+        <button class="pd-tab" data-pd="uu-dai">Ưu đãi đang có<span class="pd-tab-count">8</span></button>
+        <button class="pd-tab" data-pd="lich">Lịch &amp; nhắc</button>
+        <button class="pd-tab" data-pd="ho-so">Đặc thù &amp; nhu cầu</button>
+      </div>
+
+      <!-- Tab Hoạt động -->
+      <div class="pd-panel active" data-pd-panel="hoat-dong">
+        <div class="pd-note">
+          <div class="pd-note-title">📝 Thêm ghi chú mới</div>
+          <select>
+            <option value="">-- Chọn trạng thái cuộc gọi/tương tác --</option>
+            <option>Không kết nối</option>
+            <option>Đang tư vấn</option>
+            <option>Hẹn gọi lại</option>
+            <option>Cơ hội</option>
+            <option>Chốt thành công</option>
+            <option>Nguy cơ rời bỏ</option>
+          </select>
+          <textarea rows="3" placeholder="Nhập ghi chú về cuộc gọi, gặp mặt, nhu cầu khách hàng..."></textarea>
+          <button class="pd-note-submit" disabled>⊕ Thêm ghi chú</button>
+        </div>
+
+        <div class="pd-act-bar">
+          <div class="search-input pd-act-search">
+            <svg class="search-input__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input class="search-input__field" id="pdActSearch" placeholder="Tìm kiếm hoạt động...">
+          </div>
+          <div class="pd-filters" id="pdActFilters">
+            <button class="pd-filter active" data-type="all">Tất cả<span>12</span></button>
+            <button class="pd-filter" data-type="ghi-chu">Ghi chú<span>5</span></button>
+            <button class="pd-filter" data-type="don-hang">Đơn hàng<span>5</span></button>
+            <button class="pd-filter" data-type="lich-hen">Lịch hẹn<span>2</span></button>
+          </div>
+        </div>
+
+        <ol class="pd-tl" id="pdTimeline"></ol>
+        <p class="pd-no-act" id="pdNoAct" hidden>Không có hoạt động nào khớp với từ khoá.</p>
+      </div>
+
+      <!-- Tab Lịch sử mua hàng -->
+      <div class="pd-panel" data-pd-panel="mua-hang">
+        <div class="pd-table-wrap">
+          <table class="pd-table">
+            <thead><tr><th>Thời gian</th><th>Mã HĐ</th><th>Sản phẩm</th><th>Số tiền</th><th>Trạng thái</th></tr></thead>
+            <tbody id="pdOrderRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Sản phẩm đã mua -->
+      <div class="pd-panel" data-pd-panel="san-pham">
+        <p class="pd-panel-note">Gộp từ 12 đơn trong lịch sử mua hàng.</p>
+        <div class="pd-table-wrap">
+          <table class="pd-table">
+            <thead><tr><th>TT</th><th>Sản phẩm</th><th>Số đơn có</th><th>Đơn gần nhất</th></tr></thead>
+            <tbody id="pdProductRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Lịch sử tích điểm -->
+      <div class="pd-panel" data-pd-panel="diem">
+        <div class="pd-pt-summary">
+          <div class="pd-pt-sum pd-pt-in"><span>Tổng đã tích</span><strong>+725</strong></div>
+          <div class="pd-pt-sum pd-pt-out"><span>Tổng đã tiêu</span><strong>-200</strong></div>
+          <div class="pd-pt-sum pd-pt-bal"><span>Điểm còn lại</span><strong>525</strong></div>
+        </div>
+        <div class="pd-subtabs" data-subgroup="diem">
+          <button class="pd-subtab active" data-sub="tich">Tích điểm<span>9</span></button>
+          <button class="pd-subtab" data-sub="tieu">Tiêu điểm<span>3</span></button>
+        </div>
+        <div class="pd-subpanel active" data-subpanel="tich">
+          <div class="pd-table-wrap">
+            <table class="pd-table">
+              <thead><tr><th>Thời gian</th><th>Nguồn</th><th>Diễn giải</th><th>Điểm</th></tr></thead>
+              <tbody>
+                <tr><td class="pd-td-date">23/07/2026</td><td class="pd-td-code">HD_L255I019</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">06/07/2026</td><td class="pd-td-code">HD_1953X82A</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">15/06/2026</td><td class="pd-td-code">HD_59W7281A</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">28/05/2026</td><td class="pd-td-code">HD_709X2E18</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">08/05/2026</td><td class="pd-td-code">HD_Y41K7459</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">17/04/2026</td><td class="pd-td-code">HD_R28236K7</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">16/03/2026</td><td class="pd-td-code">HD_944Q65R0</td><td>Đơn giao thành công · 2.500.000 đ</td><td class="pd-pt-point in">+25</td></tr>
+                <tr><td class="pd-td-date">08/02/2026</td><td class="pd-td-code">HD_5724M2G4</td><td>Đơn giao thành công · 5.000.000 đ</td><td class="pd-pt-point in">+50</td></tr>
+                <tr><td class="pd-td-date">01/01/2026</td><td class="pd-td-code">—</td><td>Kết chuyển điểm đầu kỳ (các đơn trước 2026)</td><td class="pd-pt-point in">+500</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="pd-subpanel" data-subpanel="tieu">
+          <div class="pd-table-wrap">
+            <table class="pd-table">
+              <thead><tr><th>Thời gian</th><th>Nguồn</th><th>Diễn giải</th><th>Điểm</th></tr></thead>
+              <tbody>
+                <tr><td class="pd-td-date">21/01/2026</td><td class="pd-td-code">HD_669M81Y3</td><td>Đổi quà: Kẹo lạc đỏ - 200G</td><td class="pd-pt-point out">-100</td></tr>
+                <tr><td class="pd-td-date">24/10/2025</td><td class="pd-td-code">HD019378</td><td>Đổi quà: Bộ ấm chén Cúc cổ trường trọ</td><td class="pd-pt-point out">-50</td></tr>
+                <tr><td class="pd-td-date">06/07/2025</td><td class="pd-td-code">HD015044</td><td>Đổi quà: Hũ đựng trà sơn thủy hữu tình</td><td class="pd-pt-point out">-50</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Ưu đãi đang có -->
+      <div class="pd-panel" data-pd-panel="uu-dai">
+        <div class="pd-subtabs" data-subgroup="uu-dai">
+          <button class="pd-subtab active" data-sub="cua-kh">Ưu đãi của khách hàng<span>4</span></button>
+          <button class="pd-subtab" data-sub="he-thong">Ưu đãi chung từ hệ thống<span>4</span></button>
+        </div>
+        <div class="pd-subpanel active" data-subpanel="cua-kh">
+          <p class="pd-panel-note">Ưu đãi gắn riêng với khách hàng này — theo hạng VIP, số điểm và lịch sử mua.</p>
+          <div class="pd-offers">
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Giảm 5% cho đơn tiếp theo</h4><span class="pd-offer-state pd-offer-state--ok">Đang có hiệu lực</span></div>
+              <p>✅ Hạng VIP từ 20 trở lên</p>
+              <p>📅 Đến 30/09/2026</p>
+            </article>
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Miễn phí vận chuyển</h4><span class="pd-offer-state pd-offer-state--ok">Đang có hiệu lực</span></div>
+              <p>✅ Khách đã mua từ 10 lần</p>
+              <p>📅 Không giới hạn</p>
+            </article>
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Tặng hộp kẹo vừng ta 200g</h4><span class="pd-offer-state pd-offer-state--ok">Đủ điều kiện đổi</span></div>
+              <p>✅ Đổi bằng 100 điểm</p>
+              <p>📅 Đến 31/12/2026</p>
+            </article>
+            <article class="pd-offer pd-offer--soon">
+              <div class="pd-offer-head"><h4>Quà sinh nhật tháng 8</h4><span class="pd-offer-state pd-offer-state--soon">Sắp mở</span></div>
+              <p>✅ Sinh nhật 18/08</p>
+              <p>📅 15/08 → 31/08/2026</p>
+            </article>
+          </div>
+        </div>
+        <div class="pd-subpanel" data-subpanel="he-thong">
+          <p class="pd-panel-note">Chương trình đang chạy cho toàn hệ thống, khách nào cũng dùng được.</p>
+          <div class="pd-offers">
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Mua 2 tặng 1</h4><span class="pd-offer-state pd-offer-state--ok">Đang chạy</span></div>
+              <p>✅ Vạn Hỷ Trà - Túi Kraft 100g</p>
+              <p>📅 01/08 → 31/08/2026</p>
+            </article>
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Freeship đơn từ 500.000đ</h4><span class="pd-offer-state pd-offer-state--ok">Đang chạy</span></div>
+              <p>✅ Toàn hệ thống, mọi kênh bán</p>
+              <p>📅 01/08 → 30/09/2026</p>
+            </article>
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Giảm 10% đơn đầu trên Mini App</h4><span class="pd-offer-state pd-offer-state--ok">Đang chạy</span></div>
+              <p>✅ Khách mới cài Mini App</p>
+              <p>📅 Không giới hạn</p>
+            </article>
+            <article class="pd-offer pd-offer--ok">
+              <div class="pd-offer-head"><h4>Tích điểm x2 cuối tuần</h4><span class="pd-offer-state pd-offer-state--ok">Đang chạy</span></div>
+              <p>✅ Áp dụng T7 &amp; CN hàng tuần</p>
+              <p>📅 Đến 31/12/2026</p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Lịch & nhắc -->
+      <div class="pd-panel" data-pd-panel="lich">
+        <div class="pd-sched-grid">
+          <div class="pd-sched">
+            <h4>Thời gian tiếp cận bán hàng kế tiếp</h4>
+            <input type="datetime-local">
+            <button class="pd-sched-btn" disabled>🕐 Cập nhật lịch</button>
+            <div class="pd-sched-current"><strong>✓ Lịch bán hàng kế tiếp:</strong> 22/08/2026 10:20</div>
+            <p class="pd-hint">(nhập liệu thời gian hẹn bán hàng lần kế tiếp)</p>
+          </div>
+          <div class="pd-sched">
+            <h4>Thời gian tiếp cận chăm sóc kế tiếp</h4>
+            <input type="datetime-local">
+            <button class="pd-sched-btn" disabled>🕐 Cập nhật lịch</button>
+            <div class="pd-sched-current"><strong>✓ Lịch chăm sóc kế tiếp:</strong> 22/08/2026 10:25</div>
+            <p class="pd-hint">(nhập liệu thông tin hữu ích cho lần chăm sóc lần kế tiếp)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Đặc thù & nhu cầu -->
+      <div class="pd-panel" data-pd-panel="ho-so">
+        <div class="pd-doc">
+          <h4>📦 Đặc thù sản phẩm</h4>
+          <div class="pd-doc-text">Đinh ngọc</div>
+        </div>
+        <div class="pd-doc">
+          <h4>🧠 Nhu cầu sử dụng</h4>
+          <div class="pd-doc-text">Trung bình tháng rưỡi hết nửa cân</div>
+        </div>
+        <div class="pd-doc">
+          <h4>📄 Ghi chú hồ sơ</h4>
+          <div class="pd-doc-text">1. Hành vi, sở thích: Chỉ dùng trà đinh Đinh Ngọc, trung bình 1 tháng hết nửa cân, hết sẽ chủ động nhắn tin báo gửi, yêu cầu không cần chăm sóc<br>2. Nỗi đau &amp; rào cản:<br>- Nỗi đau:<br>- Rào cản:<br>- Quyết định<br>3. Phản hồi:<br>4. Phong cách giao tiếp:<br>- Kênh ưu tiên: khó tính khó tiếp cận<br>- Thời gian vàng: chỉ được gọi vào 8,9h sáng còn lại nhắn tin chứ không nghe máy bao giờ</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="pd-footer">
+      <button class="pd-btn pd-btn--danger">🗑 Xoá</button>
+      <button class="pd-btn">Hủy</button>
+      <button class="pd-btn pd-btn--primary">💾 Lưu</button>
+    </div>
+  </div>
+
+<script>
+  // ==== Dữ liệu danh sách hội thoại ====
+  var SRC_VD = 'Vận Đơn Trà Dược Việt Nam - 0325173345';
+  var SRC_LH = 'Lộc Hạnh Trà Dược Việt Nam';
+
+  // preview types: {cake:'...'} sinh nhật, {img:true} hình ảnh, {text:'...'} văn bản
+  var CONVS = [
+    {init:'KV', color:'#ec4899', name:'Kd Vanhoa 0348302234', time:'5h', cake:'Ks Văn Hóa', src:SRC_VD, active:true},
+    {init:'T-', color:'#ec4899', name:'TDVN - JT CARE ĐƠN HÀNG', time:'1d', text:'@Thủy Anna  check hành trình đơn này giúp chị với. 802802916652 Đã đến bưu cục phát chưa ? chưa giao mà đã thấy quét tồn rồi ?', src:SRC_VD},
+    {init:'NT', color:'#9333ea', name:'Ngọc Thảo Trà Dược Việt Nam', time:'1d', cake:'Ngọc Thảo Trà Dược Việt Nam', src:SRC_VD, unread:2},
+    {init:'NT', color:'#9333ea', name:'Ngọc Thảo Trà Dược Việt Nam', time:'1d', cake:'Ngọc Thảo Trà Dược Việt Nam', src:SRC_VD, unread:2},
+    {init:'T-', color:'#16a34a', name:'TDVN - VIETTEL POST CARE ĐƠN HÀNG', time:'3d', img:true, src:SRC_VD, unread:4},
+    {init:'H',  color:'#ef4444', name:'Hb', time:'5d', text:'mùng 1 đầu tháng chúc CH buôn may bán đắt /-rose', src:SRC_LH},
+    {init:'PK', color:'#ec4899', name:'Phòng KDPTTT tháng 72026', time:'5d', text:'@Tuấn Anh Đỗ Ok em. chị nhận thông tin liên hệ trao đổi lại với khách.', src:SRC_LH},
+    {init:'LH', color:'#0ea5e9', name:'Lộc Hạnh Trà Dược Việt Nam', time:'5d', img:true, src:SRC_LH},
+    {init:'MS', color:'#9333ea', name:'Mộc Sơn', time:'5d', img:true, src:SRC_LH, unread:1},
+    {init:'MD', color:'#16a34a', name:'My Documents', time:'5d', img:true, src:SRC_LH},
+    {init:'NP', color:'#8b5cf6', name:'Nam Phong 0983281986', time:'5d', img:true, src:SRC_LH},
+    {init:'NN', color:'#16a34a', name:'Nam Nguyen', time:'5d', img:true, src:SRC_LH},
+    {init:'NH', color:'#f59e0b', name:'Nam Hoai', time:'5d', img:true, src:SRC_LH},
+    {init:'NC', color:'#16a34a', name:'Nam Cuong 0911127166', time:'5d', img:true, src:SRC_LH},
+    {init:'NC', color:'#f59e0b', name:'Nam Cao', time:'5d', img:true, src:SRC_LH},
+    {init:'NB', color:'#16a34a', name:'Nam Bùi 0979100336', time:'5d', img:true, src:SRC_LH},
+    {init:'N',  color:'#ef4444', name:'Nam0338370172', time:'5d', img:true, src:SRC_LH},
+    {init:'ND', color:'#16a34a', name:'Nabi Dông Nghi 0888724008', time:'5d', img:true, src:SRC_LH},
+    {init:'AT', color:'#3b82f6', name:'Anh Trường Hưng Yên 0786363363', time:'5d', img:true, src:SRC_LH},
+    {init:'M',  color:'#16a34a', name:'My', time:'5d', img:true, src:SRC_LH},
+    {init:'NV', color:'#ef4444', name:'N Việtnamss 0975499520', time:'5d', img:true, src:SRC_LH},
+    {init:'M',  color:'#9333ea', name:'Mythienho', time:'5d', img:true, src:SRC_LH},
+    {init:'MH', color:'#3b82f6', name:'Mysu Hoa Màu Nắng', time:'5d', img:true, src:SRC_LH},
+    {init:'MN', color:'#8b5cf6', name:'MỸ NGHỆ THANH THẢO', time:'5d', img:true, src:SRC_LH},
+    {init:'ML', color:'#0ea5e9', name:'Mỹ Linh 0933305238', time:'5d', img:true, src:SRC_LH},
+    {init:'MN', color:'#16a34a', name:'Mỹ Nghệ Đại Việt', time:'5d', img:true, src:SRC_LH},
+    {init:'MM', color:'#9333ea', name:'My Mobile Phone 0933926612', time:'5d', img:true, src:SRC_LH},
+    {init:'MH', color:'#ef4444', name:'Mỹ Hoàng', time:'5d', img:true, src:SRC_LH},
+    {init:'MH', color:'#0ea5e9', name:'Mỹ Hoà 0945308308', time:'5d', img:true, src:SRC_LH},
+    {init:'MH', color:'#9333ea', name:'Mỹ Hạnh', time:'5d', img:true, src:SRC_LH}
+  ];
+
+  var ICON_CAKE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></svg>';
+  var ICON_CAMERA = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>';
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function preview(c){
+    if (c.cake) return '<span style="display:inline-flex;align-items:center;gap:4px;color:#f97316;">' + ICON_CAKE + 'Sinh nhật: ' + esc(c.cake) + '</span>';
+    if (c.img)  return '<span style="display:inline-flex;align-items:center;gap:4px;color:#3b82f6;">' + ICON_CAMERA + 'Hình ảnh</span>';
+    return esc(c.text || '');
+  }
+
+  document.getElementById('convList').innerHTML = CONVS.map(function(c){
+    return '' +
+      '<div class="conv-item' + (c.active ? ' conv-item--active' : '') + '">' +
+        '<div class="conv-item__avatar" style="background:' + c.color + ';">' + esc(c.init) + '</div>' +
+        '<div class="conv-item__body">' +
+          '<div class="conv-item__top">' +
+            '<span class="conv-item__name">' + esc(c.name) + '</span>' +
+            '<span class="conv-item__time">' + c.time + '</span>' +
+          '</div>' +
+          '<div class="conv-item__preview">' + preview(c) + '</div>' +
+          '<div class="conv-item__source"><span class="zalo-ic">Z</span><span>' + esc(c.src) + '</span></div>' +
+        '</div>' +
+        (c.unread ? '<span class="conv-item__unread-badge">' + c.unread + '</span>' : '') +
+      '</div>';
+  }).join('') +
+  '<div style="padding:10px 16px;text-align:center;"><button class="chat-messages__load-more-btn" style="width:100%;">Xem thêm hội thoại</button></div>';
+
+  // ==== Tab panel chi tiết (Thông tin / Ghi chú / File / Tạo đơn) ====
+  document.querySelectorAll('.chat-detail__tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.chat-detail__tab').forEach(function(t){ t.classList.remove('chat-detail__tab--active'); });
+      document.querySelectorAll('.chat-detail__panel').forEach(function(p){ p.classList.remove('chat-detail__panel--active'); });
+      tab.classList.add('chat-detail__tab--active');
+      var panel = document.getElementById('panel-' + tab.dataset.tab);
+      if (panel) panel.classList.add('chat-detail__panel--active');
+    });
+  });
+
+  // ==== Toggle công tắc trong form tạo đơn ====
+  document.querySelectorAll('.of-toggle').forEach(function(tg){
+    tg.addEventListener('click', function(){ tg.classList.toggle('of-toggle--on'); });
+  });
+
+  // ==== Kéo giãn panel chi tiết: min 320px, max 50% màn hình ====
+  (function(){
+    var resizer = document.getElementById('detailResizer');
+    var panel = document.getElementById('chatDetail');
+    var dragging = false;
+
+    function applyWidth(clientX){
+      var layoutRight = document.querySelector('.chat-layout').getBoundingClientRect().right;
+      var w = layoutRight - clientX;
+      var min = 320;
+      var max = Math.round(window.innerWidth * 0.5); // tối đa 50% màn hình
+      panel.style.width = Math.max(min, Math.min(w, max)) + 'px';
+    }
+    resizer.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      dragging = true;
+      resizer.classList.add('dragging');
+      document.body.classList.add('resizing-detail');
+    });
+    document.addEventListener('mousemove', function(e){
+      if (dragging) applyWidth(e.clientX);
+    });
+    document.addEventListener('mouseup', function(){
+      if (!dragging) return;
+      dragging = false;
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('resizing-detail');
+    });
+    // Nhấp đúp: trả về bề rộng mặc định
+    resizer.addEventListener('dblclick', function(){ panel.style.width = ''; });
+    // Thu màn hình lại thì kẹp bề rộng panel về trong giới hạn mới
+    window.addEventListener('resize', function(){
+      if (!panel.style.width) return;
+      var max = Math.round(window.innerWidth * 0.5);
+      if (parseInt(panel.style.width, 10) > max) panel.style.width = max + 'px';
+    });
+  })();
+
+  // ==== Tab Tài liệu bán hàng: sub-tab + tick chọn gửi vào chat + copy content ====
+  document.querySelectorAll('.sd__tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.sd__tab').forEach(function(t){ t.classList.remove('sd__tab--active'); });
+      document.querySelectorAll('.sd__panel').forEach(function(p){ p.classList.remove('sd__panel--active'); });
+      tab.classList.add('sd__tab--active');
+      document.getElementById('sd-' + tab.dataset.sd).classList.add('sd__panel--active');
+    });
+  });
+
+  // Đếm số tài liệu đã tick trong từng panel, bật/tắt nút gửi
+  function sdUpdateCount(panelId){
+    var n = document.querySelectorAll('#' + panelId + ' .sd-tile input:checked').length;
+    var btn = document.querySelector('.sd__send-btn[data-send="' + panelId + '"]');
+    btn.disabled = n === 0;
+    btn.textContent = '📤 Gửi vào chat (' + n + ')';
+  }
+  ['sd-images', 'sd-video'].forEach(function(pid){
+    document.getElementById(pid).addEventListener('change', function(e){
+      if (e.target.matches('.sd-tile input')) sdUpdateCount(pid);
+    });
+  });
+
+  // Gửi các tài liệu đã chọn vào khung chat (mock: bong bóng tin nhắn gửi đi)
+  document.querySelectorAll('.sd__send-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pid = btn.dataset.send;
+      var isVideo = pid === 'sd-video';
+      var checked = document.querySelectorAll('#' + pid + ' .sd-tile input:checked');
+      if (!checked.length) return;
+      var msgs = document.querySelector('.chat-messages');
+      var now = new Date();
+      var time = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+      checked.forEach(function(chk){
+        var wrap = document.createElement('div');
+        wrap.className = 'msg-wrapper msg-wrapper--sent';
+        wrap.innerHTML =
+          '<div class="msg msg--sent">' +
+            '<div class="msg__avatar" style="background:#16a34a;">VĐ</div>' +
+            '<div>' +
+              '<div class="msg__image" style="max-width:200px; padding:16px 12px;">' +
+                '<div style="font-size:34px; line-height:1.2;">' + chk.dataset.emoji + (isVideo ? ' ▶' : '') + '</div>' +
+                '<div style="font-size:12px; font-weight:600; color:var(--gray-700); margin-top:4px;"></div>' +
+              '</div>' +
+              '<div class="msg__time">' + time + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg></div>' +
+            '</div>' +
+          '</div>';
+        wrap.querySelector('.msg__image div:last-child').textContent = (isVideo ? 'Video: ' : '') + chk.dataset.name;
+        msgs.appendChild(wrap);
+        chk.checked = false;
+      });
+      msgs.scrollTop = msgs.scrollHeight;
+      sdUpdateCount(pid);
+    });
+  });
+
+  // Copy content giới thiệu sản phẩm
+  document.querySelectorAll('.sd-content__copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var text = btn.closest('.sd-content').querySelector('.sd-content__text').textContent;
+      var done = function(){
+        btn.classList.add('sd-content__copy--done');
+        btn.textContent = '✓ Đã copy';
+        setTimeout(function(){
+          btn.classList.remove('sd-content__copy--done');
+          btn.textContent = '📋 Copy';
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch(e){}
+        document.body.removeChild(ta); done();
+      }
+    });
+  });
+
+  // ==== Menu "..." trên header chat: Xóa hội thoại ====
+  document.getElementById('btnChatMore').addEventListener('click', function(e){
+    e.stopPropagation();
+    var menu = document.getElementById('chatMoreMenu');
+    menu.hidden = !menu.hidden;
+    this.setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  document.addEventListener('click', function(e){
+    var menu = document.getElementById('chatMoreMenu');
+    if (!menu.hidden && !e.target.closest('.chat-header-more')){
+      menu.hidden = true;
+      document.getElementById('btnChatMore').setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.getElementById('btnDeleteConv').addEventListener('click', function(){
+    document.getElementById('chatMoreMenu').hidden = true;
+    if (confirm('Xóa toàn bộ hội thoại với "Kd Vanhoa 0348302234"?\nHành động này không thể hoàn tác.')){
+      alert('Giao diện mẫu — chưa nối API, hội thoại chưa bị xóa thật.');
+    }
+  });
+
+  // ==== Nút "Tạo đơn hàng": trỏ về tab Tạo đơn của panel ====
+  document.getElementById('btnGoOrder').addEventListener('click', function(){
+    document.querySelector('.chat-detail__tab[data-tab="order"]').click();
+  });
+  // Nút "Xem hồ sơ lịch sử mua hàng": mở drawer và nhảy thẳng tới tab Lịch sử mua hàng
+  document.getElementById('btnViewProfile').addEventListener('click', function(){
+    var tab = document.querySelector('.pd-tab[data-pd="mua-hang"]');
+    if (tab) tab.click();
+  });
+
+  // ==== AI phân tích khách hàng: nút nổi → modal → ghi vào ghi chú (lịch sử) ====
+  var AI_LAST_TIME = null;
+  var AI_NOTE_TEXT =
+    '👤 Chân dung: Khách mới từ Zalo cá nhân (kênh Vận Đơn TDVN), pipeline Đăng ký, Lead 0/100. Hôm nay là sinh nhật khách (18/08).\n' +
+    '💬 Hội thoại: Shop gửi 1 ảnh (13/06), hệ thống gửi thiệp sinh nhật hôm nay — khách chưa phản hồi.\n' +
+    '🎯 Cơ hội: Dùng dịp sinh nhật mở lại hội thoại, tiềm năng chuyển Đăng ký → Lead.\n' +
+    '✅ Đề xuất: 1) Chúc sinh nhật cá nhân hoá; 2) Tặng mã ưu đãi sinh nhật hạn 7 ngày; 3) Giới thiệu Trà Đinh Ngọc 100g khi khách phản hồi.';
+
+  function aiOpenModal(){
+    var bg = document.getElementById('aiModalBg');
+    bg.classList.add('open');
+    document.getElementById('aiLoading').hidden = false;
+    document.getElementById('aiResult').hidden = true;
+    document.getElementById('btnAiToNote').disabled = true;
+    setTimeout(function(){
+      var now = new Date();
+      AI_LAST_TIME = ('0' + now.getDate()).slice(-2) + '/' + ('0' + (now.getMonth() + 1)).slice(-2) + '/' + now.getFullYear()
+        + ' · ' + ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+      document.getElementById('aiTime').textContent = 'Lượt phân tích gần nhất: ' + AI_LAST_TIME;
+      document.getElementById('aiLoading').hidden = true;
+      document.getElementById('aiResult').hidden = false;
+      document.getElementById('btnAiToNote').disabled = false;
+    }, 900);
+  }
+  function aiCloseModal(){ document.getElementById('aiModalBg').classList.remove('open'); }
+
+  document.getElementById('btnAiAnalyze').addEventListener('click', aiOpenModal);
+  document.getElementById('aiModalClose').addEventListener('click', aiCloseModal);
+  document.getElementById('aiModalClose2').addEventListener('click', aiCloseModal);
+  document.getElementById('aiModalBg').addEventListener('click', function(e){ if (e.target === this) aiCloseModal(); });
+
+  // Ghi kết quả phân tích vào tab Ghi chú nhanh — mỗi lượt là 1 bản ghi lịch sử
+  document.getElementById('btnAiToNote').addEventListener('click', function(){
+    var item = document.createElement('div');
+    item.className = 'note-item note-item--ai';
+    item.innerHTML =
+      '<div class="note-item__head"><span class="note-item__tag">🤖 AI phân tích</span>' +
+      '<span class="note-item__time">' + AI_LAST_TIME + '</span></div>' +
+      '<div class="note-item__body"></div>';
+    item.querySelector('.note-item__body').textContent = AI_NOTE_TEXT;
+    var list = document.getElementById('notesList');
+    list.insertBefore(item, list.firstChild); // lượt gần nhất luôn ở trên cùng
+    document.getElementById('notesEmpty').hidden = true;
+    aiCloseModal();
+    document.querySelector('.chat-detail__tab[data-tab="notes"]').click(); // chuyển sang tab ghi chú để thấy bản ghi
+  });
+
+  // ==== Cột Thư viện (ô thứ 4): chuyển #libRoot vào cột + bật/tắt bằng icon trên header chat ====
+  document.getElementById('chatLibrary').appendChild(document.getElementById('libRoot'));
+  document.getElementById('btnChatLibrary').addEventListener('click', function(){
+    var lib = document.getElementById('chatLibrary');
+    lib.hidden = !lib.hidden;
+    this.classList.toggle('chat-main__header-btn--active', !lib.hidden);
+  });
+  document.getElementById('chatLibraryClose').addEventListener('click', function(){
+    document.getElementById('chatLibrary').hidden = true;
+    document.getElementById('btnChatLibrary').classList.remove('chat-main__header-btn--active');
+  });
+
+  // ==== Thư viện: chuyển tab con Ảnh/Video · Files · Links ====
+  document.querySelectorAll('.lib__tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.lib__tab').forEach(function(t){ t.classList.remove('lib__tab--active'); });
+      document.querySelectorAll('.lib__panel').forEach(function(p){ p.classList.remove('lib__panel--active'); });
+      tab.classList.add('lib__tab--active');
+      document.getElementById('lib-' + tab.dataset.lib).classList.add('lib__panel--active');
+    });
+  });
+
+  // ==== Logic tạo đơn — chạy theo CRM/tao-don.html (giao diện giữ nguyên) ====
+  var opParseNum = function(v){ return Number(String(v || '').replace(/[^\d]/g, '')) || 0; };
+  var opFmt = function(n){ return new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(n))); };
+  var opMoney = function(n){ return opFmt(n) + 'đ'; };
+  var OP_LA_RATE = 1000; // MOCK — bản thật đọc tỉ lệ quy đổi Lá từ cấu hình hệ thống (BE trả về)
+  var opTransfer = 0, opPoints = 0, opSubtotal = 587000;
+
+  // Hình thức tự giao: chi phí tự điền theo hình thức, vẫn sửa tay được
+  var OF_SELF_MODES = [
+    {name:'CHỜ VẬN ĐƠN', fee:20000},
+    {name:'Nhân viên công ty đi giao', fee:20000},
+    {name:'Gửi xe khách', fee:30000},
+    {name:'Gửi xe buýt', fee:30000}
+  ];
+  var OF_CARRIERS_HTML = document.getElementById('ofShipUnit').innerHTML;
+
+  function ofShipFee(){ return opParseNum(document.getElementById('ofShipCost').value); }
+
+  function ofOrderTotal(){
+    // Tiền hàng − chiết khấu % (kẹp 0–100) − quy đổi Lá, không cho âm, cộng phí vận chuyển
+    var disc = Math.min(100, opParseNum(document.getElementById('ofDiscount').value));
+    return Math.max(opSubtotal - Math.round(opSubtotal * disc / 100) - opPoints * OP_LA_RATE, 0) + ofShipFee();
+  }
+
+  function ofRenderPayment(){
+    var total = ofOrderTotal();
+    var due = Math.max(total - opTransfer, 0); // COD = tổng − đặt cọc
+    document.getElementById('ofPayShip').textContent = opMoney(ofShipFee());
+    document.getElementById('ofPayTotal').textContent = opFmt(total);
+    document.getElementById('ofLaMoney').textContent = opPoints > 0 ? '−' + opMoney(opPoints * OP_LA_RATE) : '0đ';
+    document.getElementById('ofDeposit').textContent = opMoney(Math.min(opTransfer, total));
+    document.getElementById('ofPayCod').textContent = opMoney(due);
+    var s = document.getElementById('ofPayStatus');
+    s.className = 'of__pay-badge';
+    if (opTransfer <= 0){ s.textContent = 'Chưa thanh toán'; }
+    else if (opTransfer < total){ s.textContent = 'Đặt cọc một phần'; s.classList.add('of__pay-badge--orange'); }
+    else if (opTransfer === total){ s.textContent = '✓ Đã thanh toán đủ'; s.classList.add('of__pay-badge--green'); }
+    else { s.textContent = '⚠ Đặt cọc vượt tổng đơn'; s.classList.add('of__pay-badge--red'); }
+  }
+
+  // Bảng sản phẩm: đơn giá/KL/tồn đọc từ data-* trên .op-item, quà tặng (giá 0) vẫn cộng SL + KL
+  function ofRecalcProducts(){
+    var subtotal = 0, qtySum = 0, klSum = 0;
+    var items = document.querySelectorAll('#ofProdList .op-item');
+    items.forEach(function(it){
+      var q = Math.max(1, opParseNum(it.querySelector('.op-qty input').value) || 1);
+      var gia = Number(it.dataset.gia) || 0;
+      var kl = Number(it.dataset.kl) || 0;
+      var ton = Number(it.dataset.ton) || 0;
+      it.querySelector('.op-item__sum').textContent = opFmt(gia * q);
+      it.querySelector('.op-item__kl').textContent = (kl * q) + 'g';
+      var over = ton > 0 && q > ton;
+      it.classList.toggle('op-item--over', over);
+      it.querySelector('.op-item__stock').title = over ? 'Vượt tồn kho (còn ' + ton + ')' : '';
+      subtotal += gia * q; qtySum += q; klSum += kl * q;
+    });
+    document.getElementById('ofProdEmpty').hidden = items.length > 0;
+    var totalRow = document.getElementById('ofProdTotal');
+    totalRow.hidden = items.length === 0;
+    totalRow.innerHTML = '<span>Tổng: ' + qtySum + ' SP · ' + klSum + 'g</span><b>' + opMoney(subtotal) + '</b>';
+    // KL đóng gói tự điền theo tổng KL — thôi tự điền khi đã sửa tay
+    var w = document.getElementById('ofShipWeight');
+    if (w && !w.dataset.manual) w.value = klSum;
+    opSubtotal = Math.round(subtotal);
+    ofRenderPayment();
+  }
+
+  document.getElementById('ofShipWeight').addEventListener('input', function(){ this.dataset.manual = 1; });
+
+  document.getElementById('ofProdList').addEventListener('click', function(e){
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('op-item__del')){
+      btn.closest('.op-item').remove();
+      ofRecalcProducts();
+    } else if (btn.dataset.d){
+      var input = btn.parentElement.querySelector('input');
+      input.value = Math.max(1, (parseInt(input.value || '1', 10) || 1) + Number(btn.dataset.d));
+      ofRecalcProducts();
+    }
+  });
+  document.getElementById('ofProdList').addEventListener('input', function(e){
+    if (e.target.matches('.op-qty input')) ofRecalcProducts();
+  });
+  // Rời ô SL thì chuẩn hoá về đúng số đã dùng để tính (gõ "0"/để trống → 1)
+  document.getElementById('ofProdList').addEventListener('change', function(e){
+    if (e.target.matches('.op-qty input')){
+      e.target.value = Math.max(1, parseInt(e.target.value || '1', 10) || 1);
+      ofRecalcProducts();
+    }
+  });
+
+  // Thanh toán: chiết khấu chỉ nhận số, kẹp 0–100 ngay khi gõ; Lá & đặt cọc format vi-VN
+  document.getElementById('ofDiscount').addEventListener('input', function(){
+    var v = this.value.replace(/[^\d]/g, '');
+    if (Number(v) > 100) v = '100';
+    this.value = v;
+    ofRenderPayment();
+  });
+  document.getElementById('ofPoints').addEventListener('input', function(){
+    opPoints = opParseNum(this.value);
+    this.value = opFmt(opPoints);
+    ofRenderPayment();
+  });
+  document.getElementById('ofTransfer').addEventListener('input', function(){
+    opTransfer = opParseNum(this.value);
+    this.value = opFmt(opTransfer);
+    ofRenderPayment();
+  });
+
+  // Vận chuyển: hãng ngoài (phí + thông tin theo data-* của hãng, phí khoá) ↔ tự giao (phí sửa được)
+  function ofSyncShipSelection(){
+    var sel = document.getElementById('ofShipUnit');
+    var o = sel.options[sel.selectedIndex];
+    document.getElementById('ofShipCost').value = opFmt(Number(o.dataset.fee) || 0);
+    document.getElementById('ofShipBrand').textContent = o.text.split(' - ')[0].toUpperCase();
+    if (o.dataset.info) document.getElementById('ofShipInfo').innerHTML = 'ⓘ <b>Thông tin:</b> ' + o.dataset.info;
+    ofRenderPayment();
+  }
+  document.getElementById('ofShipUnit').addEventListener('change', ofSyncShipSelection);
+  document.getElementById('ofSelfShip').addEventListener('change', function(){
+    var sel = document.getElementById('ofShipUnit');
+    var cost = document.getElementById('ofShipCost');
+    if (this.checked){
+      sel.innerHTML = OF_SELF_MODES.map(function(m, i){
+        return '<option data-fee="' + m.fee + '"' + (i === 0 ? ' selected' : '') + '>' + m.name + '</option>';
+      }).join('');
+      document.getElementById('ofShipCostLabel').textContent = 'Chi phí Tự giao';
+      cost.disabled = false;
+      document.getElementById('ofShipInfo').style.display = 'none';
+    } else {
+      sel.innerHTML = OF_CARRIERS_HTML;
+      document.getElementById('ofShipCostLabel').textContent = 'Chi phí vận chuyển';
+      cost.disabled = true;
+      document.getElementById('ofShipInfo').style.display = '';
+    }
+    ofSyncShipSelection();
+  });
+  // Chi phí tự giao sửa tay: format vi-VN khi gõ + tính lại tổng
+  document.getElementById('ofShipCost').addEventListener('input', function(){
+    this.value = opFmt(opParseNum(this.value));
+    ofRenderPayment();
+  });
+
+  // Đặt hàng: chặn đơn rỗng (dòng quà tặng data-gia="0" không tính là sản phẩm)
+  document.getElementById('ofSubmit').addEventListener('click', function(){
+    if (!document.querySelector('#ofProdList .op-item:not([data-gia="0"])')){
+      alert('Chưa có sản phẩm nào trong đơn — thêm sản phẩm trước khi tạo đơn.');
+      return;
+    }
+    var total = ofOrderTotal();
+    var due = Math.max(total - opTransfer, 0);
+    alert(
+      'Giao diện mẫu — chưa nối API, đơn CHƯA được lưu.\nDữ liệu sẽ gửi đi khi nối API:\n\n' +
+      'Tổng đơn: ' + opMoney(total) + '\n' +
+      'Tiêu Lá: ' + opPoints + ' Lá (−' + opMoney(opPoints * OP_LA_RATE) + ')\n' +
+      'Đặt cọc CK: ' + opMoney(opTransfer) + '\n' +
+      'COD còn thu: ' + opMoney(due)
+    );
+  });
+
+  ofRecalcProducts();
+
+  // ==== Đơn đổi trả: hiện ghi chú + tự thêm vào ô Ghi chú đơn hàng ====
+  var RETURN_NOTE_TEXT = 'Đơn đổi trả: Thu hàng cũ đổi đơn mới & thu COD chênh lệch';
+  document.getElementById('ofReturnCheck').addEventListener('change', function(){
+    var banner = document.getElementById('ofReturnNote');
+    var note = document.getElementById('ofOrderNote');
+    if (this.checked){
+      banner.classList.add('of__return-note--show');
+      if (note.value.indexOf(RETURN_NOTE_TEXT) === -1){
+        note.value = note.value ? note.value.replace(/\s+$/, '') + '\n' + RETURN_NOTE_TEXT : RETURN_NOTE_TEXT;
+      }
+    } else {
+      banner.classList.remove('of__return-note--show');
+      note.value = note.value
+        .split('\n')
+        .filter(function(line){ return line.trim() !== RETURN_NOTE_TEXT; })
+        .join('\n')
+        .replace(/^\n+|\n+$/g, '');
+    }
+  });
+
+  // ==== Tooltip thanh icon lọc ====
+  var iconTip = document.createElement('div');
+  iconTip.className = 'icon-tip';
+  iconTip.innerHTML = '<div class="icon-tip__title"></div><div class="icon-tip__desc"></div>';
+  document.body.appendChild(iconTip);
+  document.querySelectorAll('.chat-icon-bar__item[data-tip-title]').forEach(function(btn){
+    btn.addEventListener('mouseenter', function(){
+      iconTip.querySelector('.icon-tip__title').textContent = btn.dataset.tipTitle;
+      iconTip.querySelector('.icon-tip__desc').textContent = btn.dataset.tipDesc || '';
+      iconTip.querySelector('.icon-tip__desc').style.display = btn.dataset.tipDesc ? '' : 'none';
+      var r = btn.getBoundingClientRect();
+      iconTip.style.left = (r.right + 10) + 'px';
+      iconTip.classList.add('show');
+      // hiển thị trước để đo chiều cao rồi căn giữa theo icon
+      var th = iconTip.offsetHeight;
+      var top = r.top + r.height / 2 - th / 2;
+      iconTip.style.top = Math.max(8, Math.min(top, window.innerHeight - th - 8)) + 'px';
+    });
+    btn.addEventListener('mouseleave', function(){ iconTip.classList.remove('show'); });
+    btn.addEventListener('blur', function(){ iconTip.classList.remove('show'); });
+  });
+
+  // ==== Drawer hồ sơ khách hàng ====
+  var pdDrawer = document.getElementById('pdDrawer');
+  var pdBackdrop = document.getElementById('pdBackdrop');
+  function pdOpen(){ pdDrawer.classList.add('open'); pdBackdrop.classList.add('open'); }
+  function pdCloseFn(){ pdDrawer.classList.remove('open'); pdBackdrop.classList.remove('open'); }
+  document.getElementById('btnViewProfile').addEventListener('click', pdOpen);
+  document.getElementById('pdClose').addEventListener('click', pdCloseFn);
+  pdBackdrop.addEventListener('click', pdCloseFn);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') pdCloseFn(); });
+
+  // Chuyển tab chính trong drawer
+  document.querySelectorAll('#pdTabs .pd-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('#pdTabs .pd-tab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.pd-panel').forEach(function(p){ p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.querySelector('.pd-panel[data-pd-panel="' + tab.dataset.pd + '"]').classList.add('active');
+    });
+  });
+
+  // Subtab (tích điểm / ưu đãi)
+  document.querySelectorAll('.pd-subtabs').forEach(function(group){
+    var panelRoot = group.parentElement;
+    group.querySelectorAll('.pd-subtab').forEach(function(st){
+      st.addEventListener('click', function(){
+        group.querySelectorAll('.pd-subtab').forEach(function(s){ s.classList.remove('active'); });
+        panelRoot.querySelectorAll('.pd-subpanel').forEach(function(p){ p.classList.remove('active'); });
+        st.classList.add('active');
+        panelRoot.querySelector('.pd-subpanel[data-subpanel="' + st.dataset.sub + '"]').classList.add('active');
+      });
+    });
+  });
+
+  // ==== Dữ liệu hoạt động (timeline) ====
+  var PD_ACTS = [
+    {type:'lich-hen', time:'22/08/2026 • 10:25', chip:'Lịch chăm sóc', kind:'Lịch chăm sóc', when:'22/08/2026 10:25'},
+    {type:'lich-hen', time:'22/08/2026 • 10:20', chip:'Lịch bán hàng', kind:'Lịch bán hàng', when:'22/08/2026 10:20'},
+    {type:'ghi-chu', time:'23/07/2026 • 03:23', note:'Gửi trà cho anh nhé. 500g Đinh Ngọc', tag:'Chốt thành công'},
+    {type:'don-hang', time:'23/07/2026', code:'HD_L255I019', prod:'Trà Đinh Ngọc - Túi thiếc VIP - 100g', money:'2.500.000 ₫', status:'done'},
+    {type:'ghi-chu', time:'06/07/2026 • 02:55', note:'Đơn vị vận chuyển không giao hàng hoàn về, lên lại đơn mới gửi khách', tag:'Chốt thành công'},
+    {type:'don-hang', time:'06/07/2026', code:'HD_1953X82A', prod:'Trà Đinh Ngọc - Túi thiếc VIP - 100g', money:'2.500.000 ₫', status:'done'},
+    {type:'ghi-chu', time:'01/07/2026 • 02:21', note:'Có chương trình/ưu đãi hay không?<br>Khả năng mua lại: (Cao, trung bình, thấp, chưa rõ)<br>Có tiềm năng upsale không: (Có, không)<br>Mai gửi tra cho a nhé 500g đinh ngọc', tag:'Chốt thành công'},
+    {type:'don-hang', time:'01/07/2026', code:'HD_49763P4R', prod:'(Quà tặng) Kẹo Vừng Ta - 200g, Trà Đinh Ngọc - Túi thiếc VIP - 100g', money:'2.500.000 ₫', status:'return'},
+    {type:'ghi-chu', time:'15/06/2026 • 02:22', note:'gửi trà cho anh nhé ( 500g đinh ngọc)'},
+    {type:'don-hang', time:'15/06/2026', code:'HD_59W7281A', prod:'Trà Đinh Ngọc - Túi thiếc VIP - 100g', money:'2.500.000 ₫', status:'done'},
+    {type:'ghi-chu', time:'28/05/2026 • 03:07', note:'Gửi trà cho anh nhé ( 500g đinh ngọc )<br>Khách bận yêu cầu không chăm sóc, có vấn đề khách sẽ chủ động nhắn zalo.'},
+    {type:'don-hang', time:'28/05/2026', code:'HD_709X2E18', prod:'Trà Đinh Ngọc - Túi thiếc VIP - 100g', money:'2.500.000 ₫', status:'done'}
+  ];
+
+  var PD_STATUS = {
+    done:   '<span class="pd-badge pd-badge--done">Giao thành công</span>',
+    return: '<span class="pd-badge pd-badge--return">Đã chuyển hoàn</span>',
+    cancel: '<span class="pd-badge pd-badge--cancel">Đã hủy</span>'
+  };
+  var PD_VERB = {'ghi-chu':'đã thêm ghi chú', 'don-hang':'đã tạo đơn hàng', 'lich-hen':'đã đặt lịch'};
+
+  function pdActHtml(a){
+    var chip, card;
+    if (a.type === 'ghi-chu'){
+      chip = '<span class="pd-act-chip pd-chip-ghi-chu">🗒 Nhật ký CSKH</span>';
+      card = '<div class="pd-note-text">' + a.note + '</div>' + (a.tag ? '<span class="pd-note-tag">' + a.tag + '</span>' : '');
+    } else if (a.type === 'don-hang'){
+      chip = '<span class="pd-act-chip pd-chip-don-hang">🧾 ' + a.code + '</span>';
+      card = '<div class="pd-kv"><span>Sản phẩm</span><b>' + a.prod + '</b></div>' +
+             '<div class="pd-kv"><span>Số tiền</span><b class="pd-money">' + a.money + '</b></div>' +
+             '<div class="pd-kv"><span>Trạng thái</span>' + PD_STATUS[a.status] + '</div>';
+    } else {
+      chip = '<span class="pd-act-chip pd-chip-lich-hen">📅 ' + a.chip + '</span>';
+      card = '<div class="pd-kv"><span>Loại lịch</span><b>' + a.kind + '</b></div>' +
+             '<div class="pd-kv"><span>Thời gian</span><span class="pd-time-pill">🕐 ' + a.when + '</span></div>';
+    }
+    var PD_STATUS_TEXT = {done:'giao thành công', return:'đã chuyển hoàn', cancel:'đã hủy'};
+    var searchText = (a.note || '') + ' ' + (a.code || '') + ' ' + (a.prod || '') + ' ' + (a.kind || '') + ' ' + (a.status ? PD_STATUS_TEXT[a.status] : '') + ' ' + (a.money || '') + ' ' + a.time;
+    return '<li class="pd-act" data-type="' + a.type + '" data-search="' + searchText.toLowerCase().replace(/<[^>]+>/g,' ').replace(/"/g,'') + '">' +
+      '<span class="pd-act-avatar">CD</span>' +
+      '<div class="pd-act-body">' +
+        '<div class="pd-act-head">' +
+          '<span class="pd-act-actor">Dương Hoài Chang</span>' +
+          '<span class="pd-act-verb">' + PD_VERB[a.type] + '</span>' + chip +
+          '<span class="pd-act-time">' + a.time + '</span>' +
+        '</div>' +
+        '<div class="pd-act-card">' + card + '</div>' +
+      '</div>' +
+    '</li>';
+  }
+  document.getElementById('pdTimeline').innerHTML = PD_ACTS.map(pdActHtml).join('');
+
+  // Lọc + tìm kiếm hoạt động
+  var pdActType = 'all';
+  function pdApplyActFilter(){
+    var q = document.getElementById('pdActSearch').value.trim().toLowerCase();
+    var any = false;
+    document.querySelectorAll('#pdTimeline .pd-act').forEach(function(li){
+      var ok = (pdActType === 'all' || li.dataset.type === pdActType) &&
+               (!q || li.dataset.search.indexOf(q) !== -1);
+      li.style.display = ok ? '' : 'none';
+      if (ok) any = true;
+    });
+    document.getElementById('pdNoAct').hidden = any;
+  }
+  document.querySelectorAll('#pdActFilters .pd-filter').forEach(function(f){
+    f.addEventListener('click', function(){
+      document.querySelectorAll('#pdActFilters .pd-filter').forEach(function(x){ x.classList.remove('active'); });
+      f.classList.add('active');
+      pdActType = f.dataset.type;
+      pdApplyActFilter();
+    });
+  });
+  document.getElementById('pdActSearch').addEventListener('input', pdApplyActFilter);
+
+  // ==== Bảng lịch sử mua hàng ====
+  var PD_ORDERS = [
+    ['23 - 07 - 2026','HD_L255I019','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['06 - 07 - 2026','HD_1953X82A','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['01 - 07 - 2026','HD_49763P4R','(Quà tặng) Kẹo Vừng Ta - 200g, Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','return'],
+    ['15 - 06 - 2026','HD_59W7281A','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['28 - 05 - 2026','HD_709X2E18','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['08 - 05 - 2026','HD_Y41K7459','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['17 - 04 - 2026','HD_R28236K7','Trà Đinh Ngọc - Túi thiếc VIP - 100g','2.500.000 ₫','done'],
+    ['16 - 03 - 2026','HD_944Q65R0','(Quà tặng) Chè lam matcha - 250G, Trà Đinh Ngọc - Túi thiếc VIP - 100G','2.500.000 ₫','done'],
+    ['08 - 02 - 2026','HD_5724M2G4','(Quà tặng) Hồng Hỷ trà - Hồng trà shan tuyết - Hộp thiếc 80G, Trà Đinh Ngọc - Túi thiếc VIP - 100G','5.000.000 ₫','done'],
+    ['21 - 01 - 2026','HD_669M81Y3','(Quà tặng) Kẹo lạc đỏ - 200G, Trà Đinh Ngọc - Túi thiếc VIP - 100G','2.500.000 ₫','done'],
+    ['21 - 01 - 2026','HD_5377O2V4','(Quà tặng) Kẹo lạc đỏ - 200G, Trà Đinh Ngọc - Túi thiếc VIP - 100G','2.500.000 ₫','cancel'],
+    ['08 - 01 - 2026','HD_201702XL','(Quà tặng) Kẹo vừng ta - 200G, Trà Đinh Ngọc - Túi thiếc VIP - 100G','2.500.000 ₫','done']
+  ];
+  document.getElementById('pdOrderRows').innerHTML = PD_ORDERS.map(function(r){
+    return '<tr><td class="pd-td-date">' + r[0] + '</td><td class="pd-td-code">' + r[1] + '</td><td>' + r[2] + '</td><td class="pd-td-money">' + r[3] + '</td><td>' + PD_STATUS[r[4]] + '</td></tr>';
+  }).join('');
+
+  // ==== Bảng sản phẩm đã mua ====
+  var PD_PRODUCTS = [
+    ['Trà Đinh Ngọc - Túi thiếc VIP - 100g', 8, '23 - 07 - 2026'],
+    ['Kẹo Vừng Ta - 200g', 1, '01 - 07 - 2026'],
+    ['Chè lam matcha - 250G', 1, '16 - 03 - 2026'],
+    ['Hồng Hỷ trà - Hồng trà shan tuyết - Hộp thiếc 80G', 1, '08 - 02 - 2026'],
+    ['Kẹo lạc đỏ - 200G', 2, '21 - 01 - 2026'],
+    ['Kẹo vừng ta - 200G', 2, '08 - 01 - 2026'],
+    ['Bộ ấm chén Cúc cổ trường trọ kèm khay', 8, '24 - 10 - 2025'],
+    ['Vạn Hỷ Trà - Túi Kraft 500g', 2, '11 - 06 - 2024'],
+    ['Vạn Hỷ Trà - Túi Kraft 100g', 1, '16 - 01 - 2024'],
+    ['Vạn Thịnh Trà - Túi Kraft 500g', 3, '10 - 07 - 2023']
+  ];
+  document.getElementById('pdProductRows').innerHTML = PD_PRODUCTS.map(function(r, i){
+    return '<tr><td>' + (i+1) + '</td><td><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td class="pd-td-date">' + r[2] + '</td></tr>';
+  }).join('');
+</script>
+</body>
+</html>

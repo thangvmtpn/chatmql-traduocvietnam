@@ -1,0 +1,1781 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Organization ────────────────────────────────────────────────────
+// Top-level org — every resource is scoped to an org
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  status    String    @default("active") @map("status") // active | suspended
+  expiresAt DateTime? @map("expires_at") // null = unlimited (single-company default)
+  plan      String?   @map("plan") // optional label, no billing logic yet
+  adminNotes String?  @map("admin_notes") // internal notes by super admin
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  teams                 Team[]
+  users                 User[]
+  channelAccounts       ChannelAccount[]
+  contacts              Contact[]
+  conversations         Conversation[]
+  appointments          Appointment[]
+  tasks                 Task[]
+  automationRules       AutomationRule[]
+  messageTemplates      MessageTemplate[]
+  activityLogs          ActivityLog[]
+  dailyStats            DailyMessageStat[]
+  settings              AppSetting[]
+  duplicateGroups       DuplicateGroup[]
+  savedReports          SavedReport[]
+  integrations          Integration[]
+  aiConfig              AiConfig?
+  aiSuggestions         AiSuggestion[]
+  aiUsage               AiUsage[]
+  pinnedConversations   PinnedConversation[]
+  groupPolls            GroupPoll[]
+  notifications         Notification[]
+  channelContacts       ChannelContact[]
+  channelGroups         ChannelGroup[]
+  channelGroupMembers   ChannelGroupMember[]
+  notes                 Note[]
+  customProperties      CustomProperty[]
+  contactPropertyValues ContactPropertyValue[]
+  cdpEvents             CdpEvent[]
+  segments              Segment[]
+  lifecycleLogs         LifecycleLog[]
+  cdpEventDefinitions   CdpEventDefinition[]
+  automationDelayJobs   AutomationDelayJob[]
+  automationTriggerJobs AutomationTriggerJob[]
+  companies             Company[]
+  znsLogs               ZnsLog[]
+  znsCampaigns          ZnsCampaign[]
+  externalSyncRefs      ExternalSyncRef[]
+  syncOutbox            SyncOutbox[]
+  aiLogicDocs           AiLogicDoc[]
+  aiScenarios           AiScenario[]
+  aiReplyRuns           AiReplyRun[]
+  knowledgeEntries      KnowledgeEntry[]
+  contactMemories       ContactMemory[]
+  aiExamples            AiExample[]
+  aiPromptVersions      AiPromptVersion[]
+  aiFeedback            AiFeedback[]
+  aiLogicProposals      AiLogicProposal[]
+  aiMasterSessions      AiMasterSession[]
+  aiTraces              AiTrace[]
+  products              Product[]
+  productCategories     ProductCategory[]
+  knowledgeCategories   KnowledgeCategory[]
+
+  @@map("organizations")
+}
+
+// ── Team ────────────────────────────────────────────────────────────
+// Team groups within an organization for member assignment
+model Team {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  users User[]
+
+  @@map("teams")
+}
+
+// ── User ────────────────────────────────────────────────────────────
+// CRM user with role-based access
+model User {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  teamId       String?  @map("team_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         String   @default("member") // owner, admin, manager, member
+  avatarUrl    String?  @map("avatar_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  org              Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team             Team?                  @relation(fields: [teamId], references: [id])
+  channelAccounts  ChannelAccount[]
+  channelAccess    ChannelAccountAccess[]
+  assignedContacts Contact[]              @relation("AssignedContacts")
+  appointments     Appointment[]
+  assignedTasks    Task[]                 @relation("AssignedTasks")
+  createdTasks     Task[]                 @relation("CreatedTasks")
+  repliedMessages  Message[]              @relation("RepliedMessages")
+  activityLogs     ActivityLog[]
+  messageTemplates MessageTemplate[]
+  notifications    Notification[]
+  createdNotes     Note[]                 @relation("CreatedNotes")
+  ownedCompanies   Company[]              @relation("OwnedCompanies")
+  znsLogs          ZnsLog[]               @relation("ZnsSent")
+  znsCampaigns     ZnsCampaign[]          @relation("ZnsCampaignCreator")
+  // Manager hierarchy: multi-manager support via junction table
+  managedMembers   UserManager[]          @relation("ManagerOf") // members I manage
+  managers         UserManager[]          @relation("ManagedBy") // managers above me
+
+  @@map("users")
+}
+
+// ── Channel Account ─────────────────────────────────────────────────
+// A messaging channel account linked to a user (Zalo OA, Zalo Personal,
+// or future platforms like Facebook Page). Platform is stored as Int for
+// high-performance indexing on message-heavy tables.
+// Platform: 1=ZALO_OA, 2=ZALO_USER, 10=FACEBOOK_PAGE (reserved)
+model ChannelAccount {
+  id              String    @id @default(uuid())
+  orgId           String    @map("org_id")
+  ownerUserId     String    @map("owner_user_id")
+  platform        Int       @default(2) // 1=ZALO_OA, 2=ZALO_USER (see constants.ts Platform)
+  externalUid     String?   @unique @map("external_uid") // Platform-specific user ID
+  externalPageId  String?   @map("external_page_id") // Page/OA ID (distinct from user ID)
+  displayName     String?   @map("display_name")
+  avatarUrl       String?   @map("avatar_url")
+  phone           String?
+  status          String    @default("disconnected") // connected, disconnected, qr_pending
+  isDisabled      Boolean   @default(false) @map("is_disabled")
+  sessionData     Json?     @map("session_data") // Zalo personal: zca-js session
+  accessTokenEnc  String?   @map("access_token_enc") // OA: AES-256-GCM ciphertext
+  refreshTokenEnc String?   @map("refresh_token_enc") // OA: AES-256-GCM ciphertext
+  tokenExpiresAt  DateTime? @map("token_expires_at") // OA: access_token expiry
+  oaScopes        String?   @map("oa_scopes") // OA: space-separated scopes
+  lastConnectedAt DateTime? @map("last_connected_at")
+  // Soft-delete marker. Historical data (conversations, messages) stays
+  // accessible; account just hides from integrations list.
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  org                 Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner               User                   @relation(fields: [ownerUserId], references: [id])
+  access              ChannelAccountAccess[]
+  conversations       Conversation[]
+  dailyStats          DailyMessageStat[]
+  channelContacts     ChannelContact[]
+  channelGroups       ChannelGroup[]
+  channelGroupMembers ChannelGroupMember[]
+  znsTemplates        ZnsTemplate[]
+  znsLogs             ZnsLog[]
+  znsCampaigns        ZnsCampaign[]
+
+  @@unique([orgId, externalPageId])
+  @@index([orgId, platform])
+  @@map("channel_accounts")
+}
+
+// ── Channel Account Access (ACL) ────────────────────────────────────
+// ACL: which users can access which channel accounts
+model ChannelAccountAccess {
+  id               String   @id @default(uuid())
+  channelAccountId String   @map("channel_account_id")
+  userId           String   @map("user_id")
+  permission       String   @default("read") // read, chat, admin
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, userId])
+  @@map("channel_account_access")
+}
+
+// ── Contact ─────────────────────────────────────────────────────────
+// CRM contact record. lifecycleStage drives Lead/Customer classification
+// (subscriber → lead → qualified → opportunity → customer → evangelist → churned).
+// Optional companyId links to Company for B2B workflows.
+model Contact {
+  id                    String    @id @default(uuid())
+  orgId                 String    @map("org_id")
+  companyId             String?   @map("company_id")
+  zaloUid               String?   @map("zalo_uid")
+  pancakeUid            String?   @map("pancake_uid")  // Pancake page_customer_id
+  fbPsid                String?   @map("fb_psid")      // Facebook Page-scoped ID (native Messenger)
+  phone                 String?
+  email                 String?
+  fullName              String?   @map("full_name")
+  crmName               String?   @map("crm_name") // Operator-assigned display name
+  avatarUrl             String?   @map("avatar_url")
+  jobTitle              String?   @map("job_title")
+  isPrimaryContact      Boolean   @default(false) @map("is_primary_contact")
+  source                String? // FB, TT, GT, CN, Zalo, Web, etc.
+  sourceDate            DateTime? @map("source_date")
+  firstContactDate      DateTime? @map("first_contact_date")
+  lifecycleStage        String    @default("subscriber") @map("lifecycle_stage")
+  nextAppointment       DateTime? @map("next_appointment")
+  assignedUserId        String?   @map("assigned_user_id")
+  notes                 String?
+  tags                  Json      @default("[]")
+  metadata              Json      @default("{}")
+  isGroup               Boolean   @default(false) @map("is_group")
+  leadScore             Int       @default(0) @map("lead_score")
+  lastActivity          DateTime? @map("last_activity")
+  // ── Customer 360 AI Insights (persistent) ────────────────────
+  aiSummary             String?   @map("ai_summary")
+  aiSentimentLabel      String?   @map("ai_sentiment_label") // positive/neutral/negative
+  aiSentimentConfidence Float?    @map("ai_sentiment_confidence")
+  aiSentimentReason     String?   @map("ai_sentiment_reason")
+  aiIntent              String?   @map("ai_intent") // cold/warm/hot
+  aiPainPoints          Json      @default("[]") @map("ai_pain_points")
+  aiCompetitors         Json      @default("[]") @map("ai_competitors")
+  aiSignals             Json      @default("[]") @map("ai_signals")
+  aiAnalyzedAt          DateTime? @map("ai_analyzed_at")
+  aiConversationId      String?   @map("ai_conversation_id")
+  mergedInto            String?   @map("merged_into")
+  deletedAt             DateTime? @map("deleted_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  org               Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company           Company?               @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  assignedUser      User?                  @relation("AssignedContacts", fields: [assignedUserId], references: [id])
+  mergedIntoContact Contact?               @relation("ContactMerge", fields: [mergedInto], references: [id])
+  mergedFrom        Contact[]              @relation("ContactMerge")
+  conversations     Conversation[]
+  appointments      Appointment[]
+  propertyValues    ContactPropertyValue[]
+  cdpEvents         CdpEvent[]
+  lifecycleLogs     LifecycleLog[]
+
+  @@index([orgId, phone])
+  @@index([orgId, zaloUid])
+  @@index([orgId, pancakeUid])
+  @@index([orgId, fbPsid])
+  @@index([orgId, mergedInto])
+  @@index([orgId, lifecycleStage])
+  @@index([orgId, companyId])
+  @@map("contacts")
+}
+
+// ── Company ─────────────────────────────────────────────────────────
+// B2B account. Optional 1:N parent of Contact — a Contact belongs to 0 or 1
+// Company. Company itself has no lifecycle column (per 2026-05-15 decision);
+// classification is read off its contacts.
+model Company {
+  id        String    @id @default(uuid())
+  orgId     String    @map("org_id")
+  name      String
+  taxCode   String?   @map("tax_code")
+  industry  String?
+  size      String?
+  website   String?
+  address   String?
+  phone     String?
+  email     String?
+  ownerId   String?   @map("owner_id")
+  notes     String?
+  tags      Json      @default("[]")
+  metadata  Json      @default("{}")
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner    User?        @relation("OwnedCompanies", fields: [ownerId], references: [id])
+  contacts Contact[]
+
+  @@index([orgId, name])
+  @@index([orgId, taxCode])
+  @@index([orgId, deletedAt])
+  @@map("companies")
+}
+
+// ── Conversation ────────────────────────────────────────────────────
+// A chat thread between a channel account and a contact (or group)
+model Conversation {
+  id                       String    @id @default(uuid())
+  orgId                    String    @map("org_id")
+  channelAccountId         String    @map("channel_account_id")
+  contactId                String?   @map("contact_id")
+  threadType               String    @default("user") // user, group
+  externalThreadId         String?   @map("external_thread_id")
+  lastMessageAt            DateTime? @map("last_message_at")
+  unreadCount              Int       @default(0) @map("unread_count")
+  isReplied                Boolean   @default(true) @map("is_replied")
+  tab                      String    @default("main") @map("tab") // main, other
+  isPinned                 Boolean   @default(false) @map("is_pinned")
+  displayName              String?   @map("display_name") // Original name on this channel — survives contact merge
+  aiMode                   String    @default("manual") @map("ai_mode") // manual, auto, suggest (AI auto-reply mode)
+  aiModeReason             String?   @map("ai_mode_reason")
+  aiPausedUntil            DateTime? @map("ai_paused_until")
+  assignedUserId           String?   @map("assigned_user_id") // handoff assignee (soft ref to User)
+  aiRollingSummary         String?   @map("ai_rolling_summary") // L5 overflow summary
+  lastAiProcessedMessageId String?   @map("last_ai_processed_message_id") // debounce idempotency
+  createdAt                DateTime  @default(now()) @map("created_at")
+
+  org             Organization                 @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount  ChannelAccount               @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  contact         Contact?                     @relation(fields: [contactId], references: [id])
+  messages        Message[]
+  aiSuggestions   AiSuggestion[]
+  pins            PinnedConversation[]
+  idleCheckpoints ConversationIdleCheckpoint[]
+
+  @@unique([channelAccountId, externalThreadId])
+  @@index([orgId, channelAccountId, isReplied, lastMessageAt])
+  @@index([orgId, channelAccountId, lastMessageAt])
+  @@index([orgId, tab, lastMessageAt])
+  @@map("conversations")
+}
+
+// ── Message ─────────────────────────────────────────────────────────
+// Individual message within a conversation
+model Message {
+  id              String    @id @default(uuid())
+  conversationId  String    @map("conversation_id")
+  externalMsgId   String?   @map("external_msg_id")
+  senderType      String    @map("sender_type") // self, contact, system (see constants.ts SenderType)
+  senderUid       String?   @map("sender_uid")
+  senderName      String?   @map("sender_name")
+  content         String?
+  contentType     String    @default("text") @map("content_type") // text, image, file, sticker, voice, video, link
+  attachments     Json      @default("[]")
+  quote           Json?     @map("quote")
+  albumKey        String?   @map("album_key") // Zalo group_layout_id — multi-image albums
+  albumIndex      Int?      @map("album_index") // 0-based position within album
+  albumTotal      Int?      @map("album_total") // total items in album
+  isDeleted       Boolean   @default(false) @map("is_deleted")
+  deletedAt       DateTime? @map("deleted_at")
+  sentAt          DateTime  @map("sent_at")
+  repliedByUserId String?   @map("replied_by_user_id")
+  aiGenerated     Boolean   @default(false) @map("ai_generated") // marker for AI-sent messages
+  aiReplyRunId    String?   @map("ai_reply_run_id") // soft ref to AiReplyRun
+  responseSource  String?   @map("response_source") // who produced this outbound reply: null=none, manual, ai_auto, ai_suggest (see constants.ts ResponseSource)
+  znsLogId        String?   @map("zns_log_id") // link to ZnsLog for zns_template messages (delivery lifecycle)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  repliedBy    User?             @relation("RepliedMessages", fields: [repliedByUserId], references: [id])
+  znsLog       ZnsLog?           @relation(fields: [znsLogId], references: [id])
+  reactions    MessageReaction[]
+
+  @@unique([conversationId, externalMsgId])
+  @@index([conversationId, albumKey])
+  @@map("messages")
+}
+
+// ── Message Reaction ────────────────────────────────────────────────
+// Emoji reaction on a message (ported from openzca msg react)
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  reactorId String   @map("reactor_id") // Zalo UID of the person who reacted
+  emoji     String // ❤️ 👍 😆 😮 😭 😡
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, reactorId])
+  @@map("message_reactions")
+}
+
+// ── Pinned Conversation ─────────────────────────────────────────────
+// Pinned conversation (ported from openzca msg pin)
+model PinnedConversation {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  channelAccountId String   @map("channel_account_id")
+  conversationId   String   @map("conversation_id")
+  pinnedAt         DateTime @default(now()) @map("pinned_at")
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, conversationId])
+  @@map("pinned_conversations")
+}
+
+// ── Appointment ─────────────────────────────────────────────────────
+// Appointment scheduled for a contact
+model Appointment {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  contactId       String?  @map("contact_id")
+  assignedUserId  String?  @map("assigned_user_id")
+  appointmentDate DateTime @map("appointment_date")
+  appointmentTime String?  @map("appointment_time")
+  type            String?
+  status          String   @default("scheduled") // scheduled, completed, cancelled, no_show
+  notes           String?
+  reminderSent    Boolean  @default(false) @map("reminder_sent")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact      Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedUser User?        @relation(fields: [assignedUserId], references: [id])
+
+  @@map("appointments")
+}
+
+// ── Task ────────────────────────────────────────────────────────────
+// CRM task / to-do item scoped to org
+model Task {
+  id              String    @id @default(uuid())
+  orgId           String    @map("org_id")
+  title           String
+  description     String?
+  priority        String    @default("medium") // low, medium, high, urgent
+  status          String    @default("todo") // todo, in_progress, done, cancelled
+  dueDate         DateTime? @map("due_date")
+  assignedUserId  String?   @map("assigned_user_id")
+  createdByUserId String    @map("created_by_user_id")
+  contactId       String?   @map("contact_id")
+  conversationId  String?   @map("conversation_id")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignedUser User?        @relation("AssignedTasks", fields: [assignedUserId], references: [id])
+  createdBy    User         @relation("CreatedTasks", fields: [createdByUserId], references: [id])
+
+  @@index([orgId, status, dueDate])
+  @@index([orgId, assignedUserId, status])
+  @@map("tasks")
+}
+
+// ── Automation Rule ─────────────────────────────────────────────────
+model AutomationRule {
+  id          String    @id @default(uuid())
+  orgId       String    @map("org_id")
+  name        String
+  description String?
+  trigger     String
+  conditions  Json      @default("[]")
+  actions     Json      @default("[]")
+  enabled     Boolean   @default(true)
+  priority    Int       @default(0)
+  flowVersion Int       @default(1) @map("flow_version") // 1=legacy linear, 2=DAG visual
+  flowConfig  Json?     @map("flow_config") // v2 DAG: { trigger, nodes[], edges[] }
+  runCount    Int       @default(0) @map("run_count")
+  lastRunAt   DateTime? @map("last_run_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, trigger, enabled, priority])
+  @@map("automation_rules")
+}
+
+// ── Message Template ────────────────────────────────────────────────
+// Quick-reply / canned response templates
+model MessageTemplate {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  ownerUserId String?  @map("owner_user_id")
+  name        String
+  content     String
+  category    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner User?        @relation(fields: [ownerUserId], references: [id])
+
+  @@index([orgId, ownerUserId])
+  @@index([orgId, category])
+  @@map("message_templates")
+}
+
+// ── Activity Log ────────────────────────────────────────────────────
+// Audit trail for user actions
+model ActivityLog {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  userId     String?  @map("user_id")
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  details    Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User?        @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+// ── Daily Message Stat ──────────────────────────────────────────────
+// Daily messaging statistics per user per channel account
+model DailyMessageStat {
+  id                String   @id @default(uuid())
+  orgId             String   @map("org_id")
+  userId            String   @map("user_id")
+  channelAccountId  String   @map("channel_account_id")
+  statDate          DateTime @map("stat_date") @db.Date
+  messagesSent      Int      @default(0) @map("messages_sent")
+  messagesReceived  Int      @default(0) @map("messages_received")
+  messagesUnread    Int      @default(0) @map("messages_unread")
+  messagesUnreplied Int      @default(0) @map("messages_unreplied")
+  avgResponseTime   Int?     @map("avg_response_time_seconds")
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelAccountId, statDate])
+  @@map("daily_message_stats")
+}
+
+// ── Integration ─────────────────────────────────────────────────────
+// External service integration (Google Sheets, Telegram, Facebook, Zapier)
+model Integration {
+  id         String    @id @default(uuid())
+  orgId      String    @map("org_id")
+  type       String // google_sheets | telegram | facebook | zapier
+  name       String    @default("")
+  config     Json      @default("{}") // credentials + settings
+  enabled    Boolean   @default(true)
+  lastSyncAt DateTime? @map("last_sync_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  syncLogs SyncLog[]
+
+  @@map("integrations")
+}
+
+// ── Sync Log ────────────────────────────────────────────────────────
+// Sync execution log for integrations
+model SyncLog {
+  id            String   @id @default(uuid())
+  integrationId String   @map("integration_id")
+  direction     String // import | export
+  recordCount   Int      @default(0) @map("record_count")
+  status        String // success | partial | failed
+  errorMessage  String?  @map("error_message")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("sync_logs")
+}
+
+// ── App Setting ─────────────────────────────────────────────────────
+// Encrypted or plain key-value settings per org
+model AppSetting {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  settingKey     String   @map("setting_key")
+  valuePlain     String?  @map("value_plain")
+  valueEncrypted Bytes?   @map("value_encrypted")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, settingKey])
+  @@map("app_settings")
+}
+
+// ── Duplicate Group ─────────────────────────────────────────────────
+// Groups of potentially duplicate contacts detected by intelligence cron
+model DuplicateGroup {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  contactIds String[] @map("contact_ids")
+  matchType  String   @map("match_type") // phone, zalo_uid, name
+  confidence Float    @default(1.0)
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, resolved])
+  @@map("duplicate_groups")
+}
+
+// ── Conversation Idle Checkpoint ────────────────────────────────────
+// Dedup table for conversation_idle automation trigger.
+// Tracks the lastMessageAt that was already processed per threshold.
+model ConversationIdleCheckpoint {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  threshold      String // '30m', '1h', '24h'
+  lastCheckedAt  DateTime @map("last_checked_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, threshold])
+  @@map("conversation_idle_checkpoints")
+}
+
+// ── Saved Report ────────────────────────────────────────────────────
+// Saved analytics report configuration
+model SavedReport {
+  id        String    @id @default(uuid())
+  orgId     String    @map("org_id")
+  name      String
+  type      String // conversion_funnel, team_performance, response_time, custom
+  config    Json      @default("{}")
+  createdBy String    @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  lastRunAt DateTime? @map("last_run_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("saved_reports")
+}
+
+// ── AI Config ───────────────────────────────────────────────────────
+// AI provider configuration per organization
+model AiConfig {
+  id                      String   @id @default(uuid())
+  orgId                   String   @unique @map("org_id")
+  provider                String   @default("openai")
+  model                   String   @default("gpt-4o-mini")
+  maxDaily                Int      @default(500) @map("max_daily")
+  enabled                 Boolean  @default(true)
+  // Per-task overrides — JSON shape:
+  //   { reply_draft?: { provider?, model? }, summary?: {...}, sentiment?: {...}, lead_score?: {...} }
+  // Missing key OR null fields fall back to the default provider/model above.
+  taskOverrides           Json     @default("{}") @map("task_overrides")
+  // ── AI auto-reply (M1) ──
+  defaultAiMode           String   @default("manual") @map("default_ai_mode") // manual, auto, suggest
+  autoReplyEnabled        Boolean  @default(false) @map("auto_reply_enabled") // org master switch
+  debounceSeconds         Int      @default(5) @map("debounce_seconds")
+  prefilterKeywords       String?  @map("prefilter_keywords") // Pass 0 cheap handoff keywords
+  // ── RAG + embeddings (M3) ──
+  ragTopK                 Int      @default(5) @map("rag_top_k") // number of KB entries to retrieve
+  ragMinScore             Float?   @map("rag_min_score") // min cosine similarity for a RAG hit (null = default 0.35)
+  embeddingProvider       String?  @map("embedding_provider") // e.g. openai
+  embeddingModel          String?  @map("embedding_model") // e.g. text-embedding-3-small
+  // ── RAG guardrail: restrict what the responder may retrieve (empty = no limit = all) ──
+  allowedProductCategoryIds   String[] @default([]) @map("allowed_product_category_ids")
+  allowedKnowledgeCategoryIds String[] @default([]) @map("allowed_knowledge_category_ids")
+  // ── Trace retention (M3) ──
+  traceRetentionDays      Int      @default(14) @map("trace_retention_days") // info-level trace TTL
+  traceErrorRetentionDays Int      @default(90) @map("trace_error_retention_days") // error-level trace TTL
+  // ── Critic / verify-before-send (P6, opt-in) ──
+  verifyBeforeSend        Boolean  @default(false) @map("verify_before_send") // critic checks reply (grounding/policy) before send; fail → handoff
+  // ── Auto-learn (M3, opt-in) ──
+  autoLearnEnabled        Boolean  @default(false) @map("auto_learn_enabled") // AI self-tuning opt-in
+  autoLearnIntervalDays   Int      @default(7) @map("auto_learn_interval_days") // how often auto-learn runs
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("ai_configs")
+}
+
+// ── AI Suggestion ───────────────────────────────────────────────────
+// AI-generated suggestions for conversations
+model AiSuggestion {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  conversationId String   @map("conversation_id")
+  messageId      String?  @map("message_id")
+  type           String // reply_suggestion, summary, sentiment
+  content        String
+  confidence     Float
+  accepted       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([orgId, type, createdAt])
+  @@map("ai_suggestions")
+}
+
+// ── AI Usage ────────────────────────────────────────────────────────
+// Per-call token + cost ledger for quota, billing visibility, analytics.
+model AiUsage {
+  id                  String   @id @default(uuid())
+  orgId               String   @map("org_id")
+  provider            String // anthropic, gemini, openai
+  model               String
+  type                String // reply_draft, summary, sentiment, lead_score
+  conversationId      String?  @map("conversation_id")
+  contactId           String?  @map("contact_id")
+  tokensIn            Int      @default(0) @map("tokens_in")
+  tokensOut           Int      @default(0) @map("tokens_out")
+  cacheReadTokens     Int      @default(0) @map("cache_read_tokens")
+  cacheCreationTokens Int      @default(0) @map("cache_creation_tokens")
+  costUsd             Decimal  @default(0) @map("cost_usd") @db.Decimal(10, 6)
+  feature             String?  @map("feature") // auto_reply, manual_suggest, ai_master, embedding, analyze
+  aiReplyRunId        String?  @map("ai_reply_run_id") // group calls of one harness turn
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+  @@index([orgId, type, createdAt])
+  @@index([orgId, provider, createdAt])
+  @@index([orgId, feature])
+  @@map("ai_usage")
+}
+
+// ── AI Logic Doc ────────────────────────────────────────────────────
+// Markdown "brain" docs (index/persona/playbook/handoff_rules/mechanism).
+// AI Master edits these; the responder runs the org default mode on them.
+model AiLogicDoc {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  type      String // index, persona, playbook, handoff_rules, mechanism
+  content   String
+  version   Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  updatedBy String?  @map("updated_by") // userId or 'ai_master'
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  versions AiLogicDocVersion[]
+
+  @@unique([orgId, type]) // one current doc per type per org (history in versions)
+  @@index([orgId, type])
+  @@map("ai_logic_docs")
+}
+
+// ── AI Logic Doc Version ────────────────────────────────────────────
+// Version history for AiLogicDoc — enables revert.
+model AiLogicDocVersion {
+  id         String   @id @default(uuid())
+  docId      String   @map("doc_id")
+  version    Int
+  content    String
+  changedBy  String?  @map("changed_by") // userId or 'ai_master'
+  changeNote String?  @map("change_note")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  doc AiLogicDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, version])
+  @@map("ai_logic_doc_versions")
+}
+
+// ── AI Scenario (skill) ─────────────────────────────────────────────
+// Modular logic unit. Unlike the fixed AiLogicDoc types, scenarios are
+// add/remove-able skills. loadMode='always' → injected every turn; 'auto' →
+// injected only when semantically relevant to the turn (embedding of the
+// description, selected via the same RAG threshold). Scales to many scenarios
+// because only descriptions are embedded and only relevant detail is loaded.
+model AiScenario {
+  id           String                       @id @default(uuid())
+  orgId        String                       @map("org_id")
+  key          String // stable slug, unique per org
+  name         String // human title
+  description  String // short summary — embedded + shown in the overview pass
+  content      String // full detail (markdown logic)
+  loadMode     String                       @default("auto") @map("load_mode") // always | auto
+  enabled      Boolean                      @default(true)
+  triggerHints String?                      @map("trigger_hints") // optional keywords, embedded alongside the description
+  priority     Int                          @default(0) // ordering for always-loaded scenarios
+  // embedding    Unsupported("vector(1536)")? // description (+hints) embedding; HNSW index via raw SQL
+  version      Int                          @default(1)
+  updatedBy    String?                      @map("updated_by") // userId or 'ai_master'
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+
+  org      Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  versions AiScenarioVersion[]
+
+  @@unique([orgId, key])
+  @@index([orgId, loadMode, enabled])
+  @@map("ai_scenarios")
+}
+
+// Version history for AiScenario — enables revert + audit of Master edits.
+model AiScenarioVersion {
+  id          String   @id @default(uuid())
+  scenarioId  String   @map("scenario_id")
+  version     Int
+  name        String
+  description String
+  content     String
+  loadMode    String   @map("load_mode")
+  changedBy   String?  @map("changed_by")
+  changeNote  String?  @map("change_note")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  scenario AiScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@index([scenarioId, version])
+  @@map("ai_scenario_versions")
+}
+
+// ── AI Reply Run ────────────────────────────────────────────────────
+// Lightweight per-turn record of the auto-reply harness (kept long-term).
+// Heavy step trace lives in AiTrace (added in M2).
+model AiReplyRun {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  conversationId  String   @map("conversation_id")
+  mode            String // auto, suggest
+  status          String // sent, drafted, handoff, skipped, error
+  confidence      Float? // log-only (D15)
+  handoff         Boolean  @default(false)
+  decisionJson    String?  @map("decision_json")
+  promptVersionId String?  @map("prompt_version_id")
+  abBucket        String?  @map("ab_bucket")
+  usageId         String?  @map("usage_id")
+  latencyMs       Int?     @map("latency_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, conversationId])
+  @@index([orgId, status])
+  @@map("ai_reply_runs")
+}
+
+// ── Knowledge Entry (M3) ─────────────────────────────────────────────
+// Global knowledge base for RAG retrieval (FAQ, policy, price, etc.)
+// Embeddings/pgvector deferred — keyword search used until then.
+model KnowledgeEntry {
+  id         String                       @id @default(uuid())
+  orgId      String                       @map("org_id")
+  type       String // faq | description | policy | price | commitment | fact (legacy; phân nhóm chính = categoryId)
+  format     String                       @default("article") // qa | article (render hỏi-đáp vs bài viết)
+  categoryId String?                      @map("category_id") // nhóm knowledge (FK KnowledgeCategory)
+  productId  String?                      @map("product_id") // gắn sản phẩm (null = kiến thức chung)
+  title      String? // kiến thức (format article) không có tiêu đề; FAQ dùng title làm câu hỏi
+  content    String
+  keywords   String? // cách hỏi / tên gọi khác — tăng recall RAG
+  status     String // active | pending | rejected | archived
+  risk       String // low | sensitive
+  source     String // ai_extracted | staff_manual | feedback | gap_resolved
+  confidence Float?                       @default(0)
+  version    Int                          @default(1)
+  // embedding  Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
+  createdAt  DateTime                     @default(now()) @map("created_at")
+  updatedAt  DateTime                     @updatedAt @map("updated_at")
+
+  org      Organization            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category KnowledgeCategory?      @relation(fields: [categoryId], references: [id])
+  product  Product?                @relation(fields: [productId], references: [id])
+  versions KnowledgeEntryVersion[]
+
+  @@index([orgId, status])
+  @@index([orgId, type])
+  @@index([orgId, categoryId])
+  @@index([orgId, productId])
+  @@map("knowledge_entries")
+}
+
+// ── Knowledge Entry Version ──────────────────────────────────────────
+// Audit/revert history for KnowledgeEntry edits.
+model KnowledgeEntryVersion {
+  id         String   @id @default(uuid())
+  entryId    String   @map("entry_id")
+  version    Int
+  content    String
+  changedBy  String?  @map("changed_by") // userId or 'ai'
+  changeNote String?  @map("change_note")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, version])
+  @@map("knowledge_entry_versions")
+}
+
+// ── Contact Memory (M3) ──────────────────────────────────────────────
+// Per-contact facts extracted by AI or entered by staff (preference, constraint, etc.)
+model ContactMemory {
+  id         String   @id @default(uuid())
+  contactId  String   @map("contact_id")
+  orgId      String   @map("org_id")
+  kind       String // preference | constraint | fact | objection | budget
+  content    String
+  source     String // ai_extracted | staff_manual
+  confidence Float?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, isActive])
+  @@map("contact_memories")
+}
+
+// ── AI Example Bank (M3) ─────────────────────────────────────────────
+// Few-shot examples for auto-reply quality improvement.
+// Embeddings/pgvector deferred — keyword selection used until then.
+model AiExample {
+  id             String                       @id @default(uuid())
+  orgId          String                       @map("org_id")
+  conversationId String?                      @map("conversation_id")
+  suggestionId   String?                      @map("suggestion_id") // soft-ref to AiSuggestion
+  label          String // edited | exemplar
+  inputContext   String                       @map("input_context") // condensed context snapshot for few-shot
+  aiDraft        String                       @map("ai_draft")
+  finalText      String?                      @map("final_text") // staff-edited version that was sent
+  editDiff       String?                      @map("edit_diff") // diff for learning signal
+  // embedding      Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
+  createdAt      DateTime                     @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, label])
+  @@map("ai_examples")
+}
+
+// ── AI Prompt Version (M3) ───────────────────────────────────────────
+// Versioned prompt templates for technical scaffolding (ai_router / auto_reply / ai_master).
+// NOT prose logic — that lives in AiLogicDoc. Supports A/B testing via abBucket.
+model AiPromptVersion {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  name      String // auto_reply | persona | ai_router | ai_master
+  version   Int
+  content   String
+  isActive  Boolean  @default(false) @map("is_active")
+  abBucket  String?  @map("ab_bucket") // 'A' | 'B' for A/B testing
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, name, isActive])
+  @@map("ai_prompt_versions")
+}
+
+// ── AI Feedback (M3) ─────────────────────────────────────────────────
+// Staff free-text feedback on AI replies; drives AiLogicProposal generation.
+model AiFeedback {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  conversationId String?  @map("conversation_id") // soft-ref
+  messageId      String?  @map("message_id") // soft-ref to Message
+  aiReplyRunId   String?  @map("ai_reply_run_id") // soft-ref to AiReplyRun
+  authorUserId   String   @map("author_user_id")
+  text           String
+  category       String? // tone | accuracy | policy | missing_info | other
+  isExemplar     Boolean  @default(false) @map("is_exemplar") // flag reply as training example
+  status         String   @default("new") @map("status") // new | reviewed | applied | dismissed
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  org       Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  proposals AiLogicProposal[]
+
+  @@index([orgId, status])
+  @@index([orgId, conversationId])
+  @@map("ai_feedback")
+}
+
+// ── AI Logic Proposal (M3) ───────────────────────────────────────────
+// AI pending ACTION (P7) — the responder requests a mutating action (e.g. book an
+// appointment); staff must CONFIRM before it executes. NEVER auto-executed.
+// org_id is a soft-ref scalar (no FK) like AiTrace.
+model AiPendingAction {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  conversationId String?  @map("conversation_id")
+  contactId      String?  @map("contact_id")
+  type           String // request_appointment (extensible)
+  payload        Json     @default("{}")
+  summary        String? // human-readable one-liner for the review UI
+  status         String   @default("pending") // pending | confirmed | rejected
+  reviewedBy     String?  @map("reviewed_by")
+  executedRef    String?  @map("executed_ref") // id of created entity (e.g. Appointment)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([orgId, status])
+  @@map("ai_pending_actions")
+}
+
+// AiKnowledgeGap — when the AI lacks data/knowledge to answer during a live chat,
+// it logs a gap via the fire-and-forget `log_knowledge_gap` tool (does NOT interrupt
+// the reply). Staff resolve it into a KnowledgeEntry (close-the-loop) so the AI can
+// answer next time. org_id is a soft-ref scalar (no FK) like AiPendingAction.
+model AiKnowledgeGap {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  conversationId String?  @map("conversation_id")
+  contactId      String?  @map("contact_id")
+  aiReplyRunId   String?  @map("ai_reply_run_id")
+  messageId      String?  @map("message_id")
+  gapType        String   @map("gap_type") // missing_info | needs_knowledge | needs_staff
+  question       String // câu hỏi / khoảng trống AI gặp phải
+  suggestion     String? // "Đề Xuất" của AI (recommendation)
+  status         String   @default("open") // open | resolved | dismissed
+  occurrences    Int      @default(1) // dedupe counter (gộp gap trùng)
+  resolvedBy     String?  @map("resolved_by")
+  resolvedRef    String?  @map("resolved_ref") // KnowledgeEntry id (resolve trực tiếp) hoặc AiFeedback id (route Master)
+  notes          String?
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([orgId, status])
+  @@map("ai_knowledge_gaps")
+}
+
+// Long-lived API key for programmatic / MCP access (per org). The raw key is
+// shown ONCE on creation; only its sha256 hash is stored. Grants admin-level
+// API access scoped to its org; revoke by setting revokedAt.
+model ApiKey {
+  id          String    @id @default(uuid())
+  orgId       String    @map("org_id")
+  name        String // human label, e.g. "MCP — Claude Desktop"
+  prefix      String // first chars for display (e.g. "bzk_a1b2…")
+  keyHash     String    @unique @map("key_hash") // sha256 of the full raw key
+  createdById String?   @map("created_by_id")
+  lastUsedAt  DateTime? @map("last_used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([orgId])
+  @@map("api_keys")
+}
+
+// AI-generated proposals to update KnowledgeEntry / AiLogicDoc / AiPromptVersion.
+// Requires staff approval before being applied. NEVER auto-applied.
+model AiLogicProposal {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  feedbackId      String?  @map("feedback_id") // source if immediate proposal
+  masterSessionId String?  @map("master_session_id") // source if from AiMasterSession
+  source          String // feedback | consolidation | master_session
+  targetType      String   @map("target_type") // logic_doc | knowledge_entry | thread_memory | prompt_version
+  targetSubtype   String?  @map("target_subtype") // persona | playbook | handoff_rules | index
+  targetId        String?  @map("target_id") // id of the object to update
+  currentValue    String?  @map("current_value")
+  proposedValue   String   @map("proposed_value")
+  rationale       String
+  status          String   @default("pending") // pending | approved | rejected | applied
+  createdByAi     Boolean  @default(true) @map("created_by_ai")
+  reviewedBy      String?  @map("reviewed_by") // userId who reviewed
+  appliedRef      String?  @map("applied_ref") // id of created KnowledgeEntry / AiPromptVersion after apply
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  feedback AiFeedback?  @relation(fields: [feedbackId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status])
+  @@map("ai_logic_proposals")
+}
+
+// ── AI Master Session (M3) ───────────────────────────────────────────
+// Agentic Logic Editor session — full tool-loop for reviewing and improving AI logic.
+model AiMasterSession {
+  id                    String   @id @default(uuid())
+  orgId                 String   @map("org_id")
+  openedByUserId        String   @map("opened_by_user_id")
+  contextConversationId String?  @map("context_conversation_id") // soft-ref
+  seedFeedbackId        String?  @map("seed_feedback_id") // opened from feedback box
+  status                String   @default("active") // active | closed
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  org      Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  messages AiMasterMessage[]
+
+  @@index([orgId, status])
+  @@map("ai_master_sessions")
+}
+
+// ── AI Master Message (M3) ───────────────────────────────────────────
+// Turn-by-turn messages in an AiMasterSession (user / assistant / tool).
+model AiMasterMessage {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  role      String // user | assistant | tool
+  content   String?
+  toolName  String?  @map("tool_name")
+  toolData  Json?    @map("tool_data") // tool call args + result
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session AiMasterSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("ai_master_messages")
+}
+
+// ── AI Trace (M3) ────────────────────────────────────────────────────
+// Per-step debug trace for the auto-reply harness. Heavy, soft-ref (no FK),
+// purgeable independently of Conversation/Message. TTL set per retention config.
+model AiTrace {
+  id             String    @id @default(uuid())
+  orgId          String    @map("org_id")
+  conversationId String?   @map("conversation_id") // soft-ref, NO FK cascade
+  aiReplyRunId   String?   @map("ai_reply_run_id") // soft-ref to AiReplyRun
+  step           String // assemble | router | retrieve | generator | tool | error
+  level          String    @default("info") @map("level") // info | error
+  payload        Json // JSONB: context snapshot, prompt, raw output, KB hits, tokens
+  latencyMs      Int?      @map("latency_ms")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  expiresAt      DateTime? @map("expires_at") // purge cutoff (info ~14d, error ~90d)
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, conversationId])
+  @@index([createdAt])
+  @@index([expiresAt]) // purge by expiresAt — requires index
+  @@index([level, createdAt]) // purge by level+age (info 14d / error 90d)
+  @@map("ai_traces")
+}
+
+// ── ZNS Template (cache) ────────────────────────────────────────────
+// Per-OA cache of ZNS templates pulled from Zalo portal. Refreshed on
+// demand (TTL ~1h). status is Zalo's lifecycle: ENABLE / DISABLE /
+// PENDING_REVIEW. params is the dynamic schema (name, type, required,
+// maxLength, acceptNull) we render into a form in ZnsSendModal.
+model ZnsTemplate {
+  id               String   @id @default(uuid())
+  channelAccountId String   @map("channel_account_id")
+  templateId       String   @map("template_id") // Zalo numeric template id
+  templateName     String   @map("template_name")
+  status           String   @default("ENABLE") // ENABLE, DISABLE, PENDING_REVIEW
+  templateType     String?  @map("template_type") // OTP, TRANSACTION, PROMOTION
+  params           Json     @default("[]")
+  previewUrl       String?  @map("preview_url")
+  fetchedAt        DateTime @default(now()) @map("fetched_at")
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, templateId])
+  @@index([channelAccountId, status])
+  @@map("zns_templates")
+}
+
+// ── ZNS Log (audit + delivery) ──────────────────────────────────────
+// Every ZNS send creates a row. trackingId is our UUID we pass to Zalo
+// as tracking_id so the delivery webhook can flip status → DELIVERED.
+// status: pending, sent, delivered, read, failed, rejected.
+model ZnsLog {
+  id               String    @id @default(uuid())
+  orgId            String    @map("org_id")
+  channelAccountId String    @map("channel_account_id")
+  contactId        String?   @map("contact_id")
+  conversationId   String?   @map("conversation_id")
+  templateId       String    @map("template_id")
+  phone            String // normalized 84xxxxxxxxx
+  paramsJson       Json      @default("{}") @map("params_json")
+  trackingId       String    @unique @map("tracking_id") // our UUID
+  externalMsgId    String?   @map("external_msg_id") // returned by platform API
+  status           String    @default("pending") // pending, sent, delivered, read, failed, rejected
+  errorCode        String?   @map("error_code")
+  errorMessage     String?   @map("error_message")
+  sentByUserId     String    @map("sent_by_user_id")
+  sentAt           DateTime  @default(now()) @map("sent_at")
+  deliveredAt      DateTime? @map("delivered_at")
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  sentBy         User           @relation("ZnsSent", fields: [sentByUserId], references: [id])
+  messages       Message[]
+
+  @@index([orgId, sentAt])
+  @@index([channelAccountId, status])
+  @@index([contactId, sentAt])
+  @@map("zns_logs")
+}
+
+// ── ZNS Campaign (mass-send) ────────────────────────────────────────
+// One ZNS template fanned out across many recipients via the zns-send
+// BullMQ queue. Recipients can come from an explicit contact-id list or
+// from a saved Segment (evaluated at start time, snapshotted into rows).
+// templateData supports {{contact.field}} placeholders rendered per-recipient.
+model ZnsCampaign {
+  id               String    @id @default(uuid())
+  orgId            String    @map("org_id")
+  channelAccountId String    @map("channel_account_id")
+  name             String
+  templateId       String    @map("template_id")
+  templateData     Json      @default("{}") @map("template_data")
+  contactIds       Json      @default("[]") @map("contact_ids") // String[] snapshot
+  status           String    @default("draft") // draft, queued, running, completed, failed, cancelled
+  scheduledAt      DateTime? @map("scheduled_at")
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  totalCount       Int       @default(0) @map("total_count")
+  sentCount        Int       @default(0) @map("sent_count")
+  failedCount      Int       @default(0) @map("failed_count")
+  skippedCount     Int       @default(0) @map("skipped_count")
+  createdByUserId  String    @map("created_by_user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  org            Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount         @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  createdBy      User                   @relation("ZnsCampaignCreator", fields: [createdByUserId], references: [id])
+  recipients     ZnsCampaignRecipient[]
+
+  @@index([orgId, status, createdAt])
+  @@map("zns_campaigns")
+}
+
+// One row per recipient enqueued. Populated when the campaign is started.
+model ZnsCampaignRecipient {
+  id           String    @id @default(uuid())
+  campaignId   String    @map("campaign_id")
+  contactId    String?   @map("contact_id")
+  phone        String // normalized 84xxx
+  status       String    @default("pending") // pending, sent, failed, skipped
+  znsLogId     String?   @map("zns_log_id")
+  errorMessage String?   @map("error_message")
+  processedAt  DateTime? @map("processed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  campaign ZnsCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@index([contactId])
+  @@map("zns_campaign_recipients")
+}
+
+// ── Group Poll ──────────────────────────────────────────────────────
+// Group poll (ported from openzca group poll)
+model GroupPoll {
+  id               String    @id @default(uuid())
+  orgId            String    @map("org_id")
+  channelAccountId String    @map("channel_account_id")
+  groupExternalId  String    @map("group_external_id")
+  zaloPollId       String    @map("zalo_poll_id")
+  question         String
+  options          Json      @default("[]") // [{id, text, voteCount}]
+  isMultiChoice    Boolean   @default(false) @map("is_multi_choice")
+  isAnonymous      Boolean   @default(false) @map("is_anonymous")
+  isLocked         Boolean   @default(false) @map("is_locked")
+  expiresAt        DateTime? @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, zaloPollId])
+  @@index([orgId, groupExternalId])
+  @@map("group_polls")
+}
+
+// ── Notification ────────────────────────────────────────────────────
+// In-app notifications for users
+model Notification {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  userId    String   @map("user_id")
+  type      String   @default("message") // message, contact, appointment, automation
+  title     String
+  body      String   @default("")
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([orgId, createdAt])
+  @@map("notifications")
+}
+
+// ── Channel Contact ──────────────────────────────────────────────────
+// Synced contact/friend from a channel account
+model ChannelContact {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  channelAccountId String   @map("channel_account_id")
+  friendUid        String   @map("friend_uid") // Platform UID of contact
+  displayName      String   @map("display_name")
+  avatarUrl        String?  @map("avatar_url")
+  phone            String?
+  isFavorite       Boolean  @default(false) @map("is_favorite")
+  isBlocked        Boolean  @default(false) @map("is_blocked")
+  syncedAt         DateTime @default(now()) @map("synced_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, friendUid])
+  @@index([orgId, displayName])
+  @@index([channelAccountId])
+  @@map("channel_contacts")
+}
+
+// ── Channel Group ───────────────────────────────────────────────────
+// Synced group list from a channel account
+model ChannelGroup {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  channelAccountId String   @map("channel_account_id")
+  groupId          String   @map("group_id") // Platform group ID
+  name             String
+  avatarUrl        String?  @map("avatar_url")
+  memberCount      Int      @default(0) @map("member_count")
+  isAdmin          Boolean  @default(false) @map("is_admin")
+  isMuted          Boolean  @default(false) @map("is_muted")
+  syncedAt         DateTime @default(now()) @map("synced_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, groupId])
+  @@index([orgId, name])
+  @@index([channelAccountId])
+  @@map("channel_groups")
+}
+
+// ── Channel Group Member ────────────────────────────────────────────
+// Cached member list of a channel group; populated on first fetch
+// and updated incrementally from group events.
+model ChannelGroupMember {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  channelAccountId String   @map("channel_account_id")
+  groupId          String   @map("group_id") // Platform group ID (= Conversation.externalThreadId)
+  memberUid        String   @map("member_uid")
+  displayName      String?  @map("display_name")
+  avatarUrl        String?  @map("avatar_url")
+  isAdmin          Boolean  @default(false) @map("is_admin")
+  syncedAt         DateTime @default(now()) @updatedAt @map("synced_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  org            Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, groupId, memberUid])
+  @@index([channelAccountId, groupId])
+  @@index([orgId])
+  @@map("channel_group_members")
+}
+
+// ── Note ────────────────────────────────────────────────────────────
+// Internal note attached to a contact or conversation
+model Note {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  contactId       String?  @map("contact_id")
+  conversationId  String?  @map("conversation_id")
+  createdByUserId String   @map("created_by_user_id")
+  content         String
+  isPinned        Boolean  @default(false) @map("is_pinned")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("CreatedNotes", fields: [createdByUserId], references: [id])
+
+  @@index([orgId, contactId, createdAt])
+  @@index([orgId, conversationId, createdAt])
+  @@map("notes")
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CDP — Customer Data Platform
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Custom Property ─────────────────────────────────────────────────
+// Schema-defined custom fields for contacts (text, number, date, boolean, select, multi_select)
+model CustomProperty {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  name        String // Human-readable label
+  fieldKey    String   @map("field_key") // Machine key (snake_case)
+  fieldType   String   @map("field_type") // text, number, date, boolean, single_select, multi_select
+  options     Json     @default("[]") // For select types: [{value, label, color}]
+  isRequired  Boolean  @default(false) @map("is_required")
+  groupName   String?  @map("group_name") // Optional grouping category
+  sortOrder   Int      @default(0) @map("sort_order")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org    Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  values ContactPropertyValue[]
+
+  @@unique([orgId, fieldKey])
+  @@index([orgId, sortOrder])
+  @@map("custom_properties")
+}
+
+// ── Contact Property Value ──────────────────────────────────────────
+// Stores a contact's value for a custom property (EAV pattern)
+model ContactPropertyValue {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  contactId  String   @map("contact_id")
+  propertyId String   @map("property_id")
+  value      String   @default("") // Stored as text, parsed by fieldType
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  org      Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact  Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  property CustomProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, propertyId])
+  @@index([orgId, propertyId])
+  @@map("contact_property_values")
+}
+
+// ── CDP Event ───────────────────────────────────────────────────────
+// Behavioral event tracked for a contact (page_view, purchase, form_submit, custom, etc.)
+model CdpEvent {
+  id         String   @id @default(uuid())
+  orgId      String   @map("org_id")
+  contactId  String   @map("contact_id")
+  eventName  String   @map("event_name") // page_view, purchase, form_submit, status_change, etc.
+  properties Json     @default("{}") // Arbitrary event data
+  source     String? // api, system, zalo, web, etc.
+  sessionId  String?  @map("session_id")
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, eventName, timestamp])
+  @@index([contactId, timestamp])
+  @@index([orgId, timestamp])
+  @@map("cdp_events")
+}
+
+// ── Segment ─────────────────────────────────────────────────────────
+// Dynamic customer segment with filter conditions
+model Segment {
+  id               String    @id @default(uuid())
+  orgId            String    @map("org_id")
+  name             String
+  description      String?
+  conditions       Json      @default("[]") // [{type, field, operator, value}] with AND/OR groups
+  contactCount     Int       @default(0) @map("contact_count")
+  lastCalculatedAt DateTime? @map("last_calculated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("segments")
+}
+
+// ── Lifecycle Log ───────────────────────────────────────────────────
+// Records lifecycle stage transitions for a contact
+model LifecycleLog {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  contactId String   @map("contact_id")
+  fromStage String?  @map("from_stage")
+  toStage   String   @map("to_stage")
+  changedBy String?  @map("changed_by") // userId or "system"
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+  @@index([orgId, toStage, createdAt])
+  @@map("lifecycle_logs")
+}
+
+// ── CDP Event Definition ────────────────────────────────────────────
+// Event dictionary mapping machine keys to human-readable names and schema
+model CdpEventDefinition {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  eventName   String   @map("event_name")
+  displayName String   @map("display_name")
+  description String?
+  schema      Json     @default("{}") // Expected properties schema
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, eventName])
+  @@map("cdp_event_definitions")
+}
+
+// ── Automation Delay Job ────────────────────────────────────────────
+// Deferred DAG continuation — persists delay node state so the flow
+// can be resumed after minutes/hours/days even across server restarts.
+model AutomationDelayJob {
+  id                String   @id @default(uuid())
+  orgId             String   @map("org_id")
+  ruleId            String   @map("rule_id")
+  flowConfig        Json     @map("flow_config")
+  resumeFromNodeIds String[] @map("resume_from_node_ids")
+  context           Json     @default("{}")
+  executeAt         DateTime @map("execute_at")
+  status            String   @default("pending") // pending, running, done, failed
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([status, executeAt])
+  @@index([orgId, ruleId])
+  @@map("automation_delay_jobs")
+}
+
+// ── Automation Trigger Job ──────────────────────────────────────────
+// Queue-based trigger dispatch — instead of fire-and-forget promises,
+// triggers are persisted here and processed by a poller. This prevents
+// main thread blocking and survives server restarts.
+model AutomationTriggerJob {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  trigger   String // e.g. 'status_changed', 'tag_added'
+  context   Json     @default("{}") // AutomationContext serialized
+  status    String   @default("pending") // pending, running, done, failed
+  attempts  Int      @default(0)
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([orgId, trigger])
+  @@map("automation_trigger_jobs")
+}
+
+// ── Refresh Token ───────────────────────────────────────────────────
+// W5-FIX: Short-lived access token (30 min) + long-lived refresh token (7 days).
+// Token rotation: each refresh invalidates the old token and issues a new pair.
+// Family-based revocation: if a revoked token is reused, the entire family is
+// wiped to mitigate stolen-token replay attacks.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String    @unique // crypto.randomUUID() — opaque
+  family    String // groups tokens for rotation chain
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at") // set when rotated or explicitly logged out
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([family])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ── Manager Hierarchy (M:N) ─────────────────────────────────────────
+// Junction table: which managers supervise which members.
+// A member can have multiple managers; a manager can have multiple members.
+model UserManager {
+  id        String   @id @default(uuid())
+  managerId String   @map("manager_id")
+  memberId  String   @map("member_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  manager User @relation("ManagerOf", fields: [managerId], references: [id], onDelete: Cascade)
+  member  User @relation("ManagedBy", fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, memberId])
+  @@index([memberId])
+  @@map("user_managers")
+}
+
+// ── External Sync Ref (PerfexCRM & future platforms) ────────────────
+// Durable local↔external id mapping. Symmetric: reusable for future reverse pull.
+// Connection/config lives in the existing `Integration` model (type='perfex').
+model ExternalSyncRef {
+  id           String    @id @default(uuid())
+  orgId        String    @map("org_id")
+  system       String    @default("perfex") // future: other platforms
+  localType    String    @map("local_type") // 'company' | 'contact' | 'lead'
+  localId      String    @map("local_id")
+  externalId   String    @map("external_id") // Perfex numeric id (stored as string)
+  lastHash     String?   @map("last_hash") // hash of last-pushed payload → skip no-op pushes
+  lastSyncedAt DateTime? @map("last_synced_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, system, localType, localId])
+  @@index([orgId, system, localType, externalId])
+  @@map("external_sync_refs")
+}
+
+// ── Sync Outbox (transactional outbox for debounced push) ───────────
+// Transient push intents. A debounced per-org worker coalesces + flushes these to Perfex.
+model SyncOutbox {
+  id           String    @id @default(uuid())
+  orgId        String    @map("org_id")
+  localType    String    @map("local_type") // 'company' | 'contact' | 'lead'
+  localId      String    @map("local_id")
+  op           String // 'upsert' | 'delete'
+  status       String    @default("pending") // pending | processing | done | failed | skipped
+  attempts     Int       @default(0)
+  errorMessage String?   @map("error_message")
+  skipReason   String?   @map("skip_reason") // e.g. 'no_company'
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  processedAt  DateTime? @map("processed_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status, localType])
+  @@index([orgId, localType, localId]) // for coalescing
+  @@map("sync_outbox")
+}
+
+// ── Platform Admin (super admin / multi-tenant control plane) ────────
+// Separate identity from org Users. Logs in via /platform, manages all
+// organizations. NOT scoped to any org. email is unique within this table
+// only (decoupled from users.email).
+model PlatformAdmin {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens PlatformRefreshToken[]
+  auditLogs     PlatformAuditLog[]
+
+  @@map("platform_admins")
+}
+
+// Refresh token rotation for platform admins (mirrors RefreshToken).
+model PlatformRefreshToken {
+  id        String    @id @default(uuid())
+  adminId   String    @map("admin_id")
+  token     String    @unique
+  family    String
+  revokedAt DateTime? @map("revoked_at")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  admin PlatformAdmin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([family])
+  @@map("platform_refresh_tokens")
+}
+
+// Audit trail for platform-admin actions. targetOrgId/targetUserId are
+// soft references (plain columns, no FK) — purgeable, survive org deletion.
+model PlatformAuditLog {
+  id           String   @id @default(uuid())
+  adminId      String   @map("admin_id")
+  action       String // org.create | org.update | org.license | account.create | enter_company | ...
+  targetOrgId  String?  @map("target_org_id")
+  targetUserId String?  @map("target_user_id")
+  meta         Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  admin PlatformAdmin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@index([targetOrgId])
+  @@map("platform_audit_logs")
+}
+
+// ── Platform Setting ────────────────────────────────────────────────
+// Platform-wide (not org-scoped) key-value settings owned by super admins.
+// Used for white-label branding (brand name, logo, favicon). Image rows keep
+// bytes in `valueBytes` and their MIME type in `valueText`; text settings keep
+// their value in `valueText`. Singleton per key.
+model PlatformSetting {
+  id         String   @id @default(uuid())
+  settingKey String   @unique @map("setting_key") // brand_name | brand_logo | brand_favicon
+  valueText  String?  @map("value_text")          // brand name, or MIME type for image rows
+  valueBytes Bytes?   @map("value_bytes")          // image bytes for logo/favicon rows
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+// ── Product Knowledge Base ──────────────────────────────────────────
+// Product catalog + category tree. Knowledge/FAQ lives in KnowledgeEntry
+// (linked via productId/categoryId). All org-scoped + composite-unique per org.
+
+// Product category tree (catalog classification). specSchema = template for
+// standardizing product `specs` JSON; importConfig = Google Sheet sync config.
+model ProductCategory {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  parentId     String?  @map("parent_id")
+  name         String
+  slug         String
+  description  String?
+  icon         String?
+  specSchema   Json     @default("{}") @map("spec_schema") // { fields: [{key,label,type}] }
+  importConfig Json     @default("{}") @map("import_config") // Google Sheet sync (url, tab, mapping, mode)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  org      Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent   ProductCategory?  @relation("ProductCatTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("ProductCatTree")
+  products Product[]
+
+  @@unique([orgId, slug])
+  @@index([orgId, parentId])
+  @@map("product_categories")
+}
+
+model Product {
+  id               String                       @id @default(uuid())
+  orgId            String                       @map("org_id")
+  categoryId       String?                      @map("category_id")
+  name             String
+  code             String? // SKU
+  slug             String
+  description      String?
+  notes            String? // ghi chú nội bộ
+  keywords         String? // alias/synonyms — recall RAG
+  tags             String[]                     @default([])
+  priceType        String                       @default("fixed") @map("price_type") // fixed (cố định) | range (khoảng giá) | contact (báo giá) | free (miễn phí) | description (giá ghi trong mô tả)
+  price            Decimal?                     @db.Decimal(14, 2) // giá cố định, hoặc cận DƯỚI khi priceType=range
+  priceMax         Decimal?                     @db.Decimal(14, 2) @map("price_max") // cận TRÊN, chỉ dùng khi priceType=range
+  currency         String                       @default("VND")
+  specs            Json                         @default("{}") // thuộc tính linh hoạt, chuẩn theo category.specSchema
+  images           String[]                     @default([])
+  status           String                       @default("active") // draft | active | archived
+  sortOrder        Int                          @default(0) @map("sort_order")
+  source           String                       @default("manual") // manual | import | sync | ai_master
+  // embedding        Unsupported("vector(1536)")? // name + short + keywords
+  createdById      String?                      @map("created_by_id")
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+
+  org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  category ProductCategory? @relation(fields: [categoryId], references: [id])
+  knowledge KnowledgeEntry[]
+
+  @@unique([orgId, code])
+  @@unique([orgId, slug])
+  @@index([orgId, categoryId])
+  @@index([orgId, status])
+  @@map("products")
+}
+
+// Knowledge category tree (sales/consulting taxonomy: company info, FAQ,
+// policy, pricing, sales scripts…). Separate from ProductCategory.
+model KnowledgeCategory {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  parentId     String?  @map("parent_id")
+  name         String
+  slug         String
+  description  String?
+  kind         String   @default("knowledge") // knowledge (bài viết) | faq (câu hỏi thường gặp) — mỗi nhóm chỉ 1 loại
+  importConfig Json     @default("{}") @map("import_config") // Google Sheet sync per group
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  org      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent   KnowledgeCategory?  @relation("KnowledgeCatTree", fields: [parentId], references: [id])
+  children KnowledgeCategory[] @relation("KnowledgeCatTree")
+  entries  KnowledgeEntry[]
+
+  @@unique([orgId, slug])
+  @@index([orgId, parentId])
+  @@map("knowledge_categories")
+}

@@ -28,6 +28,7 @@ import { randomUUID } from 'node:crypto'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { authMiddleware } from '../auth/auth-middleware.js'
 import { prisma } from '../../shared/prisma-client.js'
+import { sendImageCore } from '../chat/send-image-core.js'
 import { runHarness } from './harness/reply-generator.js'
 import { loadCaseContext } from './master/master-agent.js'
 
@@ -200,6 +201,31 @@ export async function simulateRoutes(app: FastifyInstance): Promise<void> {
         })
         replyMessageId = msg.id
       }
+
+      // Ảnh AI muốn gửi cũng phải hiện trong luồng test. Trước đây chỉ phần chữ
+      // được ghi lại, nên người test thấy AI nói "em gửi ảnh rồi ạ" mà chẳng
+      // có ảnh nào — tưởng tính năng hỏng trong khi nó chạy đúng.
+      //
+      // Hội thoại sandbox không gắn với Zalo thật nên không có gì bay ra ngoài;
+      // sendImageCore chỉ ghi bản ghi ảnh vào luồng.
+      if (effPersist && result.images?.length) {
+        for (const [i, img] of result.images.entries()) {
+          try {
+            await sendImageCore({
+              orgId: user.orgId,
+              conversationId,
+              imageUrl: img.imageUrl,
+              caption: img.caption,
+              sender: 'ai',
+              aiReplyRunId: result.runId ?? null,
+            })
+          } catch (err) {
+            request.log.warn({ err, product: img.productName }, '[simulate] không ghi được ảnh vào luồng test')
+          }
+          void i
+        }
+      }
+
       if (effPersist) {
         await prisma.conversation.update({
           where: { id: conversationId },
@@ -220,6 +246,8 @@ export async function simulateRoutes(app: FastifyInstance): Promise<void> {
       return {
         runId: result.runId,
         reply: result.reply,
+        // Ảnh AI định gửi kèm — hiện ra để quản trị kiểm tra trước khi bật thật.
+        images: result.images ?? [],
         handoff: result.handoff ?? null,
         routerDecision: result.routerDecision ?? null,
         persisted: effPersist,

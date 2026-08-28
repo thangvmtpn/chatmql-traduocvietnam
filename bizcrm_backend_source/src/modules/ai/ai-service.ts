@@ -46,7 +46,7 @@ export {
 
 // ── Provider dispatch ───────────────────────────────────────────────────
 
-async function dispatchProvider(
+export async function dispatchProvider(
   provider: string,
   apiKey: string,
   model: string,
