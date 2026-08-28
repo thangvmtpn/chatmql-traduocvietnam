@@ -3,13 +3,11 @@
  * Tích hợp Nút Lên Đơn, Lịch Sử Đơn Hàng & Nhận diện Khách hàng CRM
  */
 (function () {
-  const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__)
+  const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:4520'
-        : (window.location.hostname.includes('chatmql-dev')
-            ? 'https://chatmql-dev.traduocvietnam.com'
-            : 'https://tracrm-api.bizino.ai'));
+        : '');
 
   // Trình duyệt KHÔNG gọi thẳng sang CRM nữa. Mọi thứ liên quan tới đơn hàng
   // đều đi qua ChatMQL backend, nơi giữ service key và kiểm tra quyền nhân viên.

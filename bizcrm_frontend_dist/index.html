@@ -8,11 +8,10 @@
     <script>
       (function() {
         var search = window.location.search || '';
-        var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-          ? 'http://localhost:4520'
-          : (window.location.hostname.indexOf('chatmql-dev') !== -1 ? 'https://chatmql-dev.traduocvietnam.com' : 'https://tracrm-api.bizino.ai');
+        var isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        var apiBase = isLocal ? 'http://localhost:4520' : '';
         window.__API_BASE__ = apiBase;
-        window.__SOCKET_BASE__ = apiBase;
+        window.__SOCKET_BASE__ = isLocal ? 'http://localhost:4520' : window.location.origin;
         fetch(apiBase + '/api/v1/platform/branding' + search)
           .then(res => res.json())
           .then(data => {
