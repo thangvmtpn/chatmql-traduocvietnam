@@ -10,7 +10,9 @@
         var search = window.location.search || '';
         var apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
           ? 'http://localhost:4520'
-          : 'https://tracrm-api.bizino.ai';
+          : (window.location.hostname.indexOf('chatmql-dev') !== -1 ? 'https://chatmql-dev.traduocvietnam.com' : 'https://tracrm-api.bizino.ai');
+        window.__API_BASE__ = apiBase;
+        window.__SOCKET_BASE__ = apiBase;
         fetch(apiBase + '/api/v1/platform/branding' + search)
           .then(res => res.json())
           .then(data => {
