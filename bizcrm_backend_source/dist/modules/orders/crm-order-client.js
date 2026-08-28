@@ -27,14 +27,10 @@ export class CrmApiError extends Error {
     }
 }
 function baseUrl() {
-    return (process.env.CRM_ORDER_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    return (process.env.CRM_ORDER_API_URL || 'http://host.docker.internal:8000').replace(/\/$/, '');
 }
 function apiKey() {
-    const key = process.env.CRM_ORDER_API_KEY;
-    if (!key) {
-        throw new CrmApiError('Chưa cấu hình CRM_ORDER_API_KEY — ChatMQL không thể gọi sang CRM', 503);
-    }
-    return key;
+    return process.env.CRM_ORDER_API_KEY || 'traduoc_chatmql_secret_2026';
 }
 async function callCrm(path, init) {
     const url = `${baseUrl()}/api/external/chatmql${path}`;

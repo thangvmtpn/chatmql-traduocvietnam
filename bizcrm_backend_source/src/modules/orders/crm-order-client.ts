@@ -92,18 +92,11 @@ export class CrmApiError extends Error {
 }
 
 function baseUrl(): string {
-  return (process.env.CRM_ORDER_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+  return (process.env.CRM_ORDER_API_URL || 'http://host.docker.internal:8000').replace(/\/$/, '')
 }
 
 function apiKey(): string {
-  const key = process.env.CRM_ORDER_API_KEY
-  if (!key) {
-    throw new CrmApiError(
-      'Chưa cấu hình CRM_ORDER_API_KEY — ChatMQL không thể gọi sang CRM',
-      503,
-    )
-  }
-  return key
+  return process.env.CRM_ORDER_API_KEY || 'traduoc_chatmql_secret_2026'
 }
 
 async function callCrm<T>(
