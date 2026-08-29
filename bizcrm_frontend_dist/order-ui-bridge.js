@@ -2365,11 +2365,8 @@
     let warehouseId = lookups.warehouses[0]?.id || null;
     let catalog = await loadCatalog(warehouseId);
     // Bỏ TEA_CATALOG viết cứng — giá và tồn kho giờ lấy thật từ FM.
-    const firstInStock = catalog.find(p => p.inventory > 0) || catalog[0];
-
-    let items = firstInStock
-      ? [{ code: firstInStock.code, name: firstInStock.name, price: firstInStock.price, quantity: 1 }]
-      : [];
+    // Mặc định danh sách sản phẩm để trống để nhân viên tự chọn.
+    let items = [];
     let orderStatusId = lookups.statuses[0]?.id || 1;
     let provinceId = null;
     let wardId = null;
