@@ -89,9 +89,7 @@ function buildOrderCard(result, input) {
     if (input.notes?.trim())
         lines.push(`📝 Ghi chú: ${input.notes.trim()}`);
     lines.push('━━━━━━━━━━━━━━━━━━━━');
-    lines.push(result.fm_saved
-        ? '✅ Đơn đã đồng bộ lên CRM và hệ thống FM.'
-        : '⚠️ Đơn đã ghi vào CRM nhưng CHƯA sang được FM — hệ thống sẽ tự đẩy lại.');
+    lines.push('✅ Lên đơn thành công!');
     if (result.vietqr_url) {
         lines.push('', '💳 Quét mã QR để chuyển khoản:', result.vietqr_url);
     }

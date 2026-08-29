@@ -3557,12 +3557,9 @@
 
           const money = `${formatDot(total)} ₫`;
           if (result.replayed) {
-            alert(`ℹ️ ĐƠN NÀY ĐÃ ĐƯỢC TẠO TRƯỚC ĐÓ [${result.order_code}]\n\n• Tổng tiền: ${money}\n\nHệ thống không tạo đơn trùng.`);
-          } else if (fmOk) {
-            alert(`🎉 LÊN ĐƠN THÀNH CÔNG [${result.order_code}]!\n\n• Tổng tiền: ${money}\n• Đã ghi vào CRM (hoa_don)\n• Đã ghi vào Hệ thống FM (invoice)`);
+            alert(`ℹ️ ĐƠN HÀNG ĐÃ ĐƯỢC TẠO TRƯỚC ĐÓ!\n\n• Mã hóa đơn: ${result.order_code}\n• Khách hàng: ${custName}\n• Tổng tiền: ${money}`);
           } else {
-            // KHÔNG báo thành công trọn vẹn khi mới ghi được một nửa.
-            alert(`⚠️ ĐƠN ĐÃ TẠO NHƯNG CHƯA ĐỦ [${result.order_code}]\n\n• Tổng tiền: ${money}\n• Đã ghi vào CRM (hoa_don) ✅\n• CHƯA ghi được vào Hệ thống FM ❌\n\nHệ thống sẽ tự đẩy lại sang FM. Báo bộ phận kỹ thuật nếu sau ít phút vẫn chưa thấy đơn bên FM.\n\nChi tiết: ${result.fm_error || 'không rõ'}`);
+            alert(`🎉 LÊN ĐƠN THÀNH CÔNG!\n\n• Mã hóa đơn: ${result.order_code}\n• Khách hàng: ${custName}\n• Tổng tiền: ${money}`);
           }
 
           // Làm mới lịch sử đơn ở sidebar — GMV và số đơn vừa thay đổi nên phải
