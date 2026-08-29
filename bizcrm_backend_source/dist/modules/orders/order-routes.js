@@ -269,6 +269,26 @@ export async function orderRoutes(app) {
         const meta = (contact?.metadata && typeof contact.metadata === 'object')
             ? contact.metadata
             : {};
+        // Chuẩn hoá dữ liệu CRM về đúng tên trường frontend đọc.
+        // CRM bridge trả `appointment: { date, type, note }` thay vì
+        // `next_sales_at` / `next_care_at` riêng — cần map lại.
+        const rawCrm = crmRes.value?.found ? crmRes.value.customer : null;
+        let crm = null;
+        if (rawCrm) {
+            const appt = rawCrm.appointment || {};
+            const apptType = (appt.type || '').toLowerCase();
+            crm = {
+                ...rawCrm,
+                // Map appointment → next_sales_at / next_care_at
+                next_sales_at: apptType.includes('bán') ? appt.date : rawCrm.next_sales_at || null,
+                next_care_at: apptType.includes('chăm') || apptType.includes('cskh') ? appt.date : rawCrm.next_care_at || null,
+                // Trường frontend cần nhưng CRM bridge chưa trả
+                customer_code: rawCrm.customer_code || (rawCrm.id_kh ? `KH${rawCrm.id_kh}` : null),
+                phone2: rawCrm.phone2 || rawCrm.sdt2 || null,
+                purchase_frequency: rawCrm.purchase_frequency || rawCrm.tan_suat_mua || null,
+                profile_note: rawCrm.profile_note || rawCrm.ghi_chu || '',
+            };
+        }
         return {
             phone,
             // Phần ChatMQL nắm giữ — CRM không có email hay tên hiển thị Zalo.
@@ -283,7 +303,7 @@ export async function orderRoutes(app) {
                 firstSeenAt: contact.createdAt,
                 address: meta.address || null,
             } : null,
-            crm: crmRes.value?.found ? crmRes.value.customer : null,
+            crm,
             orders,
         };
     });

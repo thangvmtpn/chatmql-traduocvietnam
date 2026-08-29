@@ -30,7 +30,7 @@ function baseUrl() {
     return (process.env.CRM_ORDER_API_URL || 'http://host.docker.internal:8000').replace(/\/$/, '');
 }
 function apiKey() {
-    return process.env.CRM_ORDER_API_KEY || 'traduoc_chatmql_secret_2026';
+    return process.env.CRM_ORDER_API_KEY || 'c39174092b71fae807183ef028e1920cae803970298a09f87c121e7841c2807e';
 }
 async function callCrm(path, init) {
     const url = `${baseUrl()}/api/external/chatmql${path}`;
