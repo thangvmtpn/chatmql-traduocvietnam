@@ -2379,8 +2379,8 @@
     let pkgLength = '';
     let pkgWidth = '';
     let pkgHeight = '';
-    let shippingFee = 25000;
-    let shippingProvider = 'vnpost';
+    let shippingFee = 30000;
+    let shippingProvider = 'jt_express';
     let typeFeeDelivery = 'CC_CASH'; // 'CC_CASH' (Khách trả ship) | 'PP_CASH' (Shop trả ship / Hỗ trợ ship)
     let selfShipping = false;
     let promoCode = '';
@@ -2783,8 +2783,8 @@
                   <span>🚚</span> Chọn đơn vị vận chuyển
                 </label>
                 <select id="order-carrier" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
-                  <option value="vnpost" ${shippingProvider === 'vnpost' ? 'selected' : ''}>VN Post - 25.000đ</option>
                   <option value="jt_express" ${shippingProvider === 'jt_express' ? 'selected' : ''}>J&T Express - 30.000đ</option>
+                  <option value="vnpost" ${shippingProvider === 'vnpost' ? 'selected' : ''}>VN Post - 25.000đ</option>
                   <option value="viettel_post" ${shippingProvider === 'viettel_post' ? 'selected' : ''}>Viettel Post - 28.000đ</option>
                 </select>
               </div>
@@ -3425,7 +3425,7 @@
         const custPhone = (form.phone || '').trim();
         const custAddr = (form.addr || '').trim();
         const payMethod = depositAmount > 0 ? 'vietqr' : 'cod';
-        const carrier = shippingProvider || 'vnpost';
+        const carrier = shippingProvider || 'jt_express';
         const notes = (form.notes || '').trim();
 
         const thieu = [];
