@@ -142,6 +142,7 @@ export async function createOrderAndSync(input) {
         self_shipping: input.selfShipping ?? false,
         is_fragile: input.isFragile ?? false,
         is_exchange: input.isExchange ?? false,
+        type_fee_delivery: input.typeFeeDelivery,
     });
     logger.info({ orderCode: result.order_code, requestId, status: result.status, replayed: result.replayed }, '[orders] CRM đã nhận đơn');
     // Gọi lại trùng request_id: đơn đã tồn tại, không lặp lại phần việc local

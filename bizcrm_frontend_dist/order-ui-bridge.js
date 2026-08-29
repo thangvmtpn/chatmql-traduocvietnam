@@ -2382,6 +2382,7 @@
     let pkgHeight = '';
     let shippingFee = 25000;
     let shippingProvider = 'vnpost';
+    let typeFeeDelivery = 'CC_CASH'; // 'CC_CASH' (Khách trả ship) | 'PP_CASH' (Shop trả ship / Hỗ trợ ship)
     let selfShipping = false;
     let promoCode = '';
     let promoApplied = null;
@@ -2460,7 +2461,8 @@
       const promoOff = promoApplied?.discount_amount || 0;
       const discountAmt = calcDiscountAmount();
       const pointsOff = (usedPoints || 0) * 1000;
-      const ship = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
+      const isCustomerPayShip = typeFeeDelivery === 'CC_CASH' && !selfShipping && !promoApplied?.free_shipping;
+      const ship = isCustomerPayShip ? shippingFee : 0;
       return Math.max(0, subtotal - discountAmt - promoOff - pointsOff + ship);
     }
 
@@ -2788,9 +2790,18 @@
                 </select>
               </div>
 
-              <div style="margin-bottom:6px;">
-                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chi phí vận chuyển</label>
-                <input type="number" id="order-shipping-fee" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${shippingFee}" />
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:6px;">
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chi phí vận chuyển</label>
+                  <input type="number" id="order-shipping-fee" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${shippingFee}" />
+                </div>
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Loại phí ship</label>
+                  <select id="order-type-fee-delivery" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; font-weight:600; padding:0 10px; box-sizing:border-box;">
+                    <option value="CC_CASH" ${typeFeeDelivery === 'CC_CASH' ? 'selected' : ''}>CC_CASH (Khách trả ship)</option>
+                    <option value="PP_CASH" ${typeFeeDelivery === 'PP_CASH' ? 'selected' : ''}>PP_CASH (Hỗ trợ ship)</option>
+                  </select>
+                </div>
               </div>
 
               <div style="font-size:11.5px; color:#64748b; margin-bottom:10px; display:flex; align-items:center; gap:4px;">
@@ -3226,7 +3237,8 @@
         const disc = calcDiscountAmount();
         const promoOff = promoApplied?.discount_amount || 0;
         const pointsOff = (usedPoints || 0) * 1000;
-        const ship = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
+        const isCustomerPayShip = typeFeeDelivery === 'CC_CASH' && !selfShipping && !promoApplied?.free_shipping;
+        const ship = isCustomerPayShip ? shippingFee : 0;
         const tot = Math.max(0, sub - disc - promoOff - pointsOff + ship);
         const cod = Math.max(0, tot - (depositAmount || 0));
 
@@ -3240,7 +3252,13 @@
         if (ptsEl) ptsEl.textContent = `-${vnd(pointsOff)}đ`;
 
         const shipEl = modalOverlay.querySelector('#summary-shipping');
-        if (shipEl) shipEl.textContent = `${vnd(ship)}đ`;
+        if (shipEl) {
+          if (typeFeeDelivery === 'PP_CASH') {
+            shipEl.textContent = `${vnd(shippingFee)}đ (Shop hỗ trợ)`;
+          } else {
+            shipEl.textContent = `${vnd(ship)}đ`;
+          }
+        }
 
         const depEl = modalOverlay.querySelector('#summary-deposit');
         if (depEl) depEl.textContent = `${vnd(depositAmount)}đ`;
@@ -3309,6 +3327,15 @@
       if (feeInput) {
         feeInput.oninput = e => {
           shippingFee = Number(e.target.value) || 0;
+          updateSummary();
+        };
+      }
+
+      // Loại phí ship: CC_CASH hoặc PP_CASH
+      const typeFeeSel = modalOverlay.querySelector('#order-type-fee-delivery');
+      if (typeFeeSel) {
+        typeFeeSel.onchange = e => {
+          typeFeeDelivery = e.target.value;
           updateSummary();
         };
       }
@@ -3473,6 +3500,7 @@
           selfShipping: selfShipping,
           isFragile: isFragile,
           isExchange: isExchange,
+          typeFeeDelivery: typeFeeDelivery,
           sellerName: sellerName,
           // ── Đợt 5 ──
           promoCode: promoApplied?.promotion?.code || null,

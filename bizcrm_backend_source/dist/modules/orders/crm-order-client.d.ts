@@ -34,6 +34,7 @@ export interface CrmCreateOrderPayload {
     self_shipping?: boolean;
     is_fragile?: boolean;
     is_exchange?: boolean;
+    type_fee_delivery?: 'PP_CASH' | 'CC_CASH';
 }
 export interface CrmCreateOrderResult {
     success: boolean;

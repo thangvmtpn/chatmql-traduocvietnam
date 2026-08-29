@@ -72,6 +72,7 @@ export interface CreateOrderInput {
   selfShipping?: boolean
   isFragile?: boolean
   isExchange?: boolean
+  typeFeeDelivery?: 'PP_CASH' | 'CC_CASH'
   /**
    * Khóa chống trùng đơn. Nên do trình duyệt sinh và giữ nguyên qua các lần
    * bấm lại, để timeout rồi thử lại không đẻ ra đơn thứ hai.
@@ -216,6 +217,7 @@ export async function createOrderAndSync(input: CreateOrderInput): Promise<Creat
     self_shipping: input.selfShipping ?? false,
     is_fragile: input.isFragile ?? false,
     is_exchange: input.isExchange ?? false,
+    type_fee_delivery: input.typeFeeDelivery,
   })
 
   logger.info(
