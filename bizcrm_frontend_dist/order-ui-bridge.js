@@ -20,6 +20,23 @@
     return localStorage.getItem('token') || '';
   }
 
+  function getCurrentUser() {
+    try {
+      const token = authToken();
+      if (!token) return null;
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  }
+
   function authHeaders(extra) {
     const t = authToken();
     return Object.assign(
@@ -2332,7 +2349,9 @@
     // Không bịa địa chỉ. Trống thì để nhân viên tự nhập
     const defaultAddress = crmData?.address || ctx?.contact?.address || '';
     const defaultCity = crmData?.city || ctx?.contact?.city || 'Hà Nội';
-    const staffCare = crmData?.staff_in_charge || ccState.staff || 'Trà Dược CSKH';
+    const currentUser = getCurrentUser();
+    const currentUserName = currentUser?.fullName || currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : '');
+    const staffCare = currentUserName || crmData?.staff_in_charge || ccState.staff || 'Trà Dược CSKH';
 
     // Đồng bộ cache để sidebar lịch sử đơn cũng bám đúng khách này.
     if (phone) {
@@ -2359,7 +2378,7 @@
     let discountPercent = 0;
     let discountAmount = 0;
     let usedPoints = 0;
-    let sellerName = staffCare || 'Trần Trang';
+    let sellerName = currentUserName || staffCare || 'Trà Dược CSKH';
     let pkgWeight = null;
     let pkgLength = '';
     let pkgWidth = '';
@@ -2538,7 +2557,7 @@
                   </label>
                     <select id="order-seller" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
                     <option value="">Chọn nhân viên</option>
-                    ${['Trần Trang', 'Lê Nga', 'Lê Tuấn', 'Vũ Đức Văn', 'Nguyễn Thị Huệ', 'Trà Dược CSKH', sellerName].filter((v, i, a) => v && a.indexOf(v) === i).map(st => `
+                    ${[sellerName, 'Lộc Thị Hạnh', 'Dương Hoài Chang', 'Dương Thu Trang', 'Đỗ Tuấn Anh', 'Hoàng Phương Anh', 'Ngọc Thị Thảo', 'Ngô Thị Ngân', 'Ngô Văn Tuấn', 'Nguyễn Nam Khánh', 'Nguyễn Thị Vân Anh', 'Trà Dược CSKH'].filter((v, i, a) => v && a.indexOf(v) === i).map(st => `
                       <option value="${esc(st)}" ${st === sellerName ? 'selected' : ''}>${esc(st)}</option>
                     `).join('')}
                   </select>
@@ -3074,8 +3093,8 @@
           };
           if (dangTra) { set('order-crm-badge', 'ĐANG TRA CRM…'); return; }
           set('order-crm-badge', crm ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM');
-          set('order-crm-group', crm?.priority_level || '—');
-          set('order-crm-staff', crm?.staff_in_charge || 'Trà Dược CSKH');
+          set('order-crm-group', crm?.cap_vip || crm?.priority_level || '—');
+          set('order-crm-staff', currentUserName || crm?.staff_in_charge || 'Trà Dược CSKH');
           set('order-crm-gmv', `${formatDot(crm?.gmv_total || 0)} ₫`);
           set('order-crm-count', `${crm?.order_count || 0} đơn`);
           set('order-crm-taste', crm?.thich_dung_hang || '—');

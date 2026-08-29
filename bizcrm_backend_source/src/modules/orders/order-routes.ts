@@ -791,7 +791,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         // gửi "nhân sự đang chăm sóc khách" đọc từ CRM — nên đơn bị ghi cho
         // người khác chứ không phải người bấm nút. Danh tính người tạo đơn cũng
         // không phải thứ trình duyệt được quyền tự khai.
-        sellerName: user.fullName || user.email || 'Trà Dược CSKH',
+        sellerName: body.sellerName || user.fullName || user.email || 'Trà Dược CSKH',
         sellerUsername: user.email?.split('@')[0] || undefined,
       })
 
