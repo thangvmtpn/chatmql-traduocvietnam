@@ -744,7 +744,6 @@
         { id: 'ghi-chu', label: `Ghi chú${notes ? ` (${notes.length})` : ''}` },
         { id: 'mua-hang', label: `Lịch sử mua hàng (${orders.length})` },
         { id: 'san-pham', label: `Sản phẩm đã mua${bought ? ` (${bought.total})` : ''}` },
-        { id: 'diem', label: 'Lịch sử tích điểm' },
         { id: 'uu-dai', label: 'Ưu đãi đang có' },
         { id: 'lich', label: 'Lịch & nhắc' },
         { id: 'ho-so', label: 'Đặc thù & nhu cầu' },
