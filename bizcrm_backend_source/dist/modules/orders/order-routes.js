@@ -287,6 +287,7 @@ export async function orderRoutes(app) {
                 phone2: rawCrm.phone2 || rawCrm.sdt2 || null,
                 purchase_frequency: rawCrm.purchase_frequency || rawCrm.tan_suat_mua || null,
                 profile_note: rawCrm.profile_note || rawCrm.ghi_chu || '',
+                cap_vip: rawCrm.cap_vip || rawCrm.priority_level || rawCrm.nhom_kh || null,
             };
         }
         return {

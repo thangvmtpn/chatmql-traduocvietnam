@@ -745,7 +745,7 @@
           ${infoRow('Email', cm.email)}
           ${infoRow('Nghề nghiệp', crm.occupation)}
           ${infoRow('Nguồn khách hàng', crm.referral_source || cm.source)}
-          ${infoRow('Nhóm khách hàng', crm.priority_level)}
+          ${infoRow('Cấp Vip', crm.cap_vip || crm.priority_level || crm.nhom_kh)}
           ${infoRow('Người phụ trách', crm.staff_in_charge)}
           ${infoRow('Địa chỉ', crm.address || cm.address)}
           ${infoRow('Địa chỉ 2', crm.address2)}
@@ -2495,7 +2495,7 @@
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
-                  <span style="font-weight:700; font-size:12px; color:#15803d;">Nhóm: <span id="order-crm-group">${crmData?.priority_level || '—'}</span></span>
+                  <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${crmData?.cap_vip || crmData?.priority_level || '—'}</span></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
                   👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
@@ -4616,7 +4616,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${row('Điểm', points, 'color:#16a34a;')}
               ${row('Tổng chi tiêu', ccFmtMoney(crm.gmv_total))}
               ${row('Nghề nghiệp', crm.occupation)}
-              ${row('Nhóm ưu tiên', crm.priority_level)}
+              ${row('Cấp Vip', crm.cap_vip || crm.priority_level || crm.nhom_kh)}
               ${row('Giới tính', crm.gender)}
               ${row('Ngày sinh', crm.birthday ? ccFmtDate(crm.birthday) : null)}
               ${row('Email', chat.email)}
