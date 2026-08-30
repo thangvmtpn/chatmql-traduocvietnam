@@ -205,7 +205,7 @@ export async function enqueueAiReply(convId: string, delayMs: number): Promise<s
     'ai-reply',
     { convId },
     {
-      jobId: `${convId}:${Date.now()}`,
+      jobId: `${convId}__${Date.now()}`,
       delay: delayMs,
       attempts: 1,
       removeOnComplete: true,
@@ -356,7 +356,7 @@ export function initAiReplyWorker(processor: (job: Job<AiReplyJobData>) => Promi
   )
 
   aiReplyWorker.on('completed', (job) => {
-    logger.debug({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed')
+    logger.info({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed')
   })
   aiReplyWorker.on('failed', (job, err) => {
     logger.error({ jobId: job?.id, convId: job?.data?.convId, err: err.message }, '[queue] AI reply job failed')

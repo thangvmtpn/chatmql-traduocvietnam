@@ -223,32 +223,43 @@ export async function zaloRoutes(app) {
             accountId: account.id,
         };
     });
-    // POST /api/v1/zalo-accounts/:id/backfill/:threadId — Backfill single conversation by externalThreadId
-    app.post('/api/v1/zalo-accounts/:id/backfill/:threadId', async (request, reply) => {
-        const user = request.user;
-        const { threadId } = request.params;
-        const { maxMessages = 200 } = request.body || {};
-        const account = await prisma.channelAccount.findFirst({
-            where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
-        });
-        if (!account)
-            return reply.status(404).send({ error: 'Account not found' });
-        const poolEntry = getPoolEntry(account.id);
-        if (!poolEntry || !poolEntry.api || poolEntry.status !== 'connected') {
-            return reply.status(400).send({ error: 'Tài khoản Zalo chưa kết nối' });
+    // GET /api/v1/zalo-accounts/:id/test-history/:threadId — Diagnostic test for 1-1 history API
+    app.get('/api/v1/zalo-accounts/:id/test-history/:threadId', async (request, reply) => {
+        const { id, threadId } = request.params;
+        const poolEntry = getPoolEntry(id);
+        if (!poolEntry || !poolEntry.api) {
+            return reply.status(400).send({ error: 'Tài khoản chưa kết nối trong pool' });
         }
-        const conv = await prisma.conversation.findFirst({
-            where: { channelAccountId: account.id, externalThreadId: threadId },
-            select: { id: true, threadType: true, displayName: true },
-        });
-        const threadType = conv?.threadType === 'group' ? 'group' : 'user';
-        const { backfillConversation } = await import('./zalo-message-sync.js');
-        const result = await backfillConversation(poolEntry.api, account.id, threadId, threadType, maxMessages);
+        const api = poolEntry.api;
+        const ctx = api.listener?.ctx || api.getContext?.() || {};
+        const results = [];
+        // Test combinations of endpoints and params
+        const tests = [
+            { service: api.zpwServiceMap?.chat?.[0] || 'https://chat3-wpa.chat.zalo.me', path: '/api/message/history', params: { toid: threadId, count: 20 } },
+            { service: api.zpwServiceMap?.chat?.[0] || 'https://chat3-wpa.chat.zalo.me', path: '/api/message/history', params: { toid: threadId, count: 20, imei: ctx.imei } },
+            { service: api.zpwServiceMap?.chat?.[0] || 'https://chat3-wpa.chat.zalo.me', path: '/api/message/list', params: { toid: threadId, count: 20 } },
+            { service: api.zpwServiceMap?.chat?.[0] || 'https://chat3-wpa.chat.zalo.me', path: '/api/message/list', params: { convId: threadId, count: 20, globalMsgId: 0 } },
+            { service: api.zpwServiceMap?.conversation?.[0] || 'https://tt-conversation-wpa.chat.zalo.me', path: '/api/conversation/history', params: { toid: threadId, count: 20 } },
+            { service: api.zpwServiceMap?.conversation?.[0] || 'https://tt-conversation-wpa.chat.zalo.me', path: '/api/conv/getmessage', params: { toid: threadId, count: 20 } },
+        ];
+        for (const t of tests) {
+            try {
+                const res = await api.custom(`test_${Date.now()}_${Math.random()}`, async ({ utils }) => {
+                    const url = utils.makeURL(`${t.service}${t.path}`);
+                    const encryptedParams = utils.encodeAES(JSON.stringify(t.params));
+                    const response = await utils.request(utils.makeURL(url, { params: encryptedParams }), { method: 'GET' });
+                    return response;
+                })({});
+                results.push({ test: t, status: 'ok', data: res });
+            }
+            catch (err) {
+                results.push({ test: t, status: 'error', error: err.message, stack: err.stack });
+            }
+        }
         return {
-            success: true,
-            threadId,
-            displayName: conv?.displayName,
-            ...result,
+            zpwServiceMap: api.zpwServiceMap,
+            ctx: { uid: ctx.uid, imei: ctx.imei ? 'exists' : 'missing' },
+            results
         };
     });
     // GET /api/v1/zalo-accounts/:id/stats — Statistics of contacts and messages

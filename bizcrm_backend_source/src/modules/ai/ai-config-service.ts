@@ -329,11 +329,14 @@ export function isAfterHours(
     const startMinutes = startHour * 60
     const endMinutes = endHour * 60
 
-    if (startMinutes > endMinutes) {
-      // Overnight window: e.g. 18:00 (1080m) to 08:00 (480m) next day
-      return timeInMinutes >= startMinutes || timeInMinutes < endMinutes
+    if (startMinutes < endMinutes) {
+      // Daytime window: e.g. 8:00 (480m) to 18:00 (1080m) is daytime
+      // Therefore, after-hours is outside this daytime window (< 8:00 or >= 18:00)
+      const isDaytime = timeInMinutes >= startMinutes && timeInMinutes < endMinutes
+      return !isDaytime
     } else {
-      return timeInMinutes >= startMinutes && timeInMinutes < endMinutes
+      // Overnight after-hours window: e.g. 18:00 (1080m) to 08:00 (480m) next day
+      return timeInMinutes >= startMinutes || timeInMinutes < endMinutes
     }
   } catch {
     const utcHours = date.getUTCHours() + 7

@@ -248,6 +248,16 @@ export async function handleIncomingMessage(
         const isPaused = !!(conversation.aiPausedUntil)
           && new Date(conversation.aiPausedUntil) > new Date()
 
+        logger.info({
+          orgId: account.orgId,
+          convId: conversation.id,
+          autoReplyEnabled: aiReplyCfg.autoReplyEnabled,
+          convAiMode: conversation.aiMode,
+          effectiveMode,
+          isPaused,
+          hasContent: !!msg.content?.trim(),
+        }, '[ai-harness] evaluating inbound message trigger')
+
         if (
           aiReplyCfg.autoReplyEnabled
           && !isPaused

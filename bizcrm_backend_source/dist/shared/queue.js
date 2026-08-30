@@ -142,7 +142,7 @@ export async function enqueueAiReply(convId, delayMs) {
         // Non-fatal
     }
     const job = await aiReplyQueue.add('ai-reply', { convId }, {
-        jobId: `${convId}:${Date.now()}`,
+        jobId: `${convId}__${Date.now()}`,
         delay: delayMs,
         attempts: 1,
         removeOnComplete: true,
@@ -243,7 +243,7 @@ export function initAiReplyWorker(processor) {
     // debounce this prevents two jobs for the same conversation auto-sending at once.
     aiReplyWorker = new Worker(QUEUE_NAMES.AI_REPLY, processor, { connection, prefix: REDIS_PREFIX, concurrency: 1 });
     aiReplyWorker.on('completed', (job) => {
-        logger.debug({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed');
+        logger.info({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed');
     });
     aiReplyWorker.on('failed', (job, err) => {
         logger.error({ jobId: job?.id, convId: job?.data?.convId, err: err.message }, '[queue] AI reply job failed');

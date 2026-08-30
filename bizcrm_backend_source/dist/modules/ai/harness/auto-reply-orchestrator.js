@@ -36,15 +36,16 @@ async function processAiReplyJob(job) {
             return;
         }
         const { orgId } = conv;
+        logger.info({ convId }, '[orchestrator] processing job');
         // ── 2. Guards ───────────────────────────────────────────────────────────
         const aiCfg = await getAiReplyConfig(orgId);
         if (!aiCfg.autoReplyEnabled) {
-            logger.debug({ convId }, '[orchestrator] master autoReplyEnabled=false — skipping');
+            logger.info({ convId }, '[orchestrator] master autoReplyEnabled=false — skipping');
             return;
         }
         const isPaused = !!(conv.aiPausedUntil && new Date(conv.aiPausedUntil) > new Date());
         if (isPaused) {
-            logger.debug({ convId, until: conv.aiPausedUntil }, '[orchestrator] conversation paused — skipping');
+            logger.info({ convId, until: conv.aiPausedUntil }, '[orchestrator] conversation paused — skipping');
             return;
         }
         const effectiveMode = resolveConversationMode({
@@ -55,7 +56,7 @@ async function processAiReplyJob(job) {
             schedule: aiCfg.schedule,
         });
         if (effectiveMode === 'manual') {
-            logger.debug({ convId, effectiveMode }, '[orchestrator] manual mode — skipping');
+            logger.info({ convId, effectiveMode, convAiMode: conv.aiMode }, '[orchestrator] manual mode — skipping');
             return;
         }
         // ── 3. Aggregate unprocessed inbound messages ────────────────────────────
@@ -79,7 +80,7 @@ async function processAiReplyJob(job) {
             select: { id: true, content: true, sentAt: true },
         });
         if (unprocessedMessages.length === 0) {
-            logger.debug({ convId }, '[orchestrator] no unprocessed messages — skipping');
+            logger.info({ convId, cursorSentAt }, '[orchestrator] no unprocessed messages — skipping');
             return;
         }
         const lastMessageId = unprocessedMessages.at(-1).id;
