@@ -104,7 +104,7 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
         ...(cursorSentAt ? { sentAt: { gt: cursorSentAt } } : {}),
       },
       orderBy: { sentAt: 'asc' },
-      select: { id: true, content: true, sentAt: true },
+      select: { id: true, content: true, contentType: true, sentAt: true },
     })
 
     if (unprocessedMessages.length === 0) {
@@ -123,7 +123,15 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
     })
 
     const turnText = unprocessedMessages
-      .map(m => m.content?.trim())
+      .map(m => {
+        if (m.contentType === 'sticker' || (m.content?.startsWith('{') && m.content?.includes('"catId"'))) {
+          return '[Khách gửi nhãn dán biểu cảm]'
+        }
+        if (m.contentType === 'image' || (m.content?.startsWith('{') && m.content?.includes('"href"'))) {
+          return '[Khách gửi hình ảnh]'
+        }
+        return m.content?.trim()
+      })
       .filter(Boolean)
       .join('\n')
 

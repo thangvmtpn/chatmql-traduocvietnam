@@ -183,37 +183,60 @@ export async function enqueueZnsSend(data: ZnsSendJobData): Promise<string> {
   return job.id!
 }
 
+// ── In-memory debounce map for AI auto-reply (convId -> Timeout) ─────────────
+const aiDebounceTimers = new Map<string, NodeJS.Timeout>()
+
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Cancels pending delayed jobs for the same convId (debounce reset)
- * and assigns a unique jobId so subsequent turns are never blocked.
+ * Uses reliable in-memory debouncing before queueing to BullMQ with 0 delay.
+ * This completely avoids BullMQ delayed-zset promotion stalling in Redis.
  */
-export async function enqueueAiReply(convId: string, delayMs: number): Promise<string> {
-  // Remove existing delayed/waiting jobs for this convId to reset debounce
-  try {
-    const delayedJobs = await aiReplyQueue.getJobs(['delayed', 'waiting'])
-    for (const j of delayedJobs) {
-      if (j.data?.convId === convId) {
-        await j.remove().catch(() => {})
-      }
-    }
-  } catch {
-    // Non-fatal
+export async function enqueueAiReply(convId: string, delayMs = 2500): Promise<string> {
+  // Clear any existing timer for this conversation (debounce reset)
+  const existingTimer = aiDebounceTimers.get(convId)
+  if (existingTimer) {
+    clearTimeout(existingTimer)
+    aiDebounceTimers.delete(convId)
   }
 
-  const job = await aiReplyQueue.add(
-    'ai-reply',
-    { convId },
-    {
-      jobId: `${convId}__${Date.now()}`,
-      delay: delayMs,
-      attempts: 1,
-      removeOnComplete: true,
-      removeOnFail: true,
-    },
-  )
-  logger.info({ jobId: job.id, convId, delayMs }, '[queue] AI reply job enqueued')
-  return job.id!
+  const effectiveDelay = Math.max(0, Math.min(delayMs || 2500, 3000))
+
+  if (effectiveDelay === 0) {
+    const job = await aiReplyQueue.add(
+      'ai-reply',
+      { convId },
+      {
+        attempts: 1,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    )
+    logger.info({ jobId: job.id, convId }, '[queue] AI reply job enqueued immediately')
+    return job.id!
+  }
+
+  // Schedule debounced dispatch
+  const timer = setTimeout(async () => {
+    aiDebounceTimers.delete(convId)
+    try {
+      const job = await aiReplyQueue.add(
+        'ai-reply',
+        { convId },
+        {
+          attempts: 1,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      )
+      logger.info({ jobId: job.id, convId }, '[queue] Debounced AI reply job dispatched to worker')
+    } catch (err: any) {
+      logger.error({ convId, err: err.message }, '[queue] Failed to dispatch AI reply job')
+    }
+  }, effectiveDelay)
+
+  aiDebounceTimers.set(convId, timer)
+  logger.info({ convId, delayMs: effectiveDelay }, '[queue] AI reply debounce timer scheduled')
+  return `debounce-${convId}`
 }
 
 /**
@@ -341,18 +364,30 @@ export function initZnsSendWorker(processor: (job: Job<ZnsSendJobData>) => Promi
   logger.info({ rateMax, concurrency, prefix: REDIS_PREFIX }, '[queue] ZNS send worker initialized')
 }
 
+const activeAiConversations = new Set<string>()
+
 /**
  * Initialize the AI reply worker. Call once from app.ts after initWorkers.
- * Uses concurrency=1 so each conversation is processed serially — combined with
- * the jobId=convId debounce this guarantees at most one in-flight job per conv.
+ * Uses concurrency=5 with an in-memory active conversation Set so each conversation
+ * is processed serially without blocking other conversations.
  */
 export function initAiReplyWorker(processor: (job: Job<AiReplyJobData>) => Promise<void>): void {
-  // concurrency:1 — one in-flight job per worker; combined with jobId=convId
-  // debounce this prevents two jobs for the same conversation auto-sending at once.
   aiReplyWorker = new Worker<AiReplyJobData>(
     QUEUE_NAMES.AI_REPLY,
-    processor,
-    { connection, prefix: REDIS_PREFIX, concurrency: 1 },
+    async (job) => {
+      const { convId } = job.data
+      if (activeAiConversations.has(convId)) {
+        logger.info({ convId }, '[queue] Conversation already processing — skipping duplicate execution')
+        return
+      }
+      activeAiConversations.add(convId)
+      try {
+        await processor(job)
+      } finally {
+        activeAiConversations.delete(convId)
+      }
+    },
+    { connection, prefix: REDIS_PREFIX, concurrency: 5 },
   )
 
   aiReplyWorker.on('completed', (job) => {
@@ -362,7 +397,7 @@ export function initAiReplyWorker(processor: (job: Job<AiReplyJobData>) => Promi
     logger.error({ jobId: job?.id, convId: job?.data?.convId, err: err.message }, '[queue] AI reply job failed')
   })
 
-  logger.info({ prefix: REDIS_PREFIX }, '[queue] AI reply worker initialized')
+  logger.info({ prefix: REDIS_PREFIX, concurrency: 5 }, '[queue] AI reply worker initialized')
 }
 
 /**
