@@ -175,17 +175,30 @@ async function retrieveProductKeyword(
     select: { id: true, name: true, description: true, keywords: true, code: true, price: true, priceMax: true, priceType: true, currency: true, categoryId: true },
   })
 
-  // Rank by token match count
+  // Rank by name match, phrase match, and token match count
   const scored = rows.map((r) => {
-    const haystack = `${r.name} ${r.description || ''} ${r.keywords || ''} ${r.code || ''}`.toLowerCase()
-    let matchCount = 0
-    for (const t of tokens) {
-      if (haystack.includes(t)) matchCount++
+    const nameLower = r.name.toLowerCase()
+    const descLower = (r.description || '').toLowerCase()
+    const kwLower = (r.keywords || '').toLowerCase()
+    const codeLower = (r.code || '').toLowerCase()
+    let score = 0
+
+    // Exact name match or query contains product name
+    if (clean.includes(nameLower) || nameLower.includes(clean)) {
+      score += 100
     }
-    return { row: r, matchCount }
+
+    // Name token matches (heavily weighted)
+    for (const t of tokens) {
+      if (nameLower.includes(t)) score += 10
+      if (codeLower.includes(t)) score += 10
+      if (kwLower.includes(t)) score += 5
+      if (descLower.includes(t)) score += 1
+    }
+    return { row: r, score }
   })
 
-  scored.sort((a, b) => b.matchCount - a.matchCount)
+  scored.sort((a, b) => b.score - a.score)
 
   return scored.slice(0, topK).map(({ row: r }) => ({
     id: r.id,

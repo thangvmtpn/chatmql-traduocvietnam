@@ -322,6 +322,18 @@ try {
     console.error('Vector index ensure failed:', err.message)
   )
 
+  // Auto-backfill missing product and KB embeddings on startup (fire-and-forget)
+  _prisma.organization.findMany({ select: { id: true } }).then(async (orgs) => {
+    for (const org of orgs) {
+      import('./modules/products/product-embedding.js').then(({ backfillProductEmbeddings }) =>
+        backfillProductEmbeddings(org.id).catch(() => {})
+      )
+      import('./modules/knowledge/embedding-service.js').then(({ backfillEmbeddings }) =>
+        backfillEmbeddings(org.id).catch(() => {})
+      )
+    }
+  }).catch(() => {})
+
   // ── BullMQ Workers — process automation triggers & delays via Redis ──
   initWorkers(
     async (job) => {
