@@ -7,8 +7,20 @@
  */
 import { prisma } from '../../shared/prisma-client.js';
 import { handleIncomingMessage } from '../chat/message-handler.js';
-import { emitBackfillProgress } from '../realtime/socket-gateway.js';
 import { logger } from '../../shared/logger.js';
+
+// Dynamic import for emitBackfillProgress — may not exist in all image versions
+let _emitBackfillProgress: ((orgId: string, data: any) => void) | null = null;
+try {
+  const sgModule = await import('../realtime/socket-gateway.js');
+  if (typeof sgModule.emitBackfillProgress === 'function') {
+    _emitBackfillProgress = sgModule.emitBackfillProgress;
+  }
+} catch {}
+function emitBackfillProgress(orgId: string, data: any): void {
+  if (_emitBackfillProgress) _emitBackfillProgress(orgId, data);
+  else logger.info(`[backfill] Progress: ${JSON.stringify(data)}`);
+}
 
 function mapZcaContentType(zcaType: number | string | undefined): string {
   const typeMap: Record<string, string> = {
@@ -39,21 +51,42 @@ export function registerCustomApis(api: any): void {
     if (typeof api.custom === 'function' && typeof api.getUserChatHistory !== 'function') {
       api.custom('getUserChatHistory', async ({ ctx, utils, props }: any) => {
         const { userId, count = MESSAGES_PER_PAGE, lastMsgId = 0 } = props || {};
+        
+        // Debug: log available service maps and API internals
+        logger.info(`[getUserChatHistory] zpwServiceMap keys=${api.zpwServiceMap ? Object.keys(api.zpwServiceMap).join(',') : 'undefined'}`);
+        logger.info(`[getUserChatHistory] zpwServiceMap.conversation=${JSON.stringify(api.zpwServiceMap?.conversation)}`);
+        
         const serviceMap = api.zpwServiceMap?.conversation || ['https://chat3-wpa.chat.zalo.me'];
-        const serviceURL = utils.makeURL(`${serviceMap[0]}/api/message/list`);
+        const baseUrl = `${serviceMap[0]}/api/message/list`;
+        logger.info(`[getUserChatHistory] baseUrl=${baseUrl}`);
+        
+        const serviceURL = utils.makeURL(baseUrl);
+        logger.info(`[getUserChatHistory] serviceURL after makeURL=${serviceURL}`);
+        
         const params = {
           convId: String(userId),
           count: count,
           globalMsgId: lastMsgId,
         };
+        logger.info(`[getUserChatHistory] params=${JSON.stringify(params)}`);
+        
         const encryptedParams = utils.encodeAES(JSON.stringify(params));
         if (!encryptedParams) throw new Error('Failed to encrypt params for getUserChatHistory');
-        const response = await utils.request(utils.makeURL(serviceURL, { params: encryptedParams }), {
+        
+        const finalURL = utils.makeURL(serviceURL, { params: encryptedParams });
+        logger.info(`[getUserChatHistory] finalURL=${String(finalURL).substring(0, 200)}`);
+        
+        const response = await utils.request(finalURL, {
           method: 'GET',
         });
+        
+        logger.info(`[getUserChatHistory] response type=${typeof response}, keys=${response ? Object.keys(response).join(',') : 'null'}`);
+        
         return utils.resolve(response, (result: any) => {
+          logger.info(`[getUserChatHistory] resolved result keys=${result ? Object.keys(result).join(',') : 'null'}`);
           let data = result.data;
           if (typeof data === 'string') data = JSON.parse(data);
+          logger.info(`[getUserChatHistory] data type=${typeof data}, keys=${data && typeof data === 'object' ? Object.keys(data).join(',') : 'n/a'}, sample=${JSON.stringify(data).substring(0, 500)}`);
           return data;
         });
       });
@@ -258,18 +291,36 @@ export async function backfillConversation(
         if (typeof api.getUserChatHistory !== 'function') {
           throw new Error('getUserChatHistory API is not available');
         }
+        logger.info(`[backfill:${accountId}] Calling getUserChatHistory for thread ${threadId}, lastMsgId=${lastMsgId}, count=${MESSAGES_PER_PAGE}`);
         const history = await api.getUserChatHistory({
           userId: threadId,
           count: MESSAGES_PER_PAGE,
           lastMsgId: lastMsgId,
         });
-        rawMessages = history?.msgs || history?.msgList || history?.data?.msgs || [];
+        // Debug: log raw response structure
+        logger.info(`[backfill:${accountId}] Raw history type=${typeof history}, keys=${history ? Object.keys(history).join(',') : 'null'}`);
+        if (history?.data) {
+          logger.info(`[backfill:${accountId}] history.data keys=${Object.keys(history.data).join(',')}`);
+        }
+        if (history?.msgs) {
+          logger.info(`[backfill:${accountId}] history.msgs length=${Array.isArray(history.msgs) ? history.msgs.length : typeof history.msgs}`);
+        }
+        if (history?.msgList) {
+          logger.info(`[backfill:${accountId}] history.msgList length=${Array.isArray(history.msgList) ? history.msgList.length : typeof history.msgList}`);
+        }
+        rawMessages = history?.msgs || history?.msgList || history?.data?.msgs || history?.data?.msgList || [];
+        // If still empty, log the full history (truncated) for debugging
+        if (rawMessages.length === 0 && history) {
+          logger.warn(`[backfill:${accountId}] Empty rawMessages! Full history sample: ${JSON.stringify(history).substring(0, 1000)}`);
+        }
       }
 
       if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+        logger.info(`[backfill:${accountId}] No messages returned for thread ${threadId}, stopping pagination.`);
         hasMore = false;
         break;
       }
+      logger.info(`[backfill:${accountId}] Got ${rawMessages.length} messages for thread ${threadId}`);
 
       for (const item of rawMessages) {
         total++;
@@ -330,7 +381,7 @@ export async function backfillConversation(
         await sleep(DELAY_BETWEEN_PAGES_MS);
       }
     } catch (err: any) {
-      logger.error(`[backfill:${accountId}] Error backfilling thread ${threadId}:`, err.message);
+      logger.error(`[backfill:${accountId}] Error backfilling thread ${threadId}: ${err.message || err}`, { stack: err.stack, error: String(err) });
       hasMore = false;
     }
   }
