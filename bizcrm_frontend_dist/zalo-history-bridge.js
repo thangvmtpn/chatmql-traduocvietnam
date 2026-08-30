@@ -144,41 +144,45 @@
       progressBox = document.createElement('div');
       progressBox.id = 'chatmql-backfill-progress-card';
       progressBox.style.cssText = `
-        position: fixed; bottom: 24px; right: 24px; z-index: 999999;
-        background: #ffffff; border: 1px solid #93c5fd; border-radius: 14px;
-        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.08);
-        padding: 18px 22px; width: 360px; font-family: inherit;
+        position: fixed; bottom: 24px; right: 24px; z-index: 9999999;
+        background: #ffffff; border: 2px solid #3b82f6; border-radius: 14px;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25), 0 10px 10px -5px rgba(0,0,0,0.1);
+        padding: 18px 22px; width: 380px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         animation: slideInUp 0.3s ease;
       `;
       document.body.appendChild(progressBox);
     }
 
-    const percent = Math.min(100, Math.round(((data.current || 0) / (data.total || 1)) * 100));
+    const current = Number(data.current) || 0;
+    const total = Math.max(1, Number(data.total) || 1);
+    const percent = Math.min(100, Math.max(5, Math.round((current / total) * 100)));
     const isDone = data.status === 'completed';
 
-    progressBox.innerHTML = `
+    const cardContent = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-weight:700; font-size:14px; color:#0f172a; display:flex; align-items:center; gap:8px;">
-          <span style="font-size:18px;">${isDone ? '🎉' : '📥'}</span>
+        <div style="font-weight:700; font-size:14.5px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">${isDone ? '🎉' : '📥'}</span>
           <span>${isDone ? 'Kéo lịch sử hoàn tất!' : 'Đang kéo lịch sử chat Zalo...'}</span>
         </div>
-        <span style="font-size:13px; font-weight:800; color:${isDone ? '#16a34a' : '#2563eb'};">${percent}%</span>
+        <span style="font-size:14px; font-weight:800; color:${isDone ? '#16a34a' : '#2563eb'};">${percent}%</span>
       </div>
-      <div style="font-size:12.5px; color:#475569; margin-bottom:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+      <div style="font-size:13px; color:#475569; margin-bottom:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
         ${isDone
           ? `+${data.result?.totalInserted || 0} tin mới đã lưu, ~${data.result?.totalSkipped || 0} tin đã có`
-          : `[${data.current || 0}/${data.total || 0}] ${data.threadName || 'Đang nạp dữ liệu...'}`}
+          : `[${current}/${total}] ${data.threadName || 'Đang quét dữ liệu hội thoại...'}`}
       </div>
-      <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+      <div style="width:100%; height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden;">
         <div style="width:${percent}%; height:100%; background:linear-gradient(90deg, #2563eb, #38bdf8); transition:width 0.3s ease;"></div>
       </div>
     `;
+
+    progressBox.innerHTML = cardContent;
 
     // Also update in-page progress bar if on Zalo settings tab
     const inPageProgress = document.getElementById('chatmql-inpage-progress');
     if (inPageProgress) {
       inPageProgress.style.display = 'block';
-      inPageProgress.innerHTML = progressBox.innerHTML;
+      inPageProgress.innerHTML = cardContent;
     }
 
     if (isDone) {
@@ -191,28 +195,46 @@
             progressBox = null;
           }, 500);
         }
-      }, 8000);
+      }, 10000);
     }
   }
 
-  // ── Socket.IO Connection ────────────────────────────────────────────
+  // ── Socket.IO Connection & Script Loader ────────────────────────────
   let socket = null;
+  function loadSocketIoScript(callback) {
+    if (typeof window.io === 'function') {
+      if (callback) callback();
+      return;
+    }
+    if (document.getElementById('socket-io-cdn-script')) return;
+    const script = document.createElement('script');
+    script.id = 'socket-io-cdn-script';
+    script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+    script.onload = () => {
+      initSocketListener();
+      if (callback) callback();
+    };
+    document.head.appendChild(script);
+  }
+
   function initSocketListener() {
     if (socket) return;
+    if (typeof window.io !== 'function') {
+      loadSocketIoScript();
+      return;
+    }
     try {
       const SOCKET_URL = (typeof window !== 'undefined' && window.__SOCKET_BASE__)
         ? window.__SOCKET_BASE__
         : (API_BASE || window.location.origin);
 
-      if (typeof window.io === 'function') {
-        socket = window.io(SOCKET_URL, {
-          auth: { token: authToken() },
-          transports: ['websocket', 'polling'],
-        });
-        socket.on('zalo:backfill-progress', function (data) {
-          updateProgressBar(data);
-        });
-      }
+      socket = window.io(SOCKET_URL, {
+        auth: { token: authToken() },
+        transports: ['websocket', 'polling'],
+      });
+      socket.on('zalo:backfill-progress', function (data) {
+        updateProgressBar(data);
+      });
     } catch (e) {}
   }
 
@@ -286,7 +308,6 @@
     `;
 
     const accounts = await fetchZaloAccounts();
-    // Platform.ZALO_USER is 2, Zalo OA is 1. Also include any accounts that are not OA.
     const personalAccounts = accounts.filter(a => a.platform === 2 || a.platform === 'zalo_personal' || (!a.externalPageId && a.platform !== 1));
 
     panel.innerHTML = `
@@ -401,6 +422,18 @@
 
         btn.disabled = true;
         btn.innerHTML = '<span class="spin-animation">⏳</span><span>Đang khởi chạy...</span>';
+
+        // Immediately show the progress bar on click!
+        updateProgressBar({
+          status: 'running',
+          current: 1,
+          total: 100,
+          threadName: 'Đang kết nối Zalo và nạp danh sách hội thoại...'
+        });
+
+        // Ensure socket is initialized
+        initSocketListener();
+
         try {
           const endpoints = [
             `${API_BASE}/api/v1/zalo-accounts/${accId}/backfill`,
@@ -477,6 +510,16 @@
 
         backfillBtn.disabled = true;
         backfillBtn.innerHTML = '<span class="spin-animation">⏳</span><span>Đang kéo...</span>';
+
+        // Immediately show the progress bar on click!
+        updateProgressBar({
+          status: 'running',
+          current: 1,
+          total: 100,
+          threadName: 'Đang kết nối Zalo và nạp danh sách hội thoại...'
+        });
+
+        initSocketListener();
 
         try {
           const endpoints = [
@@ -635,5 +678,9 @@
   `;
   document.head.appendChild(style);
 
+  // Initial load
+  loadSocketIoScript(() => {
+    initSocketListener();
+  });
   scheduleSync();
 })();
