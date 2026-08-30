@@ -520,7 +520,15 @@ export async function runHarness(
     const criticStarted = Date.now()
     try {
       const criticSystem = 'You are a strict QA reviewer. Respond ONLY with JSON.'
-      const criticPrompt = buildCriticPrompt({ customerMessage: ctx.turnText, reply: replyText, criteria: ctx.logic.criteria, grounding })
+      const criticPrompt = buildCriticPrompt({
+        customerMessage: ctx.turnText,
+        reply: replyText,
+        criteria: ctx.logic.criteria,
+        persona: ctx.logic.persona,
+        playbook: ctx.logic.playbook,
+        scenarios: ctx.scenarios,
+        grounding,
+      })
       const criticRaw = await callProvider(genCfg.provider, genKey, genCfg.model, criticSystem, criticPrompt, { jsonMode: true, maxTokens: 300 })
       const verdict = parseCriticVerdict(criticRaw.text)
       recordStep({

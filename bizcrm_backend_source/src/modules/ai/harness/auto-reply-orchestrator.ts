@@ -35,7 +35,12 @@ const ORCHESTRATOR_TIMEOUT_MS = 40_000
  */
 export async function processAiReply(convId: string): Promise<void> {
   if (activeAiConversations.has(convId)) {
-    logger.info({ convId }, '[orchestrator] conversation already processing — skipping duplicate execution')
+    logger.info({ convId }, '[orchestrator] conversation already processing — scheduling follow-up retry')
+    setTimeout(() => {
+      import('../../../shared/queue.js').then(({ enqueueAiReply }) => {
+        enqueueAiReply(convId, 0).catch(() => {})
+      })
+    }, 1500)
     return
   }
 
@@ -191,6 +196,16 @@ async function executeAiReplyPipeline(convId: string): Promise<void> {
 
       // ── 5. Branch on result ────────────────────────────────────────────────
       if (result.handoff?.should) {
+        if (effectiveMode === 'auto') {
+          await sendMessageCore({
+            orgId,
+            conversationId: convId,
+            text: 'Dạ em đã ghi nhận thông tin và chuyển cho chuyên viên tư vấn của Trà Dược Việt Nam liên hệ hỗ trợ mình ngay nhé ạ.',
+            sender: 'ai',
+            aiReplyRunId: result.runId,
+            triggerAutomation: false,
+          }).catch(() => {})
+        }
         await applyHandoff(orgId, convId, result.handoff.reason)
       } else if (effectiveMode === 'suggest') {
         // Reuse the harness result already computed above (no second LLM run)

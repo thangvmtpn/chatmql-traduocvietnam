@@ -7,29 +7,47 @@
  * Fail-OPEN on parse errors (don't block legit replies on critic infra issues).
  */
 
+import type { ScenarioSnippet } from '../harness/harness-types.js'
+
 export type CriticVerdict = { ok: boolean; action: 'send' | 'handoff'; reason: string }
 
 export function buildCriticPrompt(input: {
   customerMessage: string
   reply: string
   criteria: string | null
+  persona?: string | null
+  playbook?: string | null
+  scenarios?: ScenarioSnippet[]
   grounding: string
 }): string {
   const parts: string[] = []
-  parts.push(`Bạn là người KIỂM DUYỆT chất lượng câu trả lời của AI chăm sóc khách hàng. Hãy đánh giá NGHIÊM KHẮC.
+  parts.push(`Bạn là người KIỂM DUYỆT chất lượng câu trả lời của AI chăm sóc khách hàng (Trà Dược Việt Nam).
+Mục tiêu của bạn là ngăn chặn các trường hợp BỊA ĐẶT THÔNG TIN SAI LỆCH VỀ GIÁ / CAM KẾT VẬN HÀNH / TRANH CHẤP / Y TẾ NGUY HIỂM.
 
-Trả về DUY NHẤT một JSON:
+Xuất DUY NHẤT một JSON:
 { "ok": boolean, "action": "send" | "handoff", "reason": string }
 
-Quy tắc đánh giá (ok=false + action="handoff" nếu vi phạm bất kỳ):
-1. BỊA ĐẶT: câu trả lời nêu sự thật/giá/con số/thời gian/chính sách KHÔNG có trong "Dữ liệu nền". (Lời chào, câu hỏi làm rõ, diễn đạt lại dữ liệu nền thì OK.)
-2. Vi phạm tiêu chí chất lượng / chính sách bên dưới.
-3. Cam kết điều shop không thể đảm bảo, hoặc nội dung nhạy cảm cần người thật.
-Nếu chỉ là câu hỏi làm rõ / xin thêm thông tin / không khẳng định sự thật nào → ok=true, action="send".`)
+NGUYÊN TẮC ĐÁNH GIÁ (Ưu tiên hỗ trợ khách mượt mà):
+1. "action": "send", "ok": true khi:
+   - Câu trả lời là lời chào hỏi, mở đầu, xin lỗi, cảm ơn, hỏi thăm nhu cầu của khách (uống hàng ngày, mua quà biếu, nhu cầu sức khỏe).
+   - Câu trả lời gợi ý hoặc tư vấn dựa trên danh mục sản phẩm, tri thức hoặc kịch bản bán hàng phân tầng.
+   - Câu trả lời lịch sự xin phép kiểm tra lại và báo sau khi chưa có đủ thông tin.
+   - Câu trả lời không bịa đặt giá bán sai lệch hoặc cam kết sai chính sách.
+
+2. CHỈ chọn "action": "handoff", "ok": false khi THỰC SỰ CẦN THIẾT:
+   - Khách yêu cầu gặp người thật / nhân viên tư vấn trực tiếp / gọi hotline.
+   - Khách bức xúc, khiếu nại gay gắt, đe dọa hoặc tranh chấp.
+   - AI khẳng định chữa khỏi 100% bệnh nan y nguy hiểm hoặc tự bịa ra giá bán / chương trình giảm giá hoàn toàn sai lệch.
+   - TUYỆT ĐỐI KHÔNG handoff chỉ vì câu chào hỏi, hỏi nhu cầu, hay tư vấn bán hàng thông thường.`)
 
   if (input.criteria) parts.push(`\n## Tiêu chí chất lượng\n${input.criteria}`)
-  parts.push(`\n## Dữ liệu nền (nguồn sự thật AI ĐƯỢC dùng)\n${input.grounding || '(không có dữ liệu nền — mọi khẳng định sự thật đều là bịa)'}`)
-  parts.push(`\n## Tin nhắn khách\n${input.customerMessage}`)
+  if (input.persona) parts.push(`\n## Tính cách & phong cách\n${input.persona}`)
+  if (input.playbook) parts.push(`\n## Kịch bản nền\n${input.playbook}`)
+  if (input.scenarios && input.scenarios.length > 0) {
+    parts.push(`\n## Kịch bản bán hàng áp dụng\n${input.scenarios.map(s => `### ${s.name}\n${s.content}`).join('\n\n')}`)
+  }
+  parts.push(`\n## Dữ liệu sản phẩm & tri thức tra cứu được\n${input.grounding || '(Chưa gọi công cụ tra cứu / hội thoại thông thường)'}`)
+  parts.push(`\n## Tin nhắn của khách\n${input.customerMessage}`)
   parts.push(`\n## Câu trả lời của AI (cần kiểm duyệt)\n${input.reply}`)
   parts.push(`\nChỉ xuất JSON, không giải thích thêm.`)
   return parts.join('\n')
