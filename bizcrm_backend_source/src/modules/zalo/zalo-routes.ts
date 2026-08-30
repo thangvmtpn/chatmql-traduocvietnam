@@ -508,6 +508,48 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
     }
   )
 
+  // POST /api/v1/zalo-accounts/:id/sync — Alias for friends/sync
+  app.post<{ Params: { id: string } }>(
+    '/api/v1/zalo-accounts/:id/sync',
+    async (request, reply) => {
+      const user = request.user as { orgId: string }
+      const account = await prisma.channelAccount.findFirst({
+        where: { id: request.params.id, orgId: user.orgId },
+      })
+      if (!account) return reply.status(404).send({ error: 'Account not found' })
+
+      const poolEntry = getPoolEntry(request.params.id)
+      if (poolEntry?.api && poolEntry.status === 'connected') {
+        try {
+          const api = poolEntry.api as any
+          if (typeof api.getAllFriends === 'function') {
+            const friendsResult = await api.getAllFriends()
+            const friends: any[] = friendsResult?.data || friendsResult || []
+            let synced = 0
+            for (const f of friends) {
+              const uid = f.userId || f.uid || f.id
+              const name = f.displayName || f.zaloName || f.dName || f.name || `Zalo ${String(uid).slice(-4)}`
+              if (!uid) continue
+              await prisma.channelContact.upsert({
+                where: { channelAccountId_friendUid: { channelAccountId: request.params.id, friendUid: String(uid) } },
+                update: { displayName: name, avatarUrl: f.avatar || f.avatarUrl || null },
+                create: { orgId: user.orgId, channelAccountId: request.params.id, friendUid: String(uid), displayName: name, avatarUrl: f.avatar || f.avatarUrl || null },
+              })
+              synced++
+            }
+            return { synced, message: `Đã đồng bộ ${synced} bạn bè từ Zalo` }
+          }
+        } catch (err: any) {
+          logger.warn(`[zalo-routes] Sync failed:`, err.message)
+          return reply.status(500).send({ error: `Sync failed: ${err.message}` })
+        }
+      }
+      const count = await prisma.channelContact.count({ where: { channelAccountId: request.params.id } })
+      return { synced: count, message: 'Tài khoản Zalo chưa kết nối' }
+    }
+  )
+
+
   // PATCH /api/v1/zalo-accounts/:id/friends/:friendId — toggle favorite / blocked
   app.patch<{
     Params: { id: string; friendId: string }

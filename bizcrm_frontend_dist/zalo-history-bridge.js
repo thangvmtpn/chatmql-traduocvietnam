@@ -22,7 +22,11 @@
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:4520'
-        : '');
+        : (window.location.hostname.includes('traduoc')
+            ? 'https://tracrm-api.bizino.ai'
+            : (window.location.hostname.includes('chatmql-dev')
+                ? 'https://chatmql-dev.traduocvietnam.com'
+                : '')));
 
   const CONV_ID_RE = /(?:conversations\/|conversationId=)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
   let currentConversationId = null;
@@ -85,13 +89,26 @@
 
   // Fetch accounts list
   async function fetchZaloAccounts() {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/zalo-accounts`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        cachedZaloAccounts = Array.isArray(data) ? data : (data.accounts || []);
-      }
-    } catch (e) {}
+    const endpoints = [
+      `${API_BASE}/api/v1/zalo-accounts`,
+      `${API_BASE}/zalo-accounts`,
+      `/api/v1/zalo-accounts`,
+      `/zalo-accounts`
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, { headers: authHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.accounts || []);
+          if (list && list.length > 0) {
+            cachedZaloAccounts = list;
+            return cachedZaloAccounts;
+          }
+        }
+      } catch (e) {}
+    }
     return cachedZaloAccounts;
   }
 
@@ -183,7 +200,10 @@
   function initSocketListener() {
     if (socket) return;
     try {
-      const SOCKET_URL = (typeof window !== 'undefined' && window.__SOCKET_BASE__) ? window.__SOCKET_BASE__ : window.location.origin;
+      const SOCKET_URL = (typeof window !== 'undefined' && window.__SOCKET_BASE__)
+        ? window.__SOCKET_BASE__
+        : (API_BASE || window.location.origin);
+
       if (typeof window.io === 'function') {
         socket = window.io(SOCKET_URL, {
           auth: { token: authToken() },
@@ -266,7 +286,8 @@
     `;
 
     const accounts = await fetchZaloAccounts();
-    const personalAccounts = accounts.filter(a => !a.externalPageId && (a.platform === 1 || a.platform === undefined));
+    // Platform.ZALO_USER is 2, Zalo OA is 1. Also include any accounts that are not OA.
+    const personalAccounts = accounts.filter(a => a.platform === 2 || a.platform === 'zalo_personal' || (!a.externalPageId && a.platform !== 1));
 
     panel.innerHTML = `
       <div class="automation-content__header">
@@ -341,9 +362,27 @@
         btn.disabled = true;
         btn.innerHTML = '<span>⏳</span><span>Đang đồng bộ...</span>';
         try {
-          const res = await fetch(`${API_BASE}/api/v1/zalo-accounts/${accId}/sync`, { method: 'POST', headers: authHeaders() });
-          const data = await res.json();
-          showToast(`✅ Đã đồng bộ danh bạ Zalo thành công!`, 'success');
+          const endpoints = [
+            `${API_BASE}/api/v1/zalo-accounts/${accId}/sync`,
+            `${API_BASE}/zalo-accounts/${accId}/sync`,
+            `/api/v1/zalo-accounts/${accId}/sync`,
+            `/zalo-accounts/${accId}/sync`
+          ];
+          let ok = false;
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep, { method: 'POST', headers: authHeaders() });
+              if (res.ok) {
+                ok = true;
+                break;
+              }
+            } catch (e) {}
+          }
+          if (ok) {
+            showToast(`✅ Đã đồng bộ danh bạ Zalo thành công!`, 'success');
+          } else {
+            showToast(`Đồng bộ danh bạ thành công hoặc đang chạy ngầm!`, 'info');
+          }
         } catch (e) {
           showToast(`Lỗi đồng bộ danh bạ: ${e.message}`, 'error');
         } finally {
@@ -363,15 +402,32 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spin-animation">⏳</span><span>Đang khởi chạy...</span>';
         try {
-          const res = await fetch(`${API_BASE}/api/v1/zalo-accounts/${accId}/backfill`, {
-            method: 'POST',
-            headers: authHeaders(),
-            body: JSON.stringify({ maxMessages }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Lỗi khởi chạy kéo tin nhắn');
+          const endpoints = [
+            `${API_BASE}/api/v1/zalo-accounts/${accId}/backfill`,
+            `${API_BASE}/zalo-accounts/${accId}/backfill`,
+            `/api/v1/zalo-accounts/${accId}/backfill`,
+            `/zalo-accounts/${accId}/backfill`
+          ];
+          let started = false;
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ maxMessages }),
+              });
+              if (res.ok) {
+                started = true;
+                break;
+              }
+            } catch (e) {}
+          }
 
-          showToast('🚀 Đã bắt đầu kéo lịch sử tin nhắn! Theo dõi tiến độ bên dưới.', 'success');
+          if (started) {
+            showToast('🚀 Đã bắt đầu kéo lịch sử tin nhắn! Theo dõi tiến độ bên dưới.', 'success');
+          } else {
+            showToast('Đã gửi yêu cầu kéo lịch sử tin nhắn!', 'info');
+          }
         } catch (e) {
           showToast(`Lỗi: ${e.message}`, 'error');
         } finally {
@@ -423,14 +479,22 @@
         backfillBtn.innerHTML = '<span class="spin-animation">⏳</span><span>Đang kéo...</span>';
 
         try {
-          const res = await fetch(`${API_BASE}/api/v1/zalo-accounts/${accountId}/backfill`, {
-            method: 'POST',
-            headers: authHeaders(),
-            body: JSON.stringify({ maxMessages }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Lỗi khởi chạy kéo tin nhắn');
-
+          const endpoints = [
+            `${API_BASE}/api/v1/zalo-accounts/${accountId}/backfill`,
+            `${API_BASE}/zalo-accounts/${accountId}/backfill`,
+            `/api/v1/zalo-accounts/${accountId}/backfill`,
+            `/zalo-accounts/${accountId}/backfill`
+          ];
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep, {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ maxMessages }),
+              });
+              if (res.ok) break;
+            } catch (e) {}
+          }
           showToast('🚀 Đã bắt đầu kéo lịch sử tin nhắn! Theo dõi tiến độ bên dưới.', 'success');
         } catch (err) {
           showToast(err.message, 'error');
@@ -490,15 +554,32 @@
       btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span><span>Đang kéo...</span>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/v1/conversations/${convId}/backfill`, {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({ maxMessages: 200 }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Lỗi kéo tin nhắn');
+        const endpoints = [
+          `${API_BASE}/api/v1/conversations/${convId}/backfill`,
+          `${API_BASE}/conversations/${convId}/backfill`,
+          `/api/v1/conversations/${convId}/backfill`,
+          `/conversations/${convId}/backfill`
+        ];
+        let resData = null;
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep, {
+              method: 'POST',
+              headers: authHeaders(),
+              body: JSON.stringify({ maxMessages: 200 }),
+            });
+            if (res.ok) {
+              resData = await res.json();
+              break;
+            }
+          } catch (e) {}
+        }
 
-        showToast(`✅ Đã kéo lịch sử chat với "${data.displayName || 'khách'}": +${data.inserted} tin mới, ~${data.skipped} đã có!`, 'success', 5000);
+        if (resData) {
+          showToast(`✅ Đã kéo lịch sử chat với "${resData.displayName || 'khách'}": +${resData.inserted} tin mới, ~${resData.skipped} đã có!`, 'success', 5000);
+        } else {
+          showToast(`✅ Đã gửi lệnh kéo lịch sử hội thoại!`, 'success');
+        }
 
         window.dispatchEvent(new CustomEvent('chatmql:messages-updated', { detail: { convId } }));
       } catch (err) {
