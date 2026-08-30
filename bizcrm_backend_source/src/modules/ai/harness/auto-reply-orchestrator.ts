@@ -27,9 +27,42 @@ import { emitAiTyping } from '../../realtime/socket-gateway.js'
 import { sendTypingViaPool } from '../../zalo/zalo-pool.js'
 import { Platform } from '../../../shared/constants.js'
 
-async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
-  const { convId } = job.data
+const activeAiConversations = new Set<string>()
+const ORCHESTRATOR_TIMEOUT_MS = 40_000
 
+/**
+ * Execute AI reply pipeline for a conversation with timeout protection and concurrency lock.
+ */
+export async function processAiReply(convId: string): Promise<void> {
+  if (activeAiConversations.has(convId)) {
+    logger.info({ convId }, '[orchestrator] conversation already processing — skipping duplicate execution')
+    return
+  }
+
+  activeAiConversations.add(convId)
+
+  // Hard timeout to prevent hanging LLM calls from freezing execution
+  let timeoutId: NodeJS.Timeout | null = null
+  const timeoutPromise = new Promise<void>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`AI processing timed out after ${ORCHESTRATOR_TIMEOUT_MS}ms`))
+    }, ORCHESTRATOR_TIMEOUT_MS)
+  })
+
+  try {
+    await Promise.race([
+      executeAiReplyPipeline(convId),
+      timeoutPromise,
+    ])
+  } catch (err: any) {
+    logger.error({ err: err.message, convId }, '[orchestrator] execution failed or timed out')
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+    activeAiConversations.delete(convId)
+  }
+}
+
+async function executeAiReplyPipeline(convId: string): Promise<void> {
   try {
     // ── 1. Load conversation ────────────────────────────────────────────────
     const conv = await prisma.conversation.findUnique({
@@ -257,6 +290,8 @@ async function processAiReplyJob(job: Job<AiReplyJobData>): Promise<void> {
  * Initialize the AI reply worker. Call once from app.ts on startup.
  */
 export function initAiReplyOrchestrator(): void {
-  initAiReplyWorker(processAiReplyJob)
+  initAiReplyWorker(async (job) => {
+    await processAiReply(job.data.convId)
+  })
   logger.info('[orchestrator] AI reply orchestrator started')
 }

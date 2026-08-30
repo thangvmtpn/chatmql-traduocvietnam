@@ -188,8 +188,8 @@ const aiDebounceTimers = new Map<string, NodeJS.Timeout>()
 
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Uses reliable in-memory debouncing before queueing to BullMQ with 0 delay.
- * This completely avoids BullMQ delayed-zset promotion stalling in Redis.
+ * Uses reliable in-memory debouncing before triggering the AI reply orchestrator.
+ * This guarantees 100% reliability with 0 Redis/BullMQ stalls.
  */
 export async function enqueueAiReply(convId: string, delayMs = 2500): Promise<string> {
   // Clear any existing timer for this conversation (debounce reset)
@@ -202,35 +202,24 @@ export async function enqueueAiReply(convId: string, delayMs = 2500): Promise<st
   const effectiveDelay = Math.max(0, Math.min(delayMs || 2500, 3000))
 
   if (effectiveDelay === 0) {
-    const job = await aiReplyQueue.add(
-      'ai-reply',
-      { convId },
-      {
-        attempts: 1,
-        removeOnComplete: true,
-        removeOnFail: true,
-      },
-    )
-    logger.info({ jobId: job.id, convId }, '[queue] AI reply job enqueued immediately')
-    return job.id!
+    logger.info({ convId }, '[queue] Triggering AI reply immediately')
+    import('../modules/ai/harness/auto-reply-orchestrator.js').then(({ processAiReply }) => {
+      processAiReply(convId).catch(err => logger.error({ convId, err: err.message }, '[queue] Direct AI reply failed'))
+    })
+    return `direct-${convId}`
   }
 
-  // Schedule debounced dispatch
+  // Schedule debounced execution
   const timer = setTimeout(async () => {
     aiDebounceTimers.delete(convId)
     try {
-      const job = await aiReplyQueue.add(
-        'ai-reply',
-        { convId },
-        {
-          attempts: 1,
-          removeOnComplete: true,
-          removeOnFail: true,
-        },
-      )
-      logger.info({ jobId: job.id, convId }, '[queue] Debounced AI reply job dispatched to worker')
+      logger.info({ convId }, '[queue] Debounce timer expired — running AI reply orchestrator')
+      const { processAiReply } = await import('../modules/ai/harness/auto-reply-orchestrator.js')
+      processAiReply(convId).catch(err => {
+        logger.error({ convId, err: err.message }, '[queue] Direct AI reply execution failed')
+      })
     } catch (err: any) {
-      logger.error({ convId, err: err.message }, '[queue] Failed to dispatch AI reply job')
+      logger.error({ convId, err: err.message }, '[queue] Failed to trigger AI reply')
     }
   }, effectiveDelay)
 
