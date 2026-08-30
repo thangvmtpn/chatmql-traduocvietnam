@@ -525,6 +525,51 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
+  // ── Backfill conversation message history ───────────────────────────
+  app.post<{ Params: { id: string }; Body: { maxMessages?: number } }>(
+    '/api/v1/conversations/:id/backfill',
+    { preHandler: requireZaloAccess() },
+    async (request, reply) => {
+      const user = request.user as { orgId: string }
+      const { maxMessages = 200 } = request.body || {}
+
+      const conv = await prisma.conversation.findFirst({
+        where: { id: request.params.id, orgId: user.orgId },
+        select: {
+          id: true,
+          channelAccountId: true,
+          externalThreadId: true,
+          threadType: true,
+          displayName: true,
+        },
+      })
+      if (!conv) return reply.status(404).send({ error: 'Conversation not found' })
+      if (!conv.externalThreadId) return reply.status(400).send({ error: 'Conversation has no external thread ID' })
+
+      const poolEntry = getPoolEntry(conv.channelAccountId)
+      if (!poolEntry || !poolEntry.api || poolEntry.status !== 'connected') {
+        return reply.status(400).send({ error: 'Tài khoản Zalo chưa kết nối' })
+      }
+
+      const threadType = conv.threadType === 'group' ? 'group' : 'user'
+      const { backfillConversation } = await import('../zalo/zalo-message-sync.js')
+      const result = await backfillConversation(
+        poolEntry.api,
+        conv.channelAccountId,
+        conv.externalThreadId,
+        threadType,
+        maxMessages,
+      )
+
+      return {
+        success: true,
+        convId: conv.id,
+        displayName: conv.displayName,
+        ...result,
+      }
+    }
+  )
+
   // ── Message routes (send text/image/file, shared media) ─────────
   await app.register(chatMessageRoutes)
 

@@ -195,6 +195,77 @@ export async function zaloRoutes(app) {
             return reply.status(404).send({ error: 'Account not found' });
         return { accountId: request.params.id, liveStatus: account.status };
     });
+    // ── Backfill Chat History ───────────────────────────────────────────
+    // POST /api/v1/zalo-accounts/:id/backfill — Trigger full historical backfill for an account
+    app.post('/api/v1/zalo-accounts/:id/backfill', async (request, reply) => {
+        const user = request.user;
+        const { maxMessages = 200 } = request.body || {};
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const poolEntry = getPoolEntry(account.id);
+        if (!poolEntry || !poolEntry.api || poolEntry.status !== 'connected') {
+            return reply.status(400).send({ error: 'Tài khoản Zalo chưa kết nối' });
+        }
+        // Start backfill in background
+        const { backfillAllAccountConversations } = await import('./zalo-message-sync.js');
+        backfillAllAccountConversations(poolEntry.api, account.id, user.orgId, maxMessages)
+            .then(result => {
+            logger.info(`[zalo-routes] Backfill finished for ${account.id}: +${result.totalInserted} messages`);
+        })
+            .catch(err => {
+            logger.error(`[zalo-routes] Backfill failed for ${account.id}:`, err.message);
+        });
+        return {
+            message: 'Đã bắt đầu kéo lịch sử hội thoại. Theo dõi tiến độ qua sự kiện zalo:backfill-progress trên Socket.IO.',
+            accountId: account.id,
+        };
+    });
+    // POST /api/v1/zalo-accounts/:id/backfill/:threadId — Backfill single conversation by externalThreadId
+    app.post('/api/v1/zalo-accounts/:id/backfill/:threadId', async (request, reply) => {
+        const user = request.user;
+        const { threadId } = request.params;
+        const { maxMessages = 200 } = request.body || {};
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const poolEntry = getPoolEntry(account.id);
+        if (!poolEntry || !poolEntry.api || poolEntry.status !== 'connected') {
+            return reply.status(400).send({ error: 'Tài khoản Zalo chưa kết nối' });
+        }
+        const conv = await prisma.conversation.findFirst({
+            where: { channelAccountId: account.id, externalThreadId: threadId },
+            select: { id: true, threadType: true, displayName: true },
+        });
+        const threadType = conv?.threadType === 'group' ? 'group' : 'user';
+        const { backfillConversation } = await import('./zalo-message-sync.js');
+        const result = await backfillConversation(poolEntry.api, account.id, threadId, threadType, maxMessages);
+        return {
+            success: true,
+            threadId,
+            displayName: conv?.displayName,
+            ...result,
+        };
+    });
+    // GET /api/v1/zalo-accounts/:id/stats — Statistics of contacts and messages
+    app.get('/api/v1/zalo-accounts/:id/stats', async (request, reply) => {
+        const user = request.user;
+        const account = await prisma.channelAccount.findFirst({
+            where: { id: request.params.id, orgId: user.orgId },
+        });
+        if (!account)
+            return reply.status(404).send({ error: 'Account not found' });
+        const [contacts, conversations, messages] = await Promise.all([
+            prisma.channelContact.count({ where: { channelAccountId: account.id } }),
+            prisma.conversation.count({ where: { channelAccountId: account.id } }),
+            prisma.message.count({ where: { conversation: { channelAccountId: account.id } } }),
+        ]);
+        return { contacts, conversations, messages };
+    });
     // ── Zalo Account Access (ACL) ───────────────────────────────────────
     // GET /api/v1/zalo-accounts/:id/access — list users with access
     app.get('/api/v1/zalo-accounts/:id/access', async (request, reply) => {

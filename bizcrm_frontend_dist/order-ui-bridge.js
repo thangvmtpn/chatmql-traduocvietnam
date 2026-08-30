@@ -326,6 +326,7 @@
     if (!sidebar) return;
 
     renderLibraryButton();
+    renderHistoryBackfillButton();
     renderResizer(sidebar);
     renderCustomerCard(sidebar);
     renderSalesDocsSidebar(sidebar);
@@ -4434,6 +4435,44 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     btn.title = 'Thư viện hội thoại (ảnh, file, link đã trao đổi)';
     btn.textContent = '🖼️';
     btn.onclick = () => window.toggleChatLibrary();
+    actions.insertBefore(btn, actions.firstChild);
+  }
+
+  // Nút kéo lịch sử chat Zalo trên header chat
+  function renderHistoryBackfillButton() {
+    const actions = document.querySelector('.chat-main__header-actions');
+    if (!actions || document.getElementById('chatmql-header-backfill-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'chatmql-header-backfill-btn';
+    btn.type = 'button';
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 9px;font-size:12px;font-weight:600;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:4px;';
+    btn.title = 'Kéo thêm tin nhắn cũ từ Zalo cho khách hàng này';
+    btn.innerHTML = '<span>📥</span><span>Kéo lịch sử</span>';
+    btn.onclick = async () => {
+      const convId = getCurrentConversationId();
+      if (!convId) {
+        alert('Chưa xác định được cuộc hội thoại đang mở.');
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span><span>Đang kéo...</span>';
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/conversations/${convId}/backfill`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ maxMessages: 200 }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Lỗi kéo tin nhắn');
+        alert(`✅ Đã kéo tin nhắn cũ từ Zalo!\n• Tin mới thêm: +${data.inserted}\n• Tin đã có: ~${data.skipped}`);
+        window.location.reload();
+      } catch (err) {
+        alert(`Lỗi: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>📥</span><span>Kéo lịch sử</span>';
+      }
+    };
     actions.insertBefore(btn, actions.firstChild);
   }
 

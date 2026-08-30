@@ -737,16 +737,18 @@ export async function syncOnConnect(accountId: string, orgId: string, api: ZaloA
   }
   } // end getFriendList else
 
-  // ── 2. Sync recent conversations ────────────────────────────────────
-  // Group messages (synchronous API call)
+  // ── 2. Sync recent conversations (Groups & 1-1 Users) ─────────────
   try {
-    const { syncGroupMessages } = await import('./zalo-message-sync.js')
-    const backfilledMsgs = await syncGroupMessages(api, accountId)
-    if (backfilledMsgs > 0) {
-      logger.info(`[zalo-pool] ✓ Initial sync backfilled ${backfilledMsgs} group messages for ${accountId}`)
+    const { syncGroupMessages, syncUserMessages, registerCustomApis } = await import('./zalo-message-sync.js')
+    registerCustomApis(api)
+    const backfilledGroupMsgs = await syncGroupMessages(api, accountId)
+    const backfilledUserMsgs = await syncUserMessages(api, accountId)
+    const totalBackfilled = backfilledGroupMsgs + backfilledUserMsgs
+    if (totalBackfilled > 0) {
+      logger.info(`[zalo-pool] ✓ Initial sync backfilled ${totalBackfilled} messages (groups: ${backfilledGroupMsgs}, users: ${backfilledUserMsgs}) for ${accountId}`)
     }
   } catch (err: any) {
-    logger.warn(`[zalo-pool] Initial group sync failed:`, err.message)
+    logger.warn(`[zalo-pool] Initial conversation sync failed:`, err.message)
   }
 
   // NOTE: requestOldMessages is intentionally NOT called here.

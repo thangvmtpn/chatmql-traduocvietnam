@@ -235,3 +235,21 @@ export function emitAiModeChanged(
   getIO().to(`conv:${convId}`).emit('chat:ai-mode-changed', payload)
   getIO().to(`org:${orgId}`).emit('chat:ai-mode-changed', payload)
 }
+
+/**
+ * Emit backfill progress to org room.
+ * Event: 'zalo:backfill-progress'
+ */
+export function emitBackfillProgress(
+  orgId: string,
+  payload: {
+    accountId: string
+    current: number
+    total: number
+    threadName?: string
+    status: 'processing' | 'completed' | 'error'
+    result?: { totalInserted: number; totalSkipped: number; errors: number }
+  },
+) {
+  getIO().to(`org:${orgId}`).emit('zalo:backfill-progress', payload)
+}

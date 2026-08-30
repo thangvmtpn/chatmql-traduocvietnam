@@ -99,3 +99,19 @@ export declare function emitAiModeChanged(orgId: string, convId: string, payload
     aiModeReason?: string | null;
     by: string;
 }): void;
+/**
+ * Emit backfill progress to org room.
+ * Event: 'zalo:backfill-progress'
+ */
+export declare function emitBackfillProgress(orgId: string, payload: {
+    accountId: string;
+    current: number;
+    total: number;
+    threadName?: string;
+    status: 'processing' | 'completed' | 'error';
+    result?: {
+        totalInserted: number;
+        totalSkipped: number;
+        errors: number;
+    };
+}): void;

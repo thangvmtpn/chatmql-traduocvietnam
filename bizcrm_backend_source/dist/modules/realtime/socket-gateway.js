@@ -156,4 +156,11 @@ export function emitAiModeChanged(orgId, convId, payload) {
     getIO().to(`conv:${convId}`).emit('chat:ai-mode-changed', payload);
     getIO().to(`org:${orgId}`).emit('chat:ai-mode-changed', payload);
 }
+/**
+ * Emit backfill progress to org room.
+ * Event: 'zalo:backfill-progress'
+ */
+export function emitBackfillProgress(orgId, payload) {
+    getIO().to(`org:${orgId}`).emit('zalo:backfill-progress', payload);
+}
 //# sourceMappingURL=socket-gateway.js.map

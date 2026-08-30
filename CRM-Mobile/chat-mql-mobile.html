@@ -1,0 +1,2253 @@
+<!DOCTYPE html>
+<html lang="vi" style="--primary-color:#0D6838;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TDVN Chat — Mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --primary: var(--primary-color, #0D6838);
+    --primary-500:#2563eb;
+    --gray-50:#f8fafc; --gray-100:#f1f5f9; --gray-200:#e2e8f0; --gray-300:#cbd5e1;
+    --gray-400:#94a3b8; --gray-500:#64748b; --gray-600:#475569; --gray-700:#334155;
+    --gray-800:#1e293b; --gray-900:#0f172a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html{height:100%; background:#e5e7eb;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; font-size:14px; color:var(--gray-800);
+    height:100dvh; max-width:480px; margin:0 auto; background:#fff; position:relative; overflow:hidden;
+    display:flex; flex-direction:column; box-shadow:0 0 40px rgba(15,23,42,.15);
+  }
+  button{font-family:inherit; cursor:pointer;}
+  input,textarea,select{font-family:inherit;}
+  svg{flex-shrink:0;}
+
+  /* ===== Điều hướng màn (view stack) ===== */
+  .view{
+    position:absolute; inset:0; background:#fff; display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform .25s ease; z-index:20; visibility:hidden;
+  }
+  .view--open{transform:none; visibility:visible;}
+
+  /* ===== App bar dùng chung ===== */
+  .appbar{
+    display:flex; align-items:center; gap:10px; padding:10px 14px; min-height:54px;
+    border-bottom:1px solid var(--gray-200); background:#fff; flex-shrink:0;
+  }
+  .appbar__back{
+    background:none; border:none; color:var(--gray-700); width:32px; height:32px; margin-left:-6px;
+    display:flex; align-items:center; justify-content:center; border-radius:8px;
+  }
+  .appbar__title{font-size:16px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .appbar__btn{
+    background:none; border:none; color:var(--gray-500); width:34px; height:34px;
+    display:flex; align-items:center; justify-content:center; border-radius:8px; position:relative;
+  }
+  .appbar__btn:active{background:var(--gray-100);}
+  .appbar__btn--active{background:color-mix(in srgb, var(--primary) 12%, white); color:var(--primary);}
+  .appbar__badge{
+    position:absolute; top:1px; right:0; background:#ef4444; color:#fff;
+    font-size:9px; font-weight:700; border-radius:8px; padding:1px 4px;
+  }
+
+  /* ===== Banner giả lập quyền (mỏng) ===== */
+  .impersonate{
+    background:linear-gradient(90deg,#f59e0b,#ef4444); color:#fff; font-size:11px; font-weight:600;
+    padding:5px 12px; text-align:center; flex-shrink:0;
+  }
+
+  /* ===== Màn 1: màn cấp 1 (Tổng quan / Hội thoại / Cài đặt) ===== */
+  #view-list{position:relative; transform:none; visibility:visible; z-index:1; flex:1; min-height:0;}
+  /* Header kiểu mobile app cho từng màn cấp 1 — large title, không mô phỏng topnav desktop */
+  .lt-head{padding:14px 16px 8px; flex-shrink:0; background:#fff;}
+  .lt-head__row{display:flex; align-items:center; gap:10px;}
+  .lt-head__title{font-size:22px; font-weight:800; flex:1; letter-spacing:-.2px; min-width:0;}
+  .lt-head__sub{font-size:12px; color:var(--gray-500); margin-top:2px;}
+  .avatar-lg{
+    width:40px; height:40px; border-radius:50%; background:var(--primary); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;
+  }
+  /* Các panel cấp 1 */
+  .home-panel{display:none; flex:1; min-height:0; flex-direction:column;}
+  .home-panel--active{display:flex;}
+  .home-head{padding:6px 14px 0; flex-shrink:0;}
+  /* Tổng quan — dashboard mobile */
+  .ov{flex:1; overflow-y:auto; padding:12px 14px 16px;}
+  /* Chip điều hướng (từ sidebar desktop) */
+  .ov-nav{display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:2px;}
+  .ov-nav::-webkit-scrollbar{display:none;}
+  .ov-nav__chip{
+    display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border-radius:10px;
+    font-size:12px; font-weight:600; color:var(--gray-600); background:var(--gray-50); border:none;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .ov-nav__chip--active{background:color-mix(in srgb, var(--primary) 11%, white); color:var(--primary); font-weight:700;}
+  .ov-nav__badge{background:#ef4444; color:#fff; font-size:9.5px; font-weight:700; border-radius:8px; padding:0 5px;}
+  /* Nút hành động */
+  .ov-actions{display:flex; gap:8px; margin-bottom:14px;}
+  .ov-btn{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    font-size:12.5px; font-weight:600; padding:9px 10px; border-radius:9px;
+  }
+  .ov-btn--outline{border:1px solid var(--gray-200); background:#fff; color:var(--gray-700);}
+  .ov-btn--primary{border:none; background:var(--primary); color:#fff; box-shadow:0 3px 10px color-mix(in srgb, var(--primary) 30%, transparent);}
+  /* KPI cards */
+  .kpi-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;}
+  .kpi{border:1px solid var(--gray-200); border-radius:14px; padding:12px;}
+  .kpi__top{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .kpi__icon{width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .kpi__trend{font-size:11px; font-weight:700; color:#16a34a; display:inline-flex; align-items:center; gap:2px;}
+  .kpi__label{font-size:11.5px; color:var(--gray-500); font-weight:600;}
+  .kpi__value{font-size:21px; font-weight:800; margin-top:1px; letter-spacing:-.3px;}
+  .kpi__sub{font-size:10.5px; color:var(--gray-400); margin-top:1px;}
+  /* Card chung */
+  .ov-card{border:1px solid var(--gray-200); border-radius:14px; padding:14px; margin-bottom:12px;}
+  .ov-card__head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px;}
+  .ov-card__title{font-size:14px; font-weight:700;}
+  .ov-card__sub{font-size:11.5px; color:var(--gray-500); margin-top:2px;}
+  .ov-card__link{font-size:12px; color:var(--primary-500); font-weight:600; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;}
+  .ov-legend{display:flex; gap:12px; flex-wrap:wrap;}
+  .ov-legend__item{display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--gray-600);}
+  .ov-legend__dot{width:8px; height:8px; border-radius:3px;}
+  /* Bar chart tin nhắn theo ngày */
+  .bar-chart{display:flex; align-items:flex-end; justify-content:space-between; gap:6px; height:130px; padding-top:6px;}
+  .bar-col{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%;}
+  .bar-col__bars{flex:1; display:flex; align-items:flex-end; gap:3px; width:100%; justify-content:center;}
+  .bar-col__bar{width:8px; border-radius:3px 3px 0 0;}
+  .bar-col__label{font-size:10px; color:var(--gray-400); font-weight:600;}
+  /* Pipeline bars */
+  .pl-bar{display:flex; align-items:center; gap:8px; margin-bottom:11px; font-size:12px;}
+  .pl-bar__label{display:inline-flex; align-items:center; gap:6px; width:96px; flex-shrink:0; color:var(--gray-700); font-weight:500;}
+  .pl-bar__dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+  .pl-bar__track{flex:1; height:8px; background:var(--gray-100); border-radius:6px; overflow:hidden;}
+  .pl-bar__fill{height:100%; border-radius:6px; min-width:4px;}
+  .pl-bar__value{width:52px; text-align:right; font-weight:700; font-size:12px; flex-shrink:0;}
+  /* Donut nguồn khách hàng */
+  .donut-wrap{display:flex; align-items:center; gap:16px;}
+  .donut{width:120px; height:120px; border-radius:50%; position:relative; flex-shrink:0;}
+  .donut::after{content:''; position:absolute; inset:20px; background:#fff; border-radius:50%;}
+  .donut__center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1;}
+  .donut__center b{font-size:16px; font-weight:800;}
+  .donut__center span{font-size:9.5px; color:var(--gray-400);}
+  .donut-legend{flex:1; min-width:0;}
+  .donut-legend__item{display:flex; align-items:center; gap:7px; font-size:12px; padding:4px 0;}
+  .donut-legend__dot{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
+  .donut-legend__name{flex:1; color:var(--gray-600);}
+  .donut-legend__val{font-weight:700;}
+  /* Activity feed */
+  .act-item{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--gray-50);}
+  .act-item:last-child{border-bottom:none;}
+  .act-item__avatar{
+    width:34px; height:34px; border-radius:50%; background:#f59e0b; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;
+  }
+  .act-item__text{flex:1; min-width:0; font-size:12.5px; color:var(--gray-700);}
+  .act-item__time{font-size:10.5px; color:var(--gray-400); flex-shrink:0;}
+  .ov__title{font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:.4px; margin:14px 0 8px;}
+  .task-row{
+    display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--gray-100);
+    border-radius:12px; margin-bottom:8px; background:#fff; width:100%; text-align:left; font-size:13px;
+  }
+  .task-row b{display:block; font-size:13px;}
+  .task-row small{display:block; font-size:11.5px; color:var(--gray-500); margin-top:1px;}
+  .task-row .ico{font-size:18px; flex-shrink:0;}
+  /* Cài đặt */
+  .set{flex:1; overflow-y:auto;}
+  .set-row{
+    display:flex; align-items:center; gap:10px; padding:14px; border-bottom:1px solid var(--gray-100);
+    font-size:13.5px; font-weight:500; width:100%; background:#fff; border-left:none; border-right:none; border-top:none; text-align:left;
+  }
+  .set-row .ico{font-size:17px; flex-shrink:0;}
+  .set-row .val{margin-left:auto; font-size:12.5px; color:var(--gray-400);}
+  .set-row--danger{color:#ef4444; font-weight:600;}
+  .profile-card{
+    display:flex; align-items:center; gap:12px; margin:10px 14px 14px; padding:14px;
+    border:1px solid var(--gray-200); border-radius:14px;
+  }
+  .profile-card b{display:block; font-size:14.5px;}
+  .profile-card small{display:block; font-size:12px; color:var(--gray-500); margin-top:1px;}
+  /* Hồ sơ của tôi */
+  .me-nav{display:flex; gap:6px; overflow-x:auto; padding:2px 14px 12px;}
+  .me-nav::-webkit-scrollbar{display:none;}
+  .me-nav__chip{
+    display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:16px;
+    font-size:12.5px; font-weight:600; color:var(--gray-600); background:var(--gray-50); border:none; white-space:nowrap; flex-shrink:0;
+  }
+  .me-nav__chip--active{background:color-mix(in srgb, var(--primary) 11%, white); color:var(--primary); font-weight:700;}
+  .me-card{margin:0 14px 12px; border:1px solid var(--gray-200); border-radius:14px; padding:18px 16px;}
+  .me-avatar-wrap{display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:18px;}
+  .me-avatar{
+    width:88px; height:88px; border-radius:50%; background:var(--primary); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:600;
+  }
+  .me-avatar-btn{
+    display:inline-flex; align-items:center; gap:6px; border:1px solid var(--gray-300); background:#fff;
+    color:var(--gray-700); font-size:12.5px; font-weight:500; padding:7px 14px; border-radius:8px;
+  }
+  .me-field{margin-bottom:14px;}
+  .me-field label{display:block; font-size:12.5px; font-weight:600; color:var(--gray-700); margin-bottom:6px;}
+  .me-field input{
+    width:100%; padding:10px 12px; border:1px solid var(--gray-300); border-radius:8px; outline:none; font-size:13.5px; font-family:inherit;
+  }
+  .me-field input:disabled{background:var(--gray-50); color:var(--gray-500); border-color:var(--gray-200);}
+  .me-field small{display:block; font-size:11.5px; color:var(--gray-500); margin-top:5px;}
+  .me-save{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--primary); color:#fff; border:none; font-size:13px; font-weight:700; padding:11px; border-radius:9px; margin-top:4px;
+  }
+  /* Khách hàng — màn CRM Liên hệ (mobile) */
+  .crm-seg{display:flex; gap:6px; overflow-x:auto; padding:2px 14px 10px;}
+  .crm-seg::-webkit-scrollbar{display:none;}
+  .crm-seg__chip{
+    display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:16px;
+    font-size:12.5px; font-weight:600; color:var(--gray-600); background:var(--gray-50); border:none;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .crm-seg__chip--active{background:color-mix(in srgb, var(--primary) 11%, white); color:var(--primary); font-weight:700;}
+  .crm-seg__badge{background:var(--gray-200); color:var(--gray-600); font-size:9.5px; font-weight:700; border-radius:8px; padding:0 5px;}
+  .crm-filters{display:flex; gap:6px; overflow-x:auto; padding:0 14px 10px;}
+  .crm-filters::-webkit-scrollbar{display:none;}
+  .crm-filter{
+    display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border-radius:10px;
+    font-size:12px; font-weight:500; color:var(--gray-600); background:#fff; border:1px solid var(--gray-200);
+    white-space:nowrap; flex-shrink:0;
+  }
+  .crm-list{flex:1; overflow-y:auto; padding:2px 14px 14px;}
+  .crm-card{border:1px solid var(--gray-200); border-radius:14px; padding:12px; margin-bottom:10px;}
+  .crm-card__top{display:flex; align-items:center; gap:11px;}
+  .crm-card__avatar{
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:14px; font-weight:600; flex-shrink:0;
+  }
+  .crm-card__body{flex:1; min-width:0;}
+  .crm-card__name{font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .crm-card__phone{font-size:12.5px; color:var(--gray-500); margin-top:1px;}
+  .crm-stage{
+    font-size:10.5px; font-weight:700; border-radius:12px; padding:3px 9px 3px 7px; white-space:nowrap; flex-shrink:0;
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .crm-stage__dot{width:6px; height:6px; border-radius:50%;}
+  .crm-card__meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .crm-tag{
+    font-size:11px; color:var(--gray-600); background:var(--gray-50); border-radius:8px; padding:3px 9px;
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .crm-card__actions{display:flex; gap:8px; margin-top:10px;}
+  .crm-card__btn{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:8px;
+    border-radius:9px; font-size:12.5px; font-weight:600; border:1px solid var(--gray-200); background:#fff; color:var(--gray-700);
+  }
+  .crm-card__btn--primary{border:none; background:var(--primary); color:#fff;}
+  /* Bottom sheet thêm KH */
+  .sheet-bg{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:flex-end; justify-content:center; z-index:200;}
+  .sheet-bg.open{display:flex;}
+  .sheet{
+    width:100%; max-width:480px; max-height:90dvh; background:#fff; border-radius:18px 18px 0 0;
+    display:flex; flex-direction:column; overflow:hidden; animation:sheetUp .22s ease;
+  }
+  .sheet__head{display:flex; align-items:flex-start; gap:8px; padding:14px 16px; border-bottom:1px solid var(--gray-100);}
+  .sheet__title{font-size:15px; font-weight:700;}
+  .sheet__sub{font-size:11.5px; color:var(--gray-500); margin-top:2px;}
+  .sheet__close{margin-left:auto; background:none; border:none; color:var(--gray-500); width:28px; height:28px; display:flex; align-items:center; justify-content:center;}
+  .sheet__body{padding:14px 16px; overflow-y:auto;}
+  .sheet__foot{display:flex; gap:8px; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--gray-100);}
+  .fld{margin-bottom:12px;}
+  .fld__label{display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--gray-700); margin-bottom:5px;}
+  .fld__req{color:#ef4444;}
+  .fld__input,.fld__select,.fld__textarea{
+    width:100%; border:1px solid var(--gray-200); border-radius:9px; background:#fff;
+    font-size:13.5px; padding:10px; outline:none; font-family:inherit;
+  }
+  .fld__textarea{resize:vertical; min-height:60px;}
+  .fld-row{display:flex; gap:8px;}
+  .fld-row > *{flex:1; min-width:0;}
+  .sheet-btn{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:11px;
+    border-radius:9px; font-size:13px; font-weight:600;
+  }
+  .sheet-btn--ghost{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);}
+  .sheet-btn--primary{border:none; background:var(--primary); color:#fff;}
+  .search-input{display:flex; align-items:center; gap:8px; background:var(--gray-100); border-radius:10px; padding:0 12px; margin-bottom:10px;}
+  .search-input svg{color:var(--gray-400);}
+  .search-input input{border:none; background:none; outline:none; font-size:13.5px; padding:10px 0; width:100%;}
+  .chip-row{display:flex; gap:6px; overflow-x:auto; padding-bottom:10px;}
+  .chip-row::-webkit-scrollbar{display:none;}
+  .chip{
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-600);
+    font-size:12.5px; padding:6px 14px; border-radius:16px; white-space:nowrap;
+  }
+  .chip--active{background:var(--primary); border-color:var(--primary); color:#fff; font-weight:600;}
+  .conv-list{flex:1; overflow-y:auto; border-top:1px solid var(--gray-100);}
+  .conv-item{display:flex; gap:10px; padding:11px 14px; position:relative; align-items:flex-start; border-bottom:1px solid var(--gray-50);}
+  .conv-item:active{background:var(--gray-50);}
+  .conv-item__avatar{
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:14px; font-weight:600; flex-shrink:0;
+  }
+  .conv-item__body{flex:1; min-width:0;}
+  .conv-item__top{display:flex; align-items:baseline; gap:8px;}
+  .conv-item__name{font-size:13.5px; font-weight:600; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .conv-item__time{font-size:11px; color:var(--gray-400);}
+  .conv-item__preview{
+    font-size:12px; color:var(--gray-500); margin-top:2px; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  }
+  .conv-item__source{display:flex; align-items:center; gap:4px; margin-top:3px; font-size:10.5px; color:var(--gray-400);}
+  .conv-item__source span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .conv-item__unread{
+    position:absolute; right:14px; bottom:14px; background:#ef4444; color:#fff;
+    font-size:10px; font-weight:700; border-radius:9px; min-width:18px; height:18px;
+    display:flex; align-items:center; justify-content:center; padding:0 5px;
+  }
+  .zalo-ic{
+    width:12px; height:12px; border-radius:3px; background:#0068ff; color:#fff; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;
+  }
+
+  /* Bottom tab bar = menu chính (kiểu Zalo) */
+  .bottomnav{
+    display:flex; border-top:1px solid var(--gray-200); background:#fff; flex-shrink:0;
+    padding-bottom:env(safe-area-inset-bottom); box-shadow:0 -2px 10px rgba(15,23,42,.04);
+  }
+  .bottomnav__item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; position:relative;
+    padding:7px 0 6px; border:none; background:none; color:var(--gray-400); font-size:10px; font-weight:600;
+  }
+  .bottomnav__item--active{color:var(--primary);}
+  .bottomnav__badge{
+    position:absolute; top:2px; left:calc(50% + 6px); background:#ef4444; color:#fff;
+    font-size:9px; font-weight:700; border-radius:8px; min-width:15px; height:15px;
+    display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1;
+  }
+
+  /* ===== Màn 2: Chat ===== */
+  .chat-peer{display:flex; align-items:center; gap:9px; flex:1; min-width:0; border:none; background:none; text-align:left; padding:0;}
+  .chat-peer__avatar{
+    width:36px; height:36px; border-radius:50%; background:#ec4899; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; flex-shrink:0;
+  }
+  .chat-peer__name{font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; min-width:0;}
+  .chat-peer__name > span:first-child{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .pipeline-chip{
+    background:rgba(37,99,235,.094); color:#2563eb; border:1px solid rgba(37,99,235,.25);
+    border-radius:10px; padding:1px 8px; font-size:10px; font-weight:700; white-space:nowrap; flex-shrink:0;
+  }
+  .chat-peer__meta{font-size:10.5px; color:var(--gray-500); margin-top:1px; display:flex; align-items:center; gap:4px;}
+  .chat-messages{flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:4px; background:var(--gray-50);}
+  .msg-wrapper{display:flex; flex-direction:column;}
+  .chat-messages__date{
+    align-self:center; font-size:10.5px; font-weight:700; color:var(--gray-400); margin:10px 0;
+    text-transform:uppercase; letter-spacing:.4px;
+  }
+  .msg{display:flex; gap:8px; max-width:86%;}
+  .msg--received{align-self:flex-start;}
+  .msg--sent{align-self:flex-end; flex-direction:row-reverse;}
+  .msg__avatar{
+    width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:9px; font-weight:700; flex-shrink:0;
+  }
+  .msg__bubble{
+    background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:9px 12px;
+    font-size:13.5px; line-height:1.45; word-break:break-word;
+  }
+  .msg--sent .msg__bubble{background:color-mix(in srgb, var(--primary) 10%, white); border-color:color-mix(in srgb, var(--primary) 25%, white);}
+  .msg__image{
+    max-width:230px; background:#fff; border:1px solid var(--gray-200); border-radius:10px;
+    padding:16px 12px; text-align:center;
+  }
+  .msg__image span{color:var(--gray-400); font-size:12px;}
+  .msg__time{font-size:10px; color:var(--gray-400); margin-top:3px; display:flex; align-items:center; gap:3px;}
+  .msg--sent .msg__time{justify-content:flex-end;}
+  .bday-card{width:230px; border-radius:14px; overflow:hidden; box-shadow:0 2px 16px rgba(251,146,60,.18); background:#fff;}
+  .bday-card__head{background:linear-gradient(135deg,#fb923c,#f472b6 50%,#a78bfa); padding:14px 14px 10px; text-align:center;}
+  .bday-card__avatar{
+    width:48px; height:48px; border-radius:50%; border:3px solid rgba(255,255,255,.7); margin:0 auto 6px;
+    background:#9333ea; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700;
+  }
+  .bday-card__name{color:#fff; font-size:13px; font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,.15);}
+  .bday-card__body{padding:10px 14px; background:#fffbeb; text-align:center;}
+  .bday-card__date{font-size:11.5px; font-weight:700; color:#f59e0b;}
+  .bday-card__hint{font-size:12px; color:#78350f; font-weight:500; margin-top:2px;}
+  .bday-card__art{font-size:28px; margin-top:4px;}
+  .chat-inputbar{border-top:1px solid var(--gray-200); background:#fff; flex-shrink:0; padding:8px 12px calc(8px + env(safe-area-inset-bottom));}
+  .chat-inputbar__tools{display:flex; gap:6px; margin-bottom:7px; overflow-x:auto; padding-bottom:2px;}
+  .chat-inputbar__tools::-webkit-scrollbar{display:none;}
+  .tool-chip{
+    display:inline-flex; align-items:center; gap:5px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); font-size:11.5px; padding:5px 11px; border-radius:14px; white-space:nowrap; flex-shrink:0;
+  }
+  .tool-chip--active{background:color-mix(in srgb, var(--primary) 10%, white); border-color:var(--primary); color:var(--primary); font-weight:600;}
+  .tool-chip--primary{
+    background:var(--primary); border-color:var(--primary); color:#fff; font-weight:700;
+    box-shadow:0 3px 10px color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+  .chat-inputbar__row{display:flex; align-items:flex-end; gap:8px;}
+  .chat-inputbar__field{
+    flex:1; background:var(--gray-100); border-radius:18px; border:none; outline:none; resize:none;
+    font-size:14px; padding:9px 14px; max-height:96px; line-height:1.4;
+  }
+  .chat-inputbar__icon{background:none; border:none; color:var(--gray-500); width:34px; height:36px; display:flex; align-items:center; justify-content:center;}
+  .chat-inputbar__send{
+    background:var(--primary); border:none; color:#fff; width:38px; height:38px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .chat-more-menu{
+    position:absolute; top:52px; right:10px; background:#fff; border:1px solid var(--gray-200);
+    border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,.15); padding:6px; width:262px; z-index:60;
+  }
+  .chat-more-menu[hidden]{display:none;}
+  .cmm-label{font-size:10.5px; font-weight:700; color:var(--gray-400); letter-spacing:.4px; text-transform:uppercase; padding:6px 12px 4px;}
+  .cmm-ai{display:flex; align-items:flex-start; gap:9px; width:100%; padding:9px 12px; border:none; background:none; border-radius:8px; text-align:left;}
+  .cmm-ai:active{background:var(--gray-50);}
+  .cmm-ai__ic{font-size:15px; flex-shrink:0; width:20px; text-align:center;}
+  .cmm-ai__body{flex:1; min-width:0;}
+  .cmm-ai__body b{display:block; font-size:13px; color:var(--gray-800); font-weight:600;}
+  .cmm-ai__body small{display:block; font-size:11px; color:var(--gray-500); margin-top:1px; line-height:1.35;}
+  .cmm-ai__check{color:var(--primary-500); font-weight:700; visibility:hidden; flex-shrink:0;}
+  .cmm-ai--active .cmm-ai__check{visibility:visible;}
+  .cmm-ai--active .cmm-ai__body b{color:var(--primary-500);}
+  .cmm-divider{height:1px; background:var(--gray-100); margin:5px 0;}
+  .cmm-danger{
+    display:flex; align-items:center; gap:8px; width:100%; padding:9px 12px; border:none;
+    background:none; border-radius:8px; font-size:13px; color:#ef4444; text-align:left;
+  }
+
+  /* ===== Màn 3: Hồ sơ khách (4 tab) ===== */
+  .detail-tabs{
+    display:flex; gap:8px; border-bottom:1px solid var(--gray-200); padding:0 12px;
+    background:#fff; flex-shrink:0; overflow-x:auto;
+  }
+  .detail-tabs::-webkit-scrollbar{display:none;}
+  .detail-tab{
+    border:none; background:none; font-size:12.5px; color:var(--gray-500);
+    padding:11px 2px; border-bottom:2px solid transparent; white-space:nowrap;
+  }
+  .detail-tab--active{color:var(--primary); font-weight:700; border-bottom-color:var(--primary);}
+  .detail-tabs__divider{width:1px; align-self:stretch; margin:8px 2px; background:var(--gray-300); flex-shrink:0;}
+  .detail-tab--sales{color:#b45309; font-weight:600;}
+  .detail-tab--sales.detail-tab--active{color:#b45309; border-bottom-color:#b45309;}
+  .detail-body{flex:1; overflow-y:auto;}
+  .detail-panel{display:none;}
+  .detail-panel--active{display:block;}
+  .section{padding:14px; border-bottom:1px solid var(--gray-100);}
+  .section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .section-title{font-size:11.5px; font-weight:700; color:var(--gray-500); letter-spacing:.4px; display:inline-flex; align-items:center; gap:5px;}
+  .crm-stats{
+    display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--gray-200);
+    border:1px solid var(--gray-200); border-radius:10px; overflow:hidden; margin-bottom:12px;
+  }
+  .crm-stat{background:#fff; padding:9px 12px;}
+  .crm-stat span{font-size:11px; color:var(--gray-500); font-weight:600; display:block;}
+  .crm-stat b{font-size:14px; display:block; margin-top:2px;}
+  .crm-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 12px;}
+  .crm-field span{font-size:11px; color:var(--gray-500); font-weight:600; display:block;}
+  .crm-field b{font-size:12.5px; font-weight:600; display:block; margin-top:1px; word-break:break-word;}
+  .crm-field--full{grid-column:1/-1;}
+  .btn-outline{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:1px solid var(--gray-200); background:#fff; color:var(--gray-700); font-size:13px; font-weight:500;
+    padding:10px 12px; border-radius:9px;
+  }
+  .btn-green{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--primary); color:#fff; border:none; font-size:13px; font-weight:700;
+    padding:11px 12px; border-radius:9px; margin-top:8px;
+    box-shadow:0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+  .info-row{display:flex; align-items:center; gap:8px; padding:6px 0; min-height:32px;}
+  .info-row .lbl{font-size:12.5px; color:var(--gray-600);}
+  .info-row .val{margin-left:auto; font-size:12.5px; color:var(--gray-400);}
+  .info-row .val--dark{color:var(--gray-700);}
+  .cf-title{
+    display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--gray-500);
+    text-transform:uppercase; padding:6px 0; letter-spacing:.3px; border-bottom:1px solid var(--gray-100);
+  }
+  .ai-fab{
+    position:sticky; bottom:0; padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top,#fff 72%,rgba(255,255,255,0));
+  }
+  .ai-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:linear-gradient(90deg,#8b5cf6,#6366f1); color:#fff; border:none; font-size:13px; font-weight:600;
+    padding:11px 12px; border-radius:9px; box-shadow:0 6px 18px rgba(99,102,241,.35);
+  }
+
+  /* Ghi chú */
+  .pd-note{border:1px solid var(--gray-200); border-radius:10px; padding:12px; background:var(--gray-50);}
+  .pd-note-title{font-size:13px; font-weight:700; margin-bottom:8px;}
+  .pd-note select,.pd-note textarea{
+    width:100%; border:1px solid var(--gray-200); border-radius:8px; background:#fff;
+    font-size:12.5px; color:var(--gray-700); padding:9px 10px; outline:none; margin-bottom:8px;
+  }
+  .pd-note textarea{resize:vertical;}
+  .pd-note-submit{
+    width:100%; background:var(--gray-500); border:none; color:#fff; font-size:13px; font-weight:600;
+    padding:10px; border-radius:8px; opacity:.85;
+  }
+  .note-item{border:1px solid var(--gray-100); border-radius:10px; padding:10px; margin-top:8px; background:#fff;}
+  .note-item--ai{background:#faf5ff; border-color:#e9d5ff;}
+  .note-item__head{display:flex; align-items:center; gap:6px; margin-bottom:5px;}
+  .note-item__tag{background:#f3e8ff; color:#7c3aed; font-size:10.5px; font-weight:700; border-radius:4px; padding:1px 6px;}
+  .note-item__time{font-size:11px; color:var(--gray-400); margin-left:auto;}
+  .note-item__body{font-size:12px; color:var(--gray-700); line-height:1.55; white-space:pre-line;}
+  .empty-line{font-size:12px; color:var(--gray-400); margin-top:10px;}
+
+  /* ===== Form tạo đơn (port từ bản desktop) ===== */
+  .of{padding:14px; display:flex; flex-direction:column;}
+  .of__section-title{font-size:13px; font-weight:700; border-left:3px solid #ef4444; padding-left:8px; margin:14px 0 10px;}
+  .of__section-title:first-child{margin-top:0;}
+  .of__row{display:flex; gap:8px;}
+  .of__row > *{flex:1; min-width:0;}
+  .of__group{margin-bottom:10px;}
+  .of__label{display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--gray-700); margin-bottom:5px;}
+  .of__select-wrap{position:relative;}
+  .of__select-wrap::after{
+    content:''; position:absolute; right:10px; top:50%; margin-top:-2px;
+    border-left:4px solid transparent; border-right:4px solid transparent;
+    border-top:5px solid var(--gray-400); pointer-events:none;
+  }
+  .of__select,.of__input,.of__textarea{
+    width:100%; border:none; background:#eef1f6; border-radius:8px;
+    font-size:13px; color:var(--gray-700); padding:10px; outline:none; appearance:none;
+  }
+  .of__select{padding-right:26px;}
+  .of__select:disabled{color:var(--gray-400); opacity:.7;}
+  .of__textarea{resize:vertical; min-height:52px;}
+  .of__select--accent{color:var(--primary-500); font-weight:600;}
+  .of-check{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--gray-700);}
+  .of-check input{accent-color:var(--primary); width:15px; height:15px;}
+  .of__head-row{display:flex; align-items:center; justify-content:space-between;}
+  .of__info{font-size:12px; color:var(--gray-500); margin:2px 0 6px; line-height:1.5;}
+  .of__dim-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .of__unit-input{margin-left:auto; display:flex; width:120px;}
+  .of__unit-input input{
+    width:100%; min-width:0; border:none; background:#eef1f6; border-radius:8px 0 0 8px;
+    padding:8px; font-size:12.5px; text-align:right; outline:none; color:var(--gray-700);
+  }
+  .of__unit-input i{font-style:normal; background:#e2e8f0; border-radius:0 8px 8px 0; padding:8px 9px; font-size:12px; color:var(--gray-600); font-weight:600;}
+  .of__code-input{margin-left:auto; display:flex; width:165px;}
+  .of__code-input input{width:100%; min-width:0; border:none; background:#eef1f6; border-radius:8px 0 0 8px; padding:8px 9px; font-size:12.5px; outline:none;}
+  .of__code-input button{background:var(--primary-500); color:#fff; border:none; border-radius:0 8px 8px 0; font-size:12px; font-weight:600; padding:0 10px; white-space:nowrap;}
+  .of__sum-row{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12.5px;}
+  .of__sum-label{font-weight:600; color:var(--gray-700);}
+  .of__sum-label em{font-style:normal; font-weight:400; font-size:11px; color:var(--gray-400); margin-left:3px;}
+  .of__sum-value{margin-left:auto; font-weight:700;}
+  .of__total-row{
+    display:flex; align-items:center; justify-content:space-between; background:#eff6ff;
+    border:1px solid #bfdbfe; border-radius:8px; padding:10px 12px; margin:8px 0; font-size:13px; font-weight:700;
+  }
+  .of__total-row b{color:var(--primary-500); font-size:16px;}
+  .of__pay-badge{
+    margin-left:auto; background:var(--gray-100); border:1px solid var(--gray-200); color:var(--gray-600);
+    font-size:11.5px; font-weight:600; border-radius:14px; padding:3px 10px;
+  }
+  .of__pay-badge--orange{background:#fff7ed; border-color:#fed7aa; color:#c2410c;}
+  .of__pay-badge--green{background:#ecfdf3; border-color:#bbf7d0; color:#15803d;}
+  .of__pay-badge--red{background:#fef2f2; border-color:#fecaca; color:#b91c1c;}
+  .of__return-note{
+    display:none; background:#fff7ed; border:1px solid #fed7aa; color:#c2410c;
+    font-size:12.5px; font-weight:700; border-radius:8px; padding:9px 12px; margin-top:10px;
+  }
+  .of__return-note--show{display:block;}
+  .of__summary{border-top:1px dashed var(--gray-300); margin-top:12px; padding-top:12px;}
+  .of__footer{
+    position:sticky; bottom:0; background:#fff; display:flex; gap:8px;
+    padding:12px 0 calc(14px + env(safe-area-inset-bottom)); margin-top:8px; border-top:1px solid var(--gray-100);
+  }
+  .of__btn-reset{
+    flex:0 0 32%; display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    border:1px solid #fecaca; background:#fff; color:#ef4444; font-size:13px; font-weight:600;
+    padding:11px 10px; border-radius:9px;
+  }
+  .of__btn-submit{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:none; background:var(--primary); color:#fff; font-size:13px; font-weight:700;
+    padding:11px 10px; border-radius:9px;
+  }
+  .of__prod-head{display:flex; justify-content:space-between; font-size:12px; font-weight:600; color:var(--gray-700); padding:6px 0; border-bottom:1px solid var(--gray-100);}
+  .of__prod-empty{text-align:center; padding:22px 0 10px; color:var(--gray-400);}
+  .op-item{border:1px solid var(--gray-100); border-radius:10px; padding:10px; margin-top:8px;}
+  .op-item--gift{background:#fffbeb; border-color:#fde68a;}
+  .op-item__top{display:flex; align-items:center; gap:6px;}
+  .op-item__code{font-size:12.5px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .op-gift-tag{background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; border-radius:4px; padding:0 5px; font-size:10.5px; font-weight:700; flex-shrink:0;}
+  .op-item__del{
+    width:28px; height:28px; border:1px solid #f3c6c6; background:#fff5f5; border-radius:6px;
+    display:flex; align-items:center; justify-content:center; color:#dc2626; flex-shrink:0;
+  }
+  .op-item__name{font-size:12px; color:var(--gray-500); margin:2px 0 6px;}
+  .op-item__row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 0; font-size:12px; color:var(--gray-600);}
+  .op-item__kl{font-style:normal; color:var(--gray-400);}
+  .op-qty{display:flex; align-items:center; height:30px; border:1px solid var(--gray-200); border-radius:6px; overflow:hidden; background:#fff;}
+  .op-qty button{width:28px; height:100%; border:0; background:var(--gray-50); font-size:15px; color:var(--gray-700); line-height:1;}
+  .op-qty input{width:36px; height:100%; border:0; outline:0; text-align:center; font-weight:700; font-size:12.5px;}
+  .op-item--over .op-qty{border-color:#dc2626; box-shadow:0 0 0 2px rgba(220,38,38,.12);}
+  .op-item--over .op-item__stock{color:#dc2626; font-weight:700;}
+  .op-item__sum{font-size:12.5px;}
+  .op-total{display:flex; justify-content:space-between; font-size:12.5px; font-weight:600; color:var(--gray-700); padding:9px 2px; border-top:1px solid var(--gray-100); margin-top:8px;}
+  .op-total b{font-size:13.5px;}
+
+  /* ===== Tài liệu bán hàng ===== */
+  .sd{padding:14px; display:flex; flex-direction:column;}
+  .sd__tabs{display:flex; gap:16px; border-bottom:1px solid var(--gray-200); margin-bottom:10px;}
+  .sd__tab{border:none; background:none; font-size:12.5px; font-weight:500; color:var(--gray-600); padding:8px 0; border-bottom:2px solid transparent;}
+  .sd__tab--active{color:var(--primary); font-weight:700; border-bottom-color:var(--primary);}
+  .sd__panel{display:none;}
+  .sd__panel--active{display:block;}
+  .sd__note{font-size:11px; color:var(--gray-500); background:var(--gray-50); border-radius:8px; padding:7px 10px; margin-bottom:10px; line-height:1.45;}
+  .sd__search{margin-bottom:10px;}
+  .sd__group{font-size:12px; font-weight:700; margin:12px 0 6px; display:flex; align-items:center; gap:6px;}
+  .sd__grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+  .sd-tile{
+    position:relative; aspect-ratio:1; border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    border:2px solid transparent; transition:border-color .12s;
+  }
+  .sd-tile:has(input:checked){border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);}
+  .sd-tile input{position:absolute; top:5px; left:5px; width:16px; height:16px; accent-color:var(--primary); margin:0;}
+  .sd-tile__emoji{font-size:24px; line-height:1;}
+  .sd-tile__name{font-size:9.5px; font-weight:600; color:var(--gray-700); text-align:center; padding:0 4px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sd-tile__dur{position:absolute; right:4px; bottom:4px; background:rgba(0,0,0,.65); color:#fff; font-size:9.5px; border-radius:4px; padding:1px 4px; font-weight:600;}
+  .sd__send-wrap{
+    position:sticky; bottom:0; padding:10px 0 calc(6px + env(safe-area-inset-bottom)); margin-top:12px;
+    background:linear-gradient(to top,#fff 72%,rgba(255,255,255,0));
+  }
+  .sd__send-btn{
+    width:100%; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--primary); color:#fff; border:none; font-size:13px; font-weight:700;
+    padding:11px 12px; border-radius:9px;
+  }
+  .sd__send-btn:disabled{background:var(--gray-200); color:var(--gray-400);}
+  .sd-content{border:1px solid var(--gray-100); border-radius:10px; padding:10px 12px; margin-bottom:8px;}
+  .sd-content__head{display:flex; align-items:center; gap:8px; margin-bottom:5px;}
+  .sd-content__title{font-size:12.5px; font-weight:700; flex:1; min-width:0;}
+  .sd-content__code{font-size:10.5px; color:var(--gray-400); font-weight:600; white-space:nowrap;}
+  .sd-content__copy{
+    display:inline-flex; align-items:center; gap:4px; border:1px solid var(--gray-200); background:#fff;
+    color:var(--gray-600); font-size:11px; font-weight:600; padding:5px 10px; border-radius:6px; flex-shrink:0; white-space:nowrap;
+  }
+  .sd-content__copy--done{border-color:#bbf7d0; background:#ecfdf3; color:#15803d;}
+  .sd-content__text{font-size:12px; color:var(--gray-600); line-height:1.55; white-space:pre-line;}
+
+  /* ===== Màn 4: Kho lưu trữ ===== */
+  .lib{padding:12px 14px; flex:1; overflow-y:auto;}
+  .lib__tabs{display:flex; gap:0; border-bottom:1px solid var(--gray-200); margin-bottom:10px;}
+  .lib__tab{flex:1; border:none; background:none; font-size:13.5px; font-weight:600; color:var(--gray-700); padding:10px 0; border-bottom:2.5px solid transparent;}
+  .lib__tab--active{color:var(--primary-500); border-bottom-color:var(--primary-500);}
+  .lib__panel{display:none;}
+  .lib__panel--active{display:block;}
+  .lib__filters{display:flex; gap:8px; margin-bottom:12px;}
+  .lib__chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--gray-100); border:none;
+    border-radius:16px; padding:8px 14px; font-size:13px; color:var(--gray-700); font-weight:500;
+  }
+  .lib__date{font-size:13px; font-weight:700; margin:14px 0 8px;}
+  .lib__grid{display:grid; grid-template-columns:repeat(3,1fr); gap:5px;}
+  .lib__tile{aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:26px; position:relative;}
+  .lib__tile-dur{position:absolute; right:5px; bottom:5px; background:rgba(0,0,0,.65); color:#fff; font-size:10px; border-radius:4px; padding:1px 4px; font-weight:600;}
+  .lib__file,.lib__link{display:flex; align-items:center; gap:10px; padding:9px 0;}
+  .lib__file-ic{width:40px; height:40px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#fff; flex-shrink:0;}
+  .lib__link-ic{width:40px; height:40px; border-radius:9px; background:var(--gray-100); display:flex; align-items:center; justify-content:center; color:var(--gray-500); flex-shrink:0;}
+  .lib__file-name,.lib__link-title{font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .lib__file-meta{font-size:11.5px; color:var(--gray-400); margin-top:1px;}
+  .lib__link-domain{font-size:12px; color:#2563eb; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .lib__body{min-width:0; flex:1;}
+
+  /* ===== Màn 5: Lịch sử mua hàng ===== */
+  .ph-row{display:flex; gap:10px; padding:11px 14px; border-bottom:1px solid var(--gray-50); align-items:flex-start;}
+  .ph-row__ic{width:36px; height:36px; border-radius:9px; background:var(--gray-100); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .ph-row__name{font-size:13px; font-weight:600;}
+  .ph-row__meta{font-size:11.5px; color:var(--gray-400); margin-top:2px;}
+  .ph-row__right{margin-left:auto; text-align:right; flex-shrink:0;}
+  .ph-row__money{font-size:13px; font-weight:700;}
+  .ph-badge{display:inline-block; font-size:10px; font-weight:700; border-radius:10px; padding:2px 8px; margin-top:3px;}
+  .ph-badge--done{background:#ecfdf3; color:#15803d;}
+  .ph-badge--return{background:#fff7ed; color:#c2410c;}
+  .ph-badge--cancel{background:#fef2f2; color:#b91c1c;}
+
+  /* ===== Modal AI (bottom sheet) ===== */
+  .ai-modal-bg{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:flex-end; justify-content:center; z-index:100;}
+  .ai-modal-bg.open{display:flex;}
+  .ai-modal{
+    width:100%; max-width:480px; max-height:82dvh; background:#fff; border-radius:18px 18px 0 0;
+    display:flex; flex-direction:column; overflow:hidden; animation:sheetUp .22s ease;
+  }
+  @keyframes sheetUp{from{transform:translateY(40%); opacity:.6;} to{transform:none; opacity:1;}}
+  .ai-modal__head{
+    display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid var(--gray-100);
+    font-weight:700; font-size:14px; color:#7c3aed; background:linear-gradient(135deg,#faf5ff,#eff6ff);
+  }
+  .ai-modal__close{margin-left:auto; background:none; border:none; color:var(--gray-500); width:28px; height:28px; display:flex; align-items:center; justify-content:center;}
+  .ai-modal__body{padding:14px 16px; overflow-y:auto; font-size:13px; color:var(--gray-700); line-height:1.6;}
+  .ai-modal__foot{display:flex; gap:8px; padding:12px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--gray-100);}
+  .ai-loading{display:flex; align-items:center; gap:10px; color:var(--gray-500); font-size:13px; padding:14px 0;}
+  .ai-spinner{width:18px; height:18px; border:3px solid #e9d5ff; border-top-color:#8b5cf6; border-radius:50%; animation:aispin .8s linear infinite;}
+  @keyframes aispin{to{transform:rotate(360deg);}}
+  .ai-block{margin-bottom:12px;}
+  .ai-block__title{font-weight:700; font-size:12.5px; margin-bottom:3px;}
+  .ai-modal__time{font-size:11.5px; color:var(--gray-400); margin-top:6px;}
+  .ai-btn-note{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:linear-gradient(90deg,#8b5cf6,#6366f1); color:#fff; border:none; font-size:13px; font-weight:600;
+    padding:11px 14px; border-radius:9px;
+  }
+  .ai-btn-note:disabled{opacity:.55;}
+  .ai-btn-ghost{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:13px; padding:11px 16px; border-radius:9px;}
+</style>
+</head>
+<body>
+
+  <div class="impersonate">👁 Đang xem dưới quyền <b>Lộc Thị Hạnh</b> · <u>Quay lại tài khoản gốc</u></div>
+
+  <!-- ========== MÀN 1: DANH SÁCH HỘI THOẠI ========== -->
+  <div class="view view--open" id="view-list">
+    <!-- Panel Tổng quan -->
+    <div class="home-panel" id="home-overview">
+      <div class="lt-head">
+        <div class="lt-head__row">
+          <span class="avatar-lg">LT</span>
+          <div style="flex:1; min-width:0;">
+            <div class="lt-head__title" style="font-size:17px;">Chào Lộc Thị Hạnh 👋</div>
+            <div class="lt-head__sub">Thứ Tư, 19/08/2026 · Trà Dược Việt Nam</div>
+          </div>
+          <button class="appbar__btn">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+            <span class="appbar__badge">9+</span>
+          </button>
+        </div>
+      </div>
+      <div class="ov">
+        <div class="lt-head__sub" style="margin:-2px 0 12px;">Đây là tổng quan hoạt động hôm nay của bạn.</div>
+
+        <!-- Mục điều hướng (từ sidebar desktop) -->
+        <div class="ov-nav">
+          <button class="ov-nav__chip ov-nav__chip--active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            Dashboard
+          </button>
+          <button class="ov-nav__chip">📥 Hộp thư <span class="ov-nav__badge">295</span></button>
+          <button class="ov-nav__chip">🕐 Hoạt động</button>
+          <button class="ov-nav__chip">✅ Việc cần làm</button>
+          <button class="ov-nav__chip">📅 Lịch hẹn</button>
+        </div>
+
+        <!-- Hành động -->
+        <div class="ov-actions">
+          <button class="ov-btn ov-btn--outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+            Xuất báo cáo
+          </button>
+          <button class="ov-btn ov-btn--primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            Thêm nhanh
+          </button>
+        </div>
+
+        <!-- 6 thẻ KPI -->
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#e8f0fe; color:#2563eb;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+            </div></div>
+            <div class="kpi__label">Tin nhắn hôm nay</div><div class="kpi__value">303</div><div class="kpi__sub">Hôm nay</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#fef3c7; color:#f59e0b;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+            </div></div>
+            <div class="kpi__label">Chưa trả lời</div><div class="kpi__value">884</div><div class="kpi__sub">Cần xử lý</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#f1f5f9; color:#64748b;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+            </div></div>
+            <div class="kpi__label">Chưa đọc</div><div class="kpi__value">417</div><div class="kpi__sub">Tin nhắn chưa xem</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#dcfce7; color:#16a34a;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+            </div></div>
+            <div class="kpi__label">Lịch hẹn hôm nay</div><div class="kpi__value">0</div><div class="kpi__sub">Hôm nay</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#fef2f2; color:#ef4444;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+            </div><span class="kpi__trend">▲ +75</span></div>
+            <div class="kpi__label">KH mới tuần này</div><div class="kpi__value">75</div><div class="kpi__sub">Trong 7 ngày qua</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__top"><div class="kpi__icon" style="background:#f3e8ff; color:#9333ea;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
+            </div></div>
+            <div class="kpi__label">Tổng khách hàng</div><div class="kpi__value">13.351</div><div class="kpi__sub">Đang hoạt động</div>
+          </div>
+        </div>
+
+        <!-- Tin nhắn theo ngày -->
+        <div class="ov-card">
+          <div class="ov-card__head">
+            <div>
+              <div class="ov-card__title">Tin nhắn theo ngày</div>
+              <div class="ov-card__sub">7 ngày gần nhất · Tổng 4.498 tin</div>
+            </div>
+            <div class="ov-legend">
+              <span class="ov-legend__item"><span class="ov-legend__dot" style="background:#3b82f6;"></span>Đã gửi</span>
+              <span class="ov-legend__item"><span class="ov-legend__dot" style="background:#93c5fd;"></span>Đã nhận</span>
+            </div>
+          </div>
+          <div class="bar-chart" id="barChart"></div>
+        </div>
+
+        <!-- Pipeline khách hàng -->
+        <div class="ov-card">
+          <div class="ov-card__head">
+            <div>
+              <div class="ov-card__title">Pipeline khách hàng</div>
+              <div class="ov-card__sub">13.351 khách hàng đang theo dõi</div>
+            </div>
+            <span class="ov-card__link">Xem tất cả ›</span>
+          </div>
+          <div id="pipeline"></div>
+        </div>
+
+        <!-- Nguồn khách hàng -->
+        <div class="ov-card">
+          <div class="ov-card__head"><div class="ov-card__title">Nguồn khách hàng</div></div>
+          <div class="donut-wrap">
+            <div class="donut" style="background:conic-gradient(#436007 0 0.12%, #4736c5 0.12% 1.3%, #3b82f6 1.3% 100%);">
+              <div class="donut__center"><b>13.351</b><span>khách hàng</span></div>
+            </div>
+            <div class="donut-legend">
+              <div class="donut-legend__item"><span class="donut-legend__dot" style="background:#436007;"></span><span class="donut-legend__name">Web</span><span class="donut-legend__val">16</span></div>
+              <div class="donut-legend__item"><span class="donut-legend__dot" style="background:#4736c5;"></span><span class="donut-legend__name">zalo_oa</span><span class="donut-legend__val">157</span></div>
+              <div class="donut-legend__item"><span class="donut-legend__dot" style="background:#3b82f6;"></span><span class="donut-legend__name">Zalo</span><span class="donut-legend__val">13.178</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hoạt động gần đây -->
+        <div class="ov-card">
+          <div class="ov-card__head">
+            <div class="ov-card__title">Hoạt động gần đây</div>
+            <span class="ov-card__link">↻ Làm mới</span>
+          </div>
+          <div id="activityFeed"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Hội thoại -->
+    <div class="home-panel home-panel--active" id="home-chats">
+      <div class="lt-head">
+        <div class="lt-head__row">
+          <div class="lt-head__title">Hội thoại</div>
+          <button class="appbar__btn">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+            <span class="appbar__badge">9+</span>
+          </button>
+          <span class="avatar-lg" style="width:34px; height:34px; font-size:11px;" title="Lộc Thị Hạnh">LT</span>
+        </div>
+      </div>
+      <div class="home-head">
+        <div class="search-input">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input placeholder="Tìm cuộc trò chuyện...">
+        </div>
+        <div class="chip-row">
+          <button class="chip chip--active">Tất cả</button>
+          <button class="chip">Chưa đọc</button>
+          <button class="chip">Của tôi</button>
+          <button class="chip">Chưa trả lời</button>
+          <button class="chip">Cuộc gọi nhỡ</button>
+          <button class="chip">Lịch hẹn</button>
+        </div>
+      </div>
+      <div class="conv-list" id="convList"></div>
+    </div>
+
+    <!-- Panel Khách hàng — màn CRM Liên hệ -->
+    <div class="home-panel" id="home-customers">
+      <div class="lt-head">
+        <div class="lt-head__row">
+          <div style="flex:1; min-width:0;">
+            <div class="lt-head__title">Liên hệ</div>
+            <div class="lt-head__sub" id="custCount">9 liên hệ</div>
+          </div>
+          <button class="appbar__btn" id="btnAddCust" title="Thêm khách hàng">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Segment (từ sidebar desktop) -->
+      <div class="crm-seg">
+        <button class="crm-seg__chip crm-seg__chip--active">👥 Liên hệ</button>
+        <button class="crm-seg__chip">🏢 Công ty</button>
+        <button class="crm-seg__chip">➕ Leads</button>
+        <button class="crm-seg__chip">✓ Khách hàng</button>
+        <button class="crm-seg__chip">📅 Lịch hẹn</button>
+        <button class="crm-seg__chip">💬 Nhóm Zalo</button>
+        <button class="crm-seg__chip">🧑 Bạn bè Zalo</button>
+      </div>
+      <div class="home-head" style="padding-top:0;">
+        <div class="search-input">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input placeholder="Tìm theo tên / SĐT / email...">
+        </div>
+      </div>
+      <div class="crm-filters">
+        <button class="crm-filter">▽ Nguồn ⌄</button>
+        <button class="crm-filter">▽ Giai đoạn ⌄</button>
+        <button class="crm-filter">▽ Sale ⌄</button>
+        <button class="crm-filter">⤒ Nhập</button>
+        <button class="crm-filter">⤓ Xuất CSV</button>
+      </div>
+      <div class="crm-list" id="custList"></div>
+    </div>
+
+    <!-- Panel Cài đặt (Cá nhân) -->
+    <div class="home-panel" id="home-settings">
+      <div class="lt-head">
+        <div class="lt-head__row">
+          <div class="lt-head__title">Cá nhân</div>
+        </div>
+      </div>
+      <div class="set">
+        <!-- Menu con Cài đặt (từ sidebar desktop) -->
+        <div class="me-nav">
+          <button class="me-nav__chip me-nav__chip--active">👤 Hồ sơ của tôi</button>
+          <button class="me-nav__chip">🔒 Mật khẩu &amp; Bảo mật</button>
+          <button class="me-nav__chip">🔔 Thông báo</button>
+        </div>
+
+        <!-- Hồ sơ của tôi -->
+        <div class="me-card">
+          <div class="me-avatar-wrap">
+            <div class="me-avatar">LT</div>
+            <button class="me-avatar-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+              Đổi ảnh
+            </button>
+          </div>
+          <div class="me-field"><label>Họ và tên</label><input type="text" value="Lộc Thị Hạnh"></div>
+          <div class="me-field"><label>Vai trò</label><input type="text" value="member" disabled></div>
+          <div class="me-field"><label>Email</label><input type="email" value="hanhlt@traduoc.ai" disabled><small>Email đăng nhập không thể thay đổi.</small></div>
+          <div class="me-field"><label>Thành viên từ</label><input type="text" value="16/5/2026" disabled></div>
+          <button class="me-save">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>
+            Lưu thay đổi
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Menu chính kiểu Zalo: Hội thoại · Khách hàng · Tổng quan · Cá nhân -->
+    <div class="bottomnav">
+      <button class="bottomnav__item bottomnav__item--active" data-home="chats">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+        Hội thoại
+        <span class="bottomnav__badge">4</span>
+      </button>
+      <button class="bottomnav__item" data-home="customers">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg>
+        Khách hàng
+      </button>
+      <button class="bottomnav__item" data-home="overview">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+        Tổng quan
+      </button>
+      <button class="bottomnav__item" data-home="settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Cá nhân
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== MÀN 2: CHAT ========== -->
+  <div class="view" id="view-chat">
+    <div class="appbar" style="position:relative;">
+      <button class="appbar__back" data-nav-back>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <button class="chat-peer" id="btnOpenDetail" title="Xem hồ sơ khách">
+        <span class="chat-peer__avatar">KV</span>
+        <span style="min-width:0;">
+          <span class="chat-peer__name"><span>Kd Vanhoa 0348302234</span><span class="pipeline-chip">● Đăng ký</span></span>
+          <span class="chat-peer__meta">qua <span class="zalo-ic">Z</span> Vận Đơn TDVN · Lead 0/100</span>
+        </span>
+      </button>
+      <button class="appbar__btn" id="btnChatLibrary" title="Thư viện hội thoại">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/></svg>
+      </button>
+      <button class="appbar__btn" id="btnChatMore" title="Tùy chọn khác">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+      <div class="chat-more-menu" id="chatMoreMenu" hidden>
+        <div class="cmm-label">Chế độ AI trả lời</div>
+        <button class="cmm-ai cmm-ai--active" data-ai="manual">
+          <span class="cmm-ai__ic">✋</span>
+          <span class="cmm-ai__body"><b>Thủ công</b><small>Bạn tự trả lời, AI không can thiệp</small></span>
+          <span class="cmm-ai__check">✓</span>
+        </button>
+        <button class="cmm-ai" data-ai="suggest">
+          <span class="cmm-ai__ic">💡</span>
+          <span class="cmm-ai__body"><b>Gợi ý</b><small>AI soạn nháp, bạn duyệt rồi gửi</small></span>
+          <span class="cmm-ai__check">✓</span>
+        </button>
+        <button class="cmm-ai" data-ai="auto">
+          <span class="cmm-ai__ic">🤖</span>
+          <span class="cmm-ai__body"><b>Tự động</b><small>AI tự trả lời khách</small></span>
+          <span class="cmm-ai__check">✓</span>
+        </button>
+        <div class="cmm-divider"></div>
+        <button class="cmm-danger" id="btnDeleteConv">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Xóa hội thoại
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg-wrapper">
+        <div class="chat-messages__date">Thứ Bảy, 13/06/2026</div>
+        <div class="msg msg--sent">
+          <div class="msg__avatar" style="background:#16a34a;">VĐ</div>
+          <div>
+            <div class="msg__image"><span>📷 Hình ảnh (không tải được)</span></div>
+            <div class="msg__time">09:58
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="msg-wrapper">
+        <div class="chat-messages__date">HÔM NAY</div>
+        <div class="msg msg--received">
+          <div class="msg__avatar" style="background:#9333ea;">KV</div>
+          <div>
+            <div class="bday-card">
+              <div class="bday-card__head">
+                <div class="bday-card__avatar">KV</div>
+                <div class="bday-card__name">Ks Văn Hóa</div>
+              </div>
+              <div class="bday-card__body">
+                <div class="bday-card__date">18/08</div>
+                <div class="bday-card__hint">Hãy gửi lời chúc tốt đẹp!</div>
+                <div class="bday-card__art">🎂🎉🎈</div>
+              </div>
+            </div>
+            <div class="msg__time">10:16</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-inputbar">
+      <!-- Nút thao tác nhanh: menu hồ sơ khách đưa ra ngoài, Tạo đơn đứng đầu -->
+      <div class="chat-inputbar__tools">
+        <button class="tool-chip tool-chip--primary" id="btnQuickOrder">Tạo đơn</button>
+        <button class="tool-chip tool-chip--active">AI Gợi ý</button>
+        <button class="tool-chip">Tin nhanh</button>
+        <button class="tool-chip" id="btnQuickSales">Tài liệu</button>
+        <button class="tool-chip" id="btnQuickInfo">Thông tin</button>
+        <button class="tool-chip" id="btnQuickNotes">Ghi chú</button>
+      </div>
+      <div class="chat-inputbar__row">
+        <button class="chat-inputbar__icon" title="Đính kèm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+        </button>
+        <button class="chat-inputbar__icon" title="Sticker">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="M15 3v5a1 1 0 0 0 1 1h5"/><path d="M8 13h.01"/><path d="M16 13h.01"/><path d="M10 16s.8 1 2 1c1.3 0 2-1 2-1"/></svg>
+        </button>
+        <textarea class="chat-inputbar__field" id="chatInput" rows="1" placeholder="Nhập tin nhắn..."></textarea>
+        <button class="chat-inputbar__send" id="btnSend" title="Gửi">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MÀN 3: HỒ SƠ KHÁCH (4 tab) ========== -->
+  <div class="view" id="view-detail">
+    <div class="appbar">
+      <button class="appbar__back" data-nav-back>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <span class="chat-peer__avatar" style="width:34px;height:34px;">KV</span>
+      <div style="min-width:0; flex:1;">
+        <div class="appbar__title" style="font-size:14px;">Kd Vanhoa 0348302234</div>
+        <div style="font-size:11px; color:var(--gray-500);">ID: e216ee7f · SĐT: 0348302234</div>
+      </div>
+    </div>
+    <div class="detail-tabs">
+      <button class="detail-tab detail-tab--active" data-tab="info">Thông tin</button>
+      <button class="detail-tab" data-tab="notes">Ghi chú nhanh</button>
+      <button class="detail-tab" data-tab="order">Tạo đơn</button>
+      <span class="detail-tabs__divider"></span>
+      <button class="detail-tab detail-tab--sales" data-tab="sales">Tài liệu bán hàng</button>
+    </div>
+
+    <div class="detail-body" id="detailBody">
+      <!-- Tab Thông tin -->
+      <div class="detail-panel detail-panel--active" id="panel-info">
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">THÔNG TIN TỪ CRM</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+          </div>
+          <div class="crm-stats">
+            <div class="crm-stat"><span>Lịch bán hàng</span><b>—</b></div>
+            <div class="crm-stat"><span>Lịch chăm sóc</span><b>—</b></div>
+            <div class="crm-stat"><span>Số đơn</span><b>0</b></div>
+            <div class="crm-stat"><span>Ghi chú</span><b>0</b></div>
+          </div>
+          <div class="crm-grid">
+            <div class="crm-field"><span>Mã khách hàng</span><b>KH031245</b></div>
+            <div class="crm-field"><span>Số điện thoại</span><b>0348302234</b></div>
+            <div class="crm-field"><span>SĐT liên hệ khác</span><b>—</b></div>
+            <div class="crm-field"><span>Người phụ trách</span><b style="color:#2563eb;">Lộc Thị Hạnh</b></div>
+            <div class="crm-field"><span>Điểm</span><b style="color:#16a34a;">0</b></div>
+            <div class="crm-field"><span>Nghề nghiệp</span><b>—</b></div>
+            <div class="crm-field crm-field--full"><span>Nguồn khách hàng</span><b>Zalo cá nhân</b></div>
+            <div class="crm-field crm-field--full"><span>Địa chỉ</span><b>—</b></div>
+            <div class="crm-field crm-field--full"><span>Địa chỉ 2</span><b>—</b></div>
+          </div>
+        </div>
+        <div class="section">
+          <button class="btn-outline" id="btnViewHistory">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            Xem hồ sơ lịch sử mua hàng
+          </button>
+          <button class="btn-green" id="btnGoOrder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            Tạo đơn hàng
+          </button>
+        </div>
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">THÔNG TIN TÙY CHỈNH <span style="font-weight:400;color:var(--gray-400);">(3)</span></span>
+          </div>
+          <div class="cf-title">🍵 Trà Info</div>
+          <div class="info-row"><span class="lbl">Thích dùng hàng</span><span class="val">Chưa có</span></div>
+          <div class="cf-title" style="margin-top:8px;">💬 Zalo</div>
+          <div class="info-row"><span class="lbl">Bạn bè Zalo</span><span class="val">Chưa có</span></div>
+          <div class="info-row"><span class="lbl">Ngày sinh nhật</span><span class="val val--dark">18/8/2000</span></div>
+        </div>
+        <div class="ai-fab">
+          <button class="ai-btn" id="btnAiAnalyze">✨ Phân tích khách hàng (AI)</button>
+        </div>
+      </div>
+
+      <!-- Tab Ghi chú nhanh -->
+      <div class="detail-panel" id="panel-notes">
+        <div class="section">
+          <div class="pd-note">
+            <div class="pd-note-title">📝 Thêm ghi chú mới</div>
+            <select>
+              <option value="">-- Chọn trạng thái cuộc gọi/tương tác --</option>
+              <option>Không kết nối</option>
+              <option>Đang tư vấn</option>
+              <option>Hẹn gọi lại</option>
+              <option>Cơ hội</option>
+              <option>Chốt thành công</option>
+              <option>Nguy cơ rời bỏ</option>
+            </select>
+            <textarea rows="3" placeholder="Nhập ghi chú về cuộc gọi, gặp mặt, nhu cầu khách hàng..."></textarea>
+            <button class="pd-note-submit" disabled>⊕ Thêm ghi chú</button>
+          </div>
+          <div id="notesList"></div>
+          <div class="empty-line" id="notesEmpty">Chưa có ghi chú nào.</div>
+        </div>
+      </div>
+
+      <!-- Tab Tạo đơn (logic theo CRM/tao-don.html) -->
+      <div class="detail-panel" id="panel-order">
+        <div class="of">
+          <div class="of__section-title">Thông tin đơn hàng</div>
+          <div class="of__row">
+            <div class="of__group">
+              <label class="of__label">Chọn trạng thái</label>
+              <div class="of__select-wrap">
+                <select class="of__select of__select--accent">
+                  <option value="">-- Chọn trạng thái --</option>
+                  <option>Chờ xử lý</option>
+                  <option selected>Đang lấy hàng</option>
+                  <option>Chờ lấy lại</option>
+                  <option>Đã lấy hàng</option>
+                  <option>Đang giao hàng</option>
+                  <option>Chờ giao lại</option>
+                  <option>Giao thành công</option>
+                  <option>Chờ chuyển hoàn</option>
+                  <option>Đang chuyển hoàn</option>
+                  <option>Chờ chuyển hoàn lại</option>
+                  <option>Đã chuyển hoàn</option>
+                  <option>Đã hủy</option>
+                </select>
+              </div>
+            </div>
+            <div class="of__group">
+              <label class="of__label">Chọn nhân viên</label>
+              <div class="of__select-wrap">
+                <select class="of__select">
+                  <option value="" selected>Chọn nhân viên</option>
+                  <option>Lộc Thị Hạnh</option>
+                  <option>Ngọc Thảo</option>
+                  <option>Tuấn Anh Đỗ</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="of__group">
+            <label class="of__label">📍 Tỉnh/Thành phố</label>
+            <div class="of__select-wrap">
+              <select class="of__select">
+                <option value="" selected>Chọn tỉnh/thành phố</option>
+                <option>Hà Nội</option>
+                <option>TP. Hồ Chí Minh</option>
+                <option>Đà Nẵng</option>
+                <option>Hải Phòng</option>
+                <option>Hưng Yên</option>
+              </select>
+            </div>
+          </div>
+          <div class="of__group">
+            <label class="of__label">📍 Phường/Xã</label>
+            <div class="of__select-wrap">
+              <select class="of__select"><option value="" selected>Chọn phường/xã</option></select>
+            </div>
+          </div>
+          <div class="of__group">
+            <label class="of__label">Địa chỉ chi tiết</label>
+            <input class="of__input" placeholder="Điền địa chỉ chi tiết...">
+          </div>
+
+          <div class="of__section-title">Thông tin khác</div>
+          <div class="of__row">
+            <div class="of__group">
+              <label class="of__label">Nguồn đơn hàng</label>
+              <div class="of__select-wrap">
+                <select class="of__select">
+                  <option value="" selected>Chọn nguồn</option>
+                  <option>Zalo</option><option>Facebook</option><option>Website</option><option>Hotline</option>
+                </select>
+              </div>
+            </div>
+            <div class="of__group">
+              <label class="of__label">Loại đơn hàng</label>
+              <div class="of__select-wrap">
+                <select class="of__select">
+                  <option value="" selected>Chọn loại</option>
+                  <option>Bán lẻ</option><option>Bán buôn</option><option>Đơn mẫu</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="of__group">
+            <label class="of__label">Ghi chú</label>
+            <textarea class="of__textarea" id="ofOrderNote" placeholder="Nhập ghi chú đơn hàng..."></textarea>
+          </div>
+
+          <div class="of__section-title">Sản phẩm</div>
+          <div class="of__row">
+            <div class="of__group" style="flex:0 0 82px;">
+              <div class="of__select-wrap">
+                <select class="of__select" title="Chọn kho hàng">
+                  <option value="" selected>Kho</option>
+                  <option>Kho Hà Nội</option>
+                  <option>Kho HCM</option>
+                </select>
+              </div>
+            </div>
+            <div class="of__group"><input class="of__input" placeholder="Tìm sản phẩm"></div>
+            <div class="of__group"><input class="of__input" placeholder="Tìm quà tặng"></div>
+          </div>
+          <div class="of__prod-head"><span>Sản phẩm</span><span>Giá tiền</span></div>
+          <div id="ofProdList">
+            <div class="op-item" data-gia="87000" data-kl="100" data-ton="770">
+              <div class="op-item__top">
+                <span class="op-item__code">FX/TP-CC05-100/KR</span>
+                <button type="button" class="op-item__del" title="Xoá sản phẩm">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+              <div class="op-item__name">Vạn Thọ Trà - Túi Kraft 100g · Đã có VAT 8%</div>
+              <div class="op-item__row">
+                <span>87.000 đ/Túi · <i class="op-item__kl">100g</i></span>
+                <div class="op-qty"><button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button></div>
+              </div>
+              <div class="op-item__row"><span class="op-item__stock">Tồn: 770</span><b class="op-item__sum">87.000</b></div>
+            </div>
+            <div class="op-item" data-gia="500000" data-kl="100" data-ton="527">
+              <div class="op-item__top">
+                <span class="op-item__code">FX/TP-CC09-100/KR</span>
+                <button type="button" class="op-item__del" title="Xoá sản phẩm">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+              <div class="op-item__name">Trà Đinh Ngọc - Túi thiếc VIP - 100g · Đã có VAT 8%</div>
+              <div class="op-item__row">
+                <span>500.000 đ/Hộp · <i class="op-item__kl">100g</i></span>
+                <div class="op-qty"><button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button></div>
+              </div>
+              <div class="op-item__row"><span class="op-item__stock">Tồn: 527</span><b class="op-item__sum">500.000</b></div>
+            </div>
+            <div class="op-item op-item--gift" data-gia="0" data-kl="250" data-ton="120">
+              <div class="op-item__top">
+                <span class="op-item__code">QT/CL-MC-250</span>
+                <span class="op-gift-tag">🎁 Quà tặng</span>
+                <button type="button" class="op-item__del" title="Xoá quà tặng">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+              <div class="op-item__name">Chè lam matcha - 250g · Quà tặng — không tính tiền</div>
+              <div class="op-item__row">
+                <span>0 đ/Gói · <i class="op-item__kl">250g</i></span>
+                <div class="op-qty"><button type="button" data-d="-1">−</button><input value="1" inputmode="numeric"><button type="button" data-d="1">+</button></div>
+              </div>
+              <div class="op-item__row"><span class="op-item__stock">Tồn: 120</span><b class="op-item__sum">0</b></div>
+            </div>
+          </div>
+          <div class="of__prod-empty" id="ofProdEmpty" hidden>🔍 Chưa có sản phẩm nào</div>
+          <div class="op-total" id="ofProdTotal"></div>
+
+          <div class="of__summary">
+            <div class="of__head-row" style="margin-bottom:10px;">
+              <div class="of__section-title" style="margin:0;">Vận chuyển</div>
+              <label class="of-check"><input type="checkbox" id="ofSelfShip"> Tự vận chuyển</label>
+            </div>
+            <div class="of__group">
+              <label class="of__label">🚚 Chọn đơn vị vận chuyển</label>
+              <div class="of__select-wrap">
+                <select class="of__select" id="ofShipUnit">
+                  <option data-fee="25000" data-info="J&amp;T Express - Chuyển phát nhanh chuyên nghiệp" selected>J&amp;T Express - 25.000đ</option>
+                  <option data-fee="25000" data-info="VN Post - Mạng lưới bưu cục phủ khắp toàn quốc">VN Post - 25.000đ</option>
+                  <option data-fee="25000" data-info="Viettel Post - Chuyển phát nhanh trong ngày nội tỉnh">Viettel Post - 25.000đ</option>
+                </select>
+              </div>
+            </div>
+            <div class="of__group">
+              <label class="of__label" id="ofShipCostLabel">Chi phí vận chuyển</label>
+              <input class="of__input" id="ofShipCost" value="25.000" disabled>
+            </div>
+            <div class="of__info" id="ofShipInfo">ⓘ <b>Thông tin:</b> J&amp;T Express - Chuyển phát nhanh chuyên nghiệp</div>
+            <label class="of-check" style="margin-bottom:8px;"><input type="checkbox"> Hàng dễ vỡ ⓘ</label>
+            <div class="of__dim-grid">
+              <input class="of__input" id="ofShipWeight" value="450" title="KL (gram) — tự điền theo tổng KL, sửa tay được">
+              <input class="of__input" placeholder="Dài (cm)">
+              <input class="of__input" placeholder="Rộng (cm)">
+              <input class="of__input" placeholder="Cao (cm)">
+            </div>
+            <div class="of__return-note" id="ofReturnNote">Ghi chú đơn đổi: Thu hàng cũ đổi đơn mới &amp; thu cod chênh lệch</div>
+            <div class="of__head-row" style="margin-top:10px;">
+              <span style="font-size:12.5px; font-weight:700;" id="ofShipBrand">J&amp;T EXPRESS</span>
+              <label class="of-check"><input type="checkbox" id="ofReturnCheck"> Đơn đổi trả</label>
+            </div>
+          </div>
+
+          <div class="of__summary">
+            <div class="of__head-row" style="margin-bottom:4px;">
+              <div class="of__section-title" style="margin:0;">Thanh toán</div>
+              <span style="color:var(--primary-500); display:flex;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+              </span>
+            </div>
+            <div class="of__sum-row">
+              <span class="of__sum-label">Chiết khấu</span>
+              <span class="of__unit-input"><input id="ofDiscount" value="0" inputmode="numeric"><i>%</i></span>
+            </div>
+            <div class="of__sum-row">
+              <span class="of__sum-label">Mã ưu đãi</span>
+              <span class="of__code-input"><input placeholder="Nhập mã"><button>Áp dụng</button></span>
+            </div>
+            <div class="of__sum-row">
+              <span class="of__sum-label">Tiêu "Lá"<em>1 Lá = 1.000đ</em></span>
+              <span class="of__unit-input"><input id="ofPoints" value="0" inputmode="numeric"><i>Lá</i></span>
+            </div>
+            <div class="of__sum-row"><span class="of__sum-label">Quy đổi Lá</span><span class="of__sum-value" id="ofLaMoney">0đ</span></div>
+            <div class="of__sum-row"><span class="of__sum-label">Phí vận chuyển</span><span class="of__sum-value" id="ofPayShip">25.000đ</span></div>
+            <div class="of__total-row"><span>Tổng thanh toán</span><b id="ofPayTotal">612.000</b></div>
+            <div class="of__sum-row">
+              <span class="of__sum-label">Chuyển khoản (đặt cọc)</span>
+              <span class="of__unit-input"><input id="ofTransfer" value="0" inputmode="numeric" placeholder="0"><i>đ</i></span>
+            </div>
+            <div class="of__sum-row"><span class="of__sum-label">Đã đặt cọc</span><span class="of__sum-value" style="color:#16a34a;" id="ofDeposit">0đ</span></div>
+            <div class="of__sum-row"><span class="of__sum-label">Còn phải thu (COD)</span><span class="of__sum-value" style="color:#ea580c;" id="ofPayCod">612.000đ</span></div>
+            <div class="of__sum-row"><span class="of__sum-label">Trạng thái thanh toán</span><span class="of__pay-badge" id="ofPayStatus">Chưa thanh toán</span></div>
+          </div>
+
+          <div class="of__footer">
+            <button class="of__btn-reset">↺ Tạo lại</button>
+            <button class="of__btn-submit" id="ofSubmit">🛒 Đặt hàng</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Tài liệu bán hàng -->
+      <div class="detail-panel" id="panel-sales">
+        <div class="sd">
+          <div class="sd__tabs">
+            <button class="sd__tab sd__tab--active" data-sd="images">Hình ảnh</button>
+            <button class="sd__tab" data-sd="content">Content</button>
+            <button class="sd__tab" data-sd="video">Video</button>
+          </div>
+          <div class="sd__note">🔒 Chỉ hiển thị tài liệu <b>đã duyệt</b> — được phép gửi ra ngoài cho khách.</div>
+
+          <div class="sd__panel sd__panel--active" id="sd-images">
+            <div class="search-input sd__search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+              <input placeholder="Tìm ảnh theo tên, mã...">
+            </div>
+            <div class="sd__group">🍵 Trà Đinh Ngọc</div>
+            <div class="sd__grid">
+              <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">
+                <input type="checkbox" data-name="Đinh Ngọc 100g" data-code="FX/TP-CC09-100/KR" title="Mã: FX/TP-CC09-100/KR">
+                <span class="sd-tile__emoji">🍵</span><span class="sd-tile__name">Đinh Ngọc 100g</span>
+              </label>
+              <label class="sd-tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">
+                <input type="checkbox" data-name="Hộp thiếc VIP" data-code="FX/TP-CC09-HT" title="Mã: FX/TP-CC09-HT">
+                <span class="sd-tile__emoji">📦</span><span class="sd-tile__name">Hộp thiếc VIP</span>
+              </label>
+              <label class="sd-tile" style="background:linear-gradient(135deg,#fef3c7,#fde68a);">
+                <input type="checkbox" data-name="Set quà biếu" data-code="QT/SET-SN08" title="Mã: QT/SET-SN08">
+                <span class="sd-tile__emoji">🎁</span><span class="sd-tile__name">Set quà biếu</span>
+              </label>
+            </div>
+            <div class="sd__group">🏔️ Trà Shan Tuyết</div>
+            <div class="sd__grid">
+              <label class="sd-tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">
+                <input type="checkbox" data-name="Shan Tuyết cổ thụ" data-code="ST/CT-500" title="Mã: ST/CT-500">
+                <span class="sd-tile__emoji">🏔️</span><span class="sd-tile__name">Shan Tuyết cổ thụ</span>
+              </label>
+              <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#a7f3d0);">
+                <input type="checkbox" data-name="Hồng trà Shan" data-code="ST/HT-80" title="Mã: ST/HT-80">
+                <span class="sd-tile__emoji">🍃</span><span class="sd-tile__name">Hồng trà Shan</span>
+              </label>
+            </div>
+            <div class="sd__group">🫖 Ấm chén &amp; phụ kiện</div>
+            <div class="sd__grid">
+              <label class="sd-tile" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);">
+                <input type="checkbox" data-name="Bộ ấm Cúc cổ" data-code="PK/AC-CC09" title="Mã: PK/AC-CC09">
+                <span class="sd-tile__emoji">🫖</span><span class="sd-tile__name">Bộ ấm Cúc cổ</span>
+              </label>
+              <label class="sd-tile" style="background:linear-gradient(135deg,#ffedd5,#fed7aa);">
+                <input type="checkbox" data-name="Chén khải sứ" data-code="PK/CK-01" title="Mã: PK/CK-01">
+                <span class="sd-tile__emoji">☕</span><span class="sd-tile__name">Chén khải sứ</span>
+              </label>
+            </div>
+            <div class="empty-line sd__empty" hidden>Không tìm thấy tài liệu phù hợp.</div>
+            <div class="sd__send-wrap">
+              <button class="sd__send-btn" data-send="sd-images" disabled>📤 Gửi vào chat (0)</button>
+            </div>
+          </div>
+
+          <div class="sd__panel" id="sd-content">
+            <div class="search-input sd__search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+              <input placeholder="Tìm content theo tên, mã...">
+            </div>
+            <div class="sd-content">
+              <div class="sd-content__head">
+                <div class="sd-content__title">Trà Đinh Ngọc — Túi thiếc VIP 100g <span class="sd-content__code">CT-DN-01</span></div>
+                <button class="sd-content__copy">📋 Copy</button>
+              </div>
+              <div class="sd-content__text">🍵 TRÀ ĐINH NGỌC — phẩm trà thượng hạng của Trà Dược Việt Nam. Hái 1 tôm duy nhất lúc sớm mai, sao suốt bằng chảo gang. Nước xanh ngọc, hương cốm non, hậu ngọt sâu. Hộp thiếc VIP 100g — sang trọng để biếu tặng. Inbox để được tư vấn ngay ạ! 🌿</div>
+            </div>
+            <div class="sd-content">
+              <div class="sd-content__head">
+                <div class="sd-content__title">Trà Shan Tuyết cổ thụ <span class="sd-content__code">CT-ST-01</span></div>
+                <button class="sd-content__copy">📋 Copy</button>
+              </div>
+              <div class="sd-content__text">🏔️ SHAN TUYẾT CỔ THỤ — thu hái từ những cây trà trăm tuổi trên độ cao 1.400m. Búp trà phủ tuyết trắng, vị chát dịu chuyển ngọt, pha được 7-8 nước vẫn đượm hương. Món quà từ núi rừng cho người sành trà. 🍃</div>
+            </div>
+            <div class="sd-content">
+              <div class="sd-content__head">
+                <div class="sd-content__title">Combo quà biếu sinh nhật <span class="sd-content__code">CT-SN-08</span></div>
+                <button class="sd-content__copy">📋 Copy</button>
+              </div>
+              <div class="sd-content__text">🎂 Sinh nhật tháng này — TDVN gửi tặng ưu đãi đặc biệt: Combo Trà Đinh Ngọc 100g + hộp kẹo vừng ta + thiệp chúc mừng viết tay. Miễn phí gói quà &amp; giao hàng. Nhắn em để giữ ưu đãi nhé ạ! 🎁</div>
+            </div>
+            <div class="empty-line sd__empty" hidden>Không tìm thấy tài liệu phù hợp.</div>
+          </div>
+
+          <div class="sd__panel" id="sd-video">
+            <div class="search-input sd__search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+              <input placeholder="Tìm video theo tên, mã...">
+            </div>
+            <div class="sd__group">🍵 Trà Đinh Ngọc</div>
+            <div class="sd__grid">
+              <label class="sd-tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">
+                <input type="checkbox" data-name="Review Đinh Ngọc" data-code="VD-DN-REVIEW" title="Mã: VD-DN-REVIEW">
+                <span class="sd-tile__emoji">🎬</span><span class="sd-tile__name">Review Đinh Ngọc</span>
+                <span class="sd-tile__dur">▶ 1:25</span>
+              </label>
+              <label class="sd-tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">
+                <input type="checkbox" data-name="Cách pha Đinh Ngọc" data-code="VD-DN-PHA" title="Mã: VD-DN-PHA">
+                <span class="sd-tile__emoji">🫖</span><span class="sd-tile__name">Cách pha chuẩn</span>
+                <span class="sd-tile__dur">▶ 0:58</span>
+              </label>
+            </div>
+            <div class="sd__group">🏭 Thương hiệu</div>
+            <div class="sd__grid">
+              <label class="sd-tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">
+                <input type="checkbox" data-name="Xưởng trà TDVN" data-code="VD-BRAND-01" title="Mã: VD-BRAND-01">
+                <span class="sd-tile__emoji">🏭</span><span class="sd-tile__name">Xưởng trà TDVN</span>
+                <span class="sd-tile__dur">▶ 2:10</span>
+              </label>
+            </div>
+            <div class="empty-line sd__empty" hidden>Không tìm thấy tài liệu phù hợp.</div>
+            <div class="sd__send-wrap">
+              <button class="sd__send-btn" data-send="sd-video" disabled>📤 Gửi vào chat (0)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MÀN 4: KHO LƯU TRỮ ========== -->
+  <div class="view" id="view-library">
+    <div class="appbar">
+      <button class="appbar__back" data-nav-back>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="appbar__title" style="text-align:center;">Kho lưu trữ</div>
+      <button class="appbar__btn" style="width:auto; font-size:14px; font-weight:700; color:var(--gray-800);">Chọn</button>
+    </div>
+    <div class="lib">
+      <div class="lib__tabs">
+        <button class="lib__tab" data-lib="media">Ảnh/Video</button>
+        <button class="lib__tab lib__tab--active" data-lib="files">Files</button>
+        <button class="lib__tab" data-lib="links">Links</button>
+      </div>
+
+      <div class="lib__panel" id="lib-media">
+        <div class="lib__filters">
+          <button class="lib__chip">Người gửi ⌄</button>
+          <button class="lib__chip">Ngày gửi ⌄</button>
+        </div>
+        <div class="lib__date">Ngày 18 Tháng 8</div>
+        <div class="lib__grid">
+          <div class="lib__tile" style="background:linear-gradient(135deg,#fef3c7,#fde68a);">🎂</div>
+          <div class="lib__tile" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">🍵</div>
+          <div class="lib__tile" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd);">📦<span class="lib__tile-dur">▶ 0:35</span></div>
+        </div>
+        <div class="lib__date">Ngày 13 Tháng 6</div>
+        <div class="lib__grid">
+          <div class="lib__tile" style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);">🏷️</div>
+          <div class="lib__tile" style="background:linear-gradient(135deg,#f3e8ff,#e9d5ff);">🚚</div>
+        </div>
+      </div>
+
+      <div class="lib__panel lib__panel--active" id="lib-files">
+        <div class="search-input">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input placeholder="Tìm kiếm File">
+        </div>
+        <div class="lib__filters">
+          <button class="lib__chip">Loại ⌄</button>
+          <button class="lib__chip">Người gửi ⌄</button>
+          <button class="lib__chip">Ngày gửi ⌄</button>
+        </div>
+        <div class="lib__date">Ngày 14 Tháng 8</div>
+        <div class="lib__file">
+          <span class="lib__file-ic" style="background:#16a34a;">XLS</span>
+          <div class="lib__body"><div class="lib__file-name">Bảng giá sỉ TDVN T8-2026.xlsx</div><div class="lib__file-meta">128 KB · Lộc Hạnh</div></div>
+        </div>
+        <div class="lib__file">
+          <span class="lib__file-ic" style="background:#2563eb;">DOC</span>
+          <div class="lib__body"><div class="lib__file-name">Mẫu hợp đồng đại lý 2026.docx</div><div class="lib__file-meta">84 KB · Lộc Hạnh</div></div>
+        </div>
+        <div class="lib__date">Ngày 12 Tháng 8</div>
+        <div class="lib__file">
+          <span class="lib__file-ic" style="background:#ef4444;">PDF</span>
+          <div class="lib__body"><div class="lib__file-name">Phiếu giao J&amp;T 802802916652.pdf</div><div class="lib__file-meta">312 KB · Thủy Anna</div></div>
+        </div>
+        <div class="lib__date">Ngày 5 Tháng 8</div>
+        <div class="lib__file">
+          <span class="lib__file-ic" style="background:#ef4444;">PDF</span>
+          <div class="lib__body"><div class="lib__file-name">Catalogue Trà Đinh Ngọc.pdf</div><div class="lib__file-meta">2,4 MB · Ngọc Thảo</div></div>
+        </div>
+      </div>
+
+      <div class="lib__panel" id="lib-links">
+        <div class="search-input">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input placeholder="Tìm kiếm link">
+        </div>
+        <div class="lib__filters">
+          <button class="lib__chip">Người gửi ⌄</button>
+          <button class="lib__chip">Ngày gửi ⌄</button>
+        </div>
+        <div class="lib__date">Ngày 14 Tháng 8</div>
+        <div class="lib__link">
+          <span class="lib__link-ic">🔗</span>
+          <div class="lib__body"><div class="lib__link-title">Ảnh mẫu bao bì Tết 2027 (Drive)</div><div class="lib__link-domain">drive.google.com</div></div>
+        </div>
+        <div class="lib__date">Ngày 12 Tháng 8</div>
+        <div class="lib__link">
+          <span class="lib__link-ic">🔗</span>
+          <div class="lib__body"><div class="lib__link-title">Bảng giá đại lý T8 — Google Sheets</div><div class="lib__link-domain">docs.google.com</div></div>
+        </div>
+        <div class="lib__date">Ngày 11 Tháng 8</div>
+        <div class="lib__link">
+          <span class="lib__link-ic">🔗</span>
+          <div class="lib__body"><div class="lib__link-title">Trà Đinh Ngọc - Túi thiếc VIP 100g</div><div class="lib__link-domain">traduocvietnam.vn</div></div>
+        </div>
+        <div class="lib__date">Ngày 10 Tháng 8</div>
+        <div class="lib__link">
+          <span class="lib__link-ic">🔗</span>
+          <div class="lib__body"><div class="lib__link-title">Tra cứu vận đơn J&amp;T Express</div><div class="lib__link-domain">jtexpress.vn</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MÀN 5: LỊCH SỬ MUA HÀNG ========== -->
+  <div class="view" id="view-history">
+    <div class="appbar">
+      <button class="appbar__back" data-nav-back>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="appbar__title">Lịch sử mua hàng</div>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div class="ph-row">
+        <span class="ph-row__ic">🧾</span>
+        <div><div class="ph-row__name">HD_L255I019</div><div class="ph-row__meta">23/07/2026 · Trà Đinh Ngọc - Túi thiếc VIP 100g</div></div>
+        <div class="ph-row__right"><div class="ph-row__money">2.500.000đ</div><span class="ph-badge ph-badge--done">Giao thành công</span></div>
+      </div>
+      <div class="ph-row">
+        <span class="ph-row__ic">🧾</span>
+        <div><div class="ph-row__name">HD_1953X82A</div><div class="ph-row__meta">06/07/2026 · Trà Đinh Ngọc - Túi thiếc VIP 100g</div></div>
+        <div class="ph-row__right"><div class="ph-row__money">2.500.000đ</div><span class="ph-badge ph-badge--done">Giao thành công</span></div>
+      </div>
+      <div class="ph-row">
+        <span class="ph-row__ic">🧾</span>
+        <div><div class="ph-row__name">HD_49763P4R</div><div class="ph-row__meta">01/07/2026 · (Quà) Kẹo Vừng Ta + Đinh Ngọc 100g</div></div>
+        <div class="ph-row__right"><div class="ph-row__money">2.500.000đ</div><span class="ph-badge ph-badge--return">Đã chuyển hoàn</span></div>
+      </div>
+      <div class="ph-row">
+        <span class="ph-row__ic">🧾</span>
+        <div><div class="ph-row__name">HD_5377O2V4</div><div class="ph-row__meta">21/01/2026 · (Quà) Kẹo lạc đỏ + Đinh Ngọc 100g</div></div>
+        <div class="ph-row__right"><div class="ph-row__money">2.500.000đ</div><span class="ph-badge ph-badge--cancel">Đã hủy</span></div>
+      </div>
+      <div class="ph-row">
+        <span class="ph-row__ic">🧾</span>
+        <div><div class="ph-row__name">HD021279</div><div class="ph-row__meta">16/12/2025 · (Quà) Kẹo vừng ta + Đinh Ngọc 100g</div></div>
+        <div class="ph-row__right"><div class="ph-row__money">2.500.000đ</div><span class="ph-badge ph-badge--done">Giao thành công</span></div>
+      </div>
+      <div class="empty-line" style="padding:0 14px 20px;">Bản mobile hiển thị rút gọn — xem đầy đủ trên CRM desktop.</div>
+    </div>
+  </div>
+
+  <!-- ===== Bottom sheet: Thêm liên hệ mới ===== -->
+  <div class="sheet-bg" id="addCustSheet">
+    <div class="sheet">
+      <div class="sheet__head">
+        <div>
+          <div class="sheet__title">Thêm liên hệ mới</div>
+          <div class="sheet__sub">Nhập thông tin để tạo liên hệ trong hệ thống</div>
+        </div>
+        <button class="sheet__close" id="addCustClose">✕</button>
+      </div>
+      <div class="sheet__body">
+        <div class="fld">
+          <label class="fld__label">👤 Họ và tên <span class="fld__req">*</span></label>
+          <input class="fld__input" placeholder="Nhập tên liên hệ">
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label class="fld__label">📞 Số điện thoại</label><input class="fld__input" placeholder="0912 345 678"></div>
+          <div class="fld"><label class="fld__label">✉️ Email</label><input class="fld__input" type="email" placeholder="email@example.com"></div>
+        </div>
+        <div class="fld"><label class="fld__label">🏢 Công ty</label><input class="fld__input" placeholder="Tìm công ty (nếu có)..."></div>
+        <div class="fld-row">
+          <div class="fld"><label class="fld__label">🌐 Nguồn</label>
+            <select class="fld__select"><option>Zalo</option><option>Facebook</option><option>Website</option><option>LinkedIn</option><option>AI Bot</option><option>Giới thiệu</option><option>Khác</option></select>
+          </div>
+          <div class="fld"><label class="fld__label">🔀 Giai đoạn</label>
+            <select class="fld__select"><option>Đăng ký</option><option>Lead</option><option>Đủ điều kiện</option><option>Cơ hội</option><option>Khách hàng</option><option>VIP/Đại sứ</option><option>Rời bỏ</option></select>
+          </div>
+        </div>
+        <div class="fld"><label class="fld__label">🏷️ Nhãn / Tags</label><input class="fld__input" placeholder="VIP, Tiềm năng, Hot..."></div>
+        <div class="fld"><label class="fld__label">📝 Ghi chú nội bộ</label><textarea class="fld__textarea" placeholder="Thêm ghi chú về liên hệ..."></textarea></div>
+      </div>
+      <div class="sheet__foot">
+        <button class="sheet-btn sheet-btn--ghost" id="addCustCancel">Hủy</button>
+        <button class="sheet-btn sheet-btn--primary" id="addCustSubmit">＋ Tạo liên hệ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal AI (bottom sheet) ===== -->
+  <div class="ai-modal-bg" id="aiModalBg">
+    <div class="ai-modal">
+      <div class="ai-modal__head">
+        ✨ Customer 360 — Phân tích khách hàng
+        <button class="ai-modal__close" id="aiModalClose">✕</button>
+      </div>
+      <div class="ai-modal__body">
+        <div class="ai-loading" id="aiLoading"><span class="ai-spinner"></span> Đang phân tích cuộc trò chuyện gần nhất...</div>
+        <div id="aiResult" hidden>
+          <div class="ai-block">
+            <div class="ai-block__title">👤 Chân dung khách hàng</div>
+            Khách mới từ Zalo cá nhân (kênh Vận Đơn TDVN), pipeline <b>Đăng ký</b>, Lead 0/100. Hôm nay là <b>sinh nhật khách (18/08)</b>.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">💬 Tóm tắt hội thoại</div>
+            Shop gửi 1 ảnh (13/06), hệ thống vừa gửi thiệp sinh nhật hôm nay. Khách <b>chưa phản hồi</b> — chưa rõ nhu cầu cụ thể.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">🎯 Cơ hội</div>
+            Sinh nhật là cớ tự nhiên để mở lại hội thoại. Tiềm năng chuyển <b>Đăng ký → Lead</b> nếu khách phản hồi lời chúc.
+          </div>
+          <div class="ai-block">
+            <div class="ai-block__title">✅ Đề xuất hành động</div>
+            1. Gửi lời chúc sinh nhật cá nhân hoá kèm ảnh thiệp.<br>
+            2. Tặng mã ưu đãi sinh nhật (hạn 7 ngày) để tạo lý do mua.<br>
+            3. Nếu khách phản hồi — giới thiệu Trà Đinh Ngọc bản dùng thử 100g.
+          </div>
+          <div class="ai-modal__time" id="aiTime">Lượt phân tích gần nhất: —</div>
+        </div>
+      </div>
+      <div class="ai-modal__foot">
+        <button class="ai-btn-ghost" id="aiModalClose2">Đóng</button>
+        <button class="ai-btn-note" id="btnAiToNote" disabled>✏️ Ghi vào ghi chú</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ================== ĐIỀU HƯỚNG MÀN ==================
+  var navStack = [];
+  function navOpen(id){
+    document.getElementById(id).classList.add('view--open');
+    navStack.push(id);
+  }
+  function navBack(){
+    var id = navStack.pop();
+    if (id) document.getElementById(id).classList.remove('view--open');
+  }
+  document.querySelectorAll('[data-nav-back]').forEach(function(b){ b.addEventListener('click', navBack); });
+
+  // ================== ĐIỀU HƯỚNG CẤP 1: bottom tab bar (Tổng quan / Hội thoại / Cài đặt) ==================
+  function homeSwitch(key){
+    document.querySelectorAll('.home-panel').forEach(function(p){
+      p.classList.toggle('home-panel--active', p.id === 'home-' + key);
+    });
+    document.querySelectorAll('.bottomnav__item').forEach(function(t){
+      t.classList.toggle('bottomnav__item--active', t.dataset.home === key);
+    });
+  }
+  document.querySelectorAll('.bottomnav__item').forEach(function(btn){
+    btn.addEventListener('click', function(){ if (btn.dataset.home) homeSwitch(btn.dataset.home); });
+  });
+  // ---- Dashboard Tổng quan: biểu đồ tin nhắn, pipeline, hoạt động ----
+  // Bar chart tin nhắn theo ngày (7 ngày) — cặp Đã gửi / Đã nhận
+  var BAR_DAYS = [
+    {d:'T2', sent:520, recv:470}, {d:'T3', sent:610, recv:560}, {d:'T4', sent:480, recv:430},
+    {d:'T5', sent:700, recv:640}, {d:'T6', sent:590, recv:520}, {d:'T7', sent:430, recv:390},
+    {d:'CN', sent:303, recv:280}
+  ];
+  var barMax = 0;
+  BAR_DAYS.forEach(function(x){ barMax = Math.max(barMax, x.sent, x.recv); });
+  document.getElementById('barChart').innerHTML = BAR_DAYS.map(function(x){
+    return '<div class="bar-col"><div class="bar-col__bars">' +
+      '<div class="bar-col__bar" style="height:' + Math.round(x.sent / barMax * 100) + '%; background:#3b82f6;"></div>' +
+      '<div class="bar-col__bar" style="height:' + Math.round(x.recv / barMax * 100) + '%; background:#93c5fd;"></div>' +
+      '</div><div class="bar-col__label">' + x.d + '</div></div>';
+  }).join('');
+
+  // Pipeline khách hàng
+  var PIPELINE = [
+    {name:'Khách hàng', color:'#16a34a', value:4},
+    {name:'mql', color:'#94a3b8', value:1},
+    {name:'Cơ hội', color:'#ea580c', value:2},
+    {name:'Lead', color:'#f59e0b', value:7},
+    {name:'Đủ điều kiện', color:'#9333ea', value:2},
+    {name:'Đăng ký', color:'#2563eb', value:13335}
+  ];
+  var plMax = Math.max.apply(null, PIPELINE.map(function(p){ return p.value; }));
+  document.getElementById('pipeline').innerHTML = PIPELINE.map(function(p){
+    return '<div class="pl-bar">' +
+      '<span class="pl-bar__label"><span class="pl-bar__dot" style="background:' + p.color + ';"></span>' + p.name + '</span>' +
+      '<span class="pl-bar__track"><span class="pl-bar__fill" style="width:' + (p.value / plMax * 100) + '%; background:' + p.color + ';"></span></span>' +
+      '<span class="pl-bar__value">' + p.value.toLocaleString('vi-VN') + '</span></div>';
+  }).join('');
+
+  // Hoạt động gần đây
+  var ACTIVITY = ['Aaa','Chu Đức Tuấn','Lân Ngãi','Nguyen Van Toj','Đào Văn Hưng','Thành Thu','Trần Sang','Do Quang','Le Quoc Viet','Nguyễn Văn Phòng'];
+  function initials(name){
+    var p = name.trim().split(/\s+/);
+    return (p.length > 1 ? p[0].charAt(0) + p[p.length - 1].charAt(0) : p[0].charAt(0)).toUpperCase();
+  }
+  document.getElementById('activityFeed').innerHTML = ACTIVITY.map(function(n){
+    return '<div class="act-item"><div class="act-item__avatar">' + esc(initials(n)) + '</div>' +
+      '<div class="act-item__text"><b>' + esc(n) + '</b> chuyển sang "subscriber"</div>' +
+      '<span class="act-item__time">1 phút trước</span></div>';
+  }).join('');
+
+  // ================== DANH SÁCH HỘI THOẠI ==================
+  var SRC_VD = 'Vận Đơn Trà Dược Việt Nam - 0325173345';
+  var SRC_LH = 'Lộc Hạnh Trà Dược Việt Nam';
+  var CONVS = [
+    {init:'KV', color:'#ec4899', name:'Kd Vanhoa 0348302234', time:'5h', cake:'Ks Văn Hóa', src:SRC_VD},
+    {init:'T-', color:'#ec4899', name:'TDVN - JT CARE ĐƠN HÀNG', time:'1d', text:'@Thủy Anna check hành trình đơn này giúp chị với. 802802916652 Đã đến bưu cục phát chưa?', src:SRC_VD},
+    {init:'NT', color:'#9333ea', name:'Ngọc Thảo Trà Dược Việt Nam', time:'1d', cake:'Ngọc Thảo Trà Dược Việt Nam', src:SRC_VD, unread:2},
+    {init:'T-', color:'#16a34a', name:'TDVN - VIETTEL POST CARE ĐƠN HÀNG', time:'3d', img:true, src:SRC_VD, unread:4},
+    {init:'H',  color:'#ef4444', name:'Hb', time:'5d', text:'mùng 1 đầu tháng chúc CH buôn may bán đắt /-rose', src:SRC_LH},
+    {init:'PK', color:'#ec4899', name:'Phòng KDPTTT tháng 72026', time:'5d', text:'@Tuấn Anh Đỗ Ok em. chị nhận thông tin liên hệ trao đổi lại với khách.', src:SRC_LH},
+    {init:'LH', color:'#0ea5e9', name:'Lộc Hạnh Trà Dược Việt Nam', time:'5d', img:true, src:SRC_LH},
+    {init:'MS', color:'#9333ea', name:'Mộc Sơn', time:'5d', img:true, src:SRC_LH, unread:1},
+    {init:'NP', color:'#8b5cf6', name:'Nam Phong 0983281986', time:'5d', img:true, src:SRC_LH},
+    {init:'NN', color:'#16a34a', name:'Nam Nguyen', time:'5d', img:true, src:SRC_LH},
+    {init:'NH', color:'#f59e0b', name:'Nam Hoai', time:'5d', img:true, src:SRC_LH},
+    {init:'NC', color:'#16a34a', name:'Nam Cuong 0911127166', time:'5d', img:true, src:SRC_LH},
+    {init:'AT', color:'#3b82f6', name:'Anh Trường Hưng Yên 0786363363', time:'5d', img:true, src:SRC_LH},
+    {init:'ML', color:'#0ea5e9', name:'Mỹ Linh 0933305238', time:'5d', img:true, src:SRC_LH}
+  ];
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function preview(c){
+    if (c.cake) return '<span style="color:#f97316;">🎂 Sinh nhật: ' + esc(c.cake) + '</span>';
+    if (c.img)  return '<span style="color:#3b82f6;">📷 Hình ảnh</span>';
+    return esc(c.text || '');
+  }
+  document.getElementById('convList').innerHTML = CONVS.map(function(c, i){
+    return '<div class="conv-item" data-i="' + i + '">' +
+      '<div class="conv-item__avatar" style="background:' + c.color + ';">' + esc(c.init) + '</div>' +
+      '<div class="conv-item__body">' +
+        '<div class="conv-item__top"><span class="conv-item__name">' + esc(c.name) + '</span><span class="conv-item__time">' + c.time + '</span></div>' +
+        '<div class="conv-item__preview">' + preview(c) + '</div>' +
+        '<div class="conv-item__source"><span class="zalo-ic">Z</span><span>' + esc(c.src) + '</span></div>' +
+      '</div>' +
+      (c.unread ? '<span class="conv-item__unread">' + c.unread + '</span>' : '') +
+    '</div>';
+  }).join('');
+  // Chạm hội thoại → mở màn chat (mock: nội dung chat theo Kd Vanhoa)
+  document.getElementById('convList').addEventListener('click', function(e){
+    if (e.target.closest('.conv-item')) navOpen('view-chat');
+  });
+
+  // ================== KHÁCH HÀNG — màn CRM Liên hệ ==================
+  var STAGE = {
+    subscriber:{name:'Đăng ký', color:'#2563eb'}, lead:{name:'Lead', color:'#f59e0b'},
+    qualified:{name:'Đủ điều kiện', color:'#9333ea'}, opportunity:{name:'Cơ hội', color:'#ea580c'},
+    customer:{name:'Khách hàng', color:'#16a34a'}, evangelist:{name:'VIP/Đại sứ', color:'#0891b2'},
+    churned:{name:'Rời bỏ', color:'#ef4444'}
+  };
+  var CUSTOMERS = [
+    {init:'AT', color:'#3b82f6', name:'Anh Trường Hưng Yên', phone:'0786363363', stage:'lead', source:'Zalo', sale:'Lộc Thị Hạnh', score:35},
+    {init:'H',  color:'#ef4444', name:'Hb', phone:'0912456789', stage:'subscriber', source:'Zalo', sale:'Ngọc Thảo', score:0},
+    {init:'KV', color:'#ec4899', name:'Kd Vanhoa', phone:'0348302234', stage:'subscriber', source:'Zalo', sale:'Lộc Thị Hạnh', score:0},
+    {init:'LH', color:'#0ea5e9', name:'Lộc Hạnh TDVN', phone:'0325173345', stage:'customer', source:'Zalo OA', sale:'Lộc Thị Hạnh', score:120},
+    {init:'ML', color:'#0ea5e9', name:'Mỹ Linh', phone:'0933305238', stage:'opportunity', source:'Facebook', sale:'Tuấn Anh Đỗ', score:68},
+    {init:'MS', color:'#9333ea', name:'Mộc Sơn', phone:'0977123456', stage:'qualified', source:'Website', sale:'Ngọc Thảo', score:52},
+    {init:'NC', color:'#16a34a', name:'Nam Cuong', phone:'0911127166', stage:'customer', source:'Zalo', sale:'Lộc Thị Hạnh', score:210},
+    {init:'NP', color:'#8b5cf6', name:'Nam Phong', phone:'0983281986', stage:'lead', source:'Zalo', sale:'Tuấn Anh Đỗ', score:40},
+    {init:'NT', color:'#9333ea', name:'Ngọc Thảo TDVN', phone:'0325173345', stage:'evangelist', source:'Zalo OA', sale:'Lộc Thị Hạnh', score:520}
+  ];
+  document.getElementById('custCount').textContent = CUSTOMERS.length + ' liên hệ';
+  var callSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>';
+  var chatSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>';
+  document.getElementById('custList').innerHTML = CUSTOMERS.map(function(c){
+    var s = STAGE[c.stage];
+    return '<div class="crm-card">' +
+      '<div class="crm-card__top" data-open-chat>' +
+        '<div class="crm-card__avatar" style="background:' + c.color + ';">' + esc(c.init) + '</div>' +
+        '<div class="crm-card__body"><div class="crm-card__name">' + esc(c.name) + '</div>' +
+        '<div class="crm-card__phone">' + c.phone + '</div></div>' +
+        '<span class="crm-stage" style="background:' + s.color + '18; color:' + s.color + ';">' +
+          '<span class="crm-stage__dot" style="background:' + s.color + ';"></span>' + s.name + '</span>' +
+      '</div>' +
+      '<div class="crm-card__meta">' +
+        '<span class="crm-tag">🌐 ' + esc(c.source) + '</span>' +
+        '<span class="crm-tag">👤 ' + esc(c.sale) + '</span>' +
+        '<span class="crm-tag">⭐ ' + c.score + ' điểm</span>' +
+      '</div>' +
+      '<div class="crm-card__actions">' +
+        '<button class="crm-card__btn" data-call onclick="event.stopPropagation()">' + callSvg + ' Gọi</button>' +
+        '<button class="crm-card__btn crm-card__btn--primary" data-open-chat>' + chatSvg + ' Nhắn tin</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('custList').addEventListener('click', function(e){
+    if (e.target.closest('[data-call]')) return;
+    if (e.target.closest('[data-open-chat]')) navOpen('view-chat');
+  });
+  // Thêm KH → bottom sheet
+  var addCustSheet = document.getElementById('addCustSheet');
+  document.getElementById('btnAddCust').addEventListener('click', function(){ addCustSheet.classList.add('open'); });
+  function closeAddCust(){ addCustSheet.classList.remove('open'); }
+  document.getElementById('addCustClose').addEventListener('click', closeAddCust);
+  document.getElementById('addCustCancel').addEventListener('click', closeAddCust);
+  addCustSheet.addEventListener('click', function(e){ if (e.target === addCustSheet) closeAddCust(); });
+  document.getElementById('addCustSubmit').addEventListener('click', function(){
+    closeAddCust();
+    alert('Giao diện mẫu — chưa nối API, liên hệ chưa được lưu thật.');
+  });
+
+  // ================== CHAT ==================
+  function nowTime(){
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  var TICKS = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>';
+  function chatScrollBottom(){
+    var m = document.getElementById('chatMessages');
+    m.scrollTop = m.scrollHeight;
+  }
+  // Gửi tin nhắn văn bản
+  function sendText(){
+    var inp = document.getElementById('chatInput');
+    var t = inp.value.trim();
+    if (!t) return;
+    var w = document.createElement('div');
+    w.className = 'msg-wrapper';
+    w.innerHTML = '<div class="msg msg--sent"><div class="msg__avatar" style="background:#16a34a;">VĐ</div>' +
+      '<div><div class="msg__bubble"></div><div class="msg__time">' + nowTime() + TICKS + '</div></div></div>';
+    w.querySelector('.msg__bubble').textContent = t;
+    document.getElementById('chatMessages').appendChild(w);
+    inp.value = ''; inp.style.height = '';
+    chatScrollBottom();
+  }
+  document.getElementById('btnSend').addEventListener('click', sendText);
+  document.getElementById('chatInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendText(); }
+  });
+  document.getElementById('chatInput').addEventListener('input', function(){
+    this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 96) + 'px';
+  });
+
+  // Mở hồ sơ khách / thư viện / menu xóa
+  function openDetailTab(tab){
+    if (!document.getElementById('view-detail').classList.contains('view--open')) navOpen('view-detail');
+    document.querySelector('.detail-tab[data-tab="' + tab + '"]').click();
+  }
+  document.getElementById('btnOpenDetail').addEventListener('click', function(){ navOpen('view-detail'); });
+  document.getElementById('btnChatLibrary').addEventListener('click', function(){ navOpen('view-library'); });
+  // Nút thao tác nhanh trên ô nhập — menu hồ sơ đưa ra ngoài cho tiện thao tác
+  document.getElementById('btnQuickOrder').addEventListener('click', function(){ openDetailTab('order'); });
+  document.getElementById('btnQuickSales').addEventListener('click', function(){ openDetailTab('sales'); });
+  document.getElementById('btnQuickInfo').addEventListener('click', function(){ openDetailTab('info'); });
+  document.getElementById('btnQuickNotes').addEventListener('click', function(){ openDetailTab('notes'); });
+  document.getElementById('btnChatMore').addEventListener('click', function(e){
+    e.stopPropagation();
+    var m = document.getElementById('chatMoreMenu');
+    m.hidden = !m.hidden;
+  });
+  document.addEventListener('click', function(e){
+    var m = document.getElementById('chatMoreMenu');
+    if (!m.hidden && !e.target.closest('#btnChatMore') && !e.target.closest('#chatMoreMenu')) m.hidden = true;
+  });
+  // Chọn chế độ AI trả lời (trong menu ⋯)
+  document.querySelectorAll('.cmm-ai').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.cmm-ai').forEach(function(b){ b.classList.remove('cmm-ai--active'); });
+      btn.classList.add('cmm-ai--active');
+      document.getElementById('chatMoreMenu').hidden = true;
+    });
+  });
+  document.getElementById('btnDeleteConv').addEventListener('click', function(){
+    document.getElementById('chatMoreMenu').hidden = true;
+    if (confirm('Xóa toàn bộ hội thoại với "Kd Vanhoa 0348302234"?\nHành động này không thể hoàn tác.')){
+      alert('Giao diện mẫu — chưa nối API, hội thoại chưa bị xóa thật.');
+    }
+  });
+
+  // ================== HỒ SƠ KHÁCH: 4 TAB ==================
+  document.querySelectorAll('.detail-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.detail-tab').forEach(function(t){ t.classList.remove('detail-tab--active'); });
+      document.querySelectorAll('.detail-panel').forEach(function(p){ p.classList.remove('detail-panel--active'); });
+      tab.classList.add('detail-tab--active');
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('detail-panel--active');
+      document.getElementById('detailBody').scrollTop = 0;
+    });
+  });
+  document.getElementById('btnGoOrder').addEventListener('click', function(){
+    document.querySelector('.detail-tab[data-tab="order"]').click();
+  });
+  document.getElementById('btnViewHistory').addEventListener('click', function(){ navOpen('view-history'); });
+
+  // ================== KHO LƯU TRỮ ==================
+  document.querySelectorAll('.lib__tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.lib__tab').forEach(function(t){ t.classList.remove('lib__tab--active'); });
+      document.querySelectorAll('.lib__panel').forEach(function(p){ p.classList.remove('lib__panel--active'); });
+      tab.classList.add('lib__tab--active');
+      document.getElementById('lib-' + tab.dataset.lib).classList.add('lib__panel--active');
+    });
+  });
+
+  // ================== TÀI LIỆU BÁN HÀNG ==================
+  document.querySelectorAll('.sd__tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.sd__tab').forEach(function(t){ t.classList.remove('sd__tab--active'); });
+      document.querySelectorAll('.sd__panel').forEach(function(p){ p.classList.remove('sd__panel--active'); });
+      tab.classList.add('sd__tab--active');
+      document.getElementById('sd-' + tab.dataset.sd).classList.add('sd__panel--active');
+    });
+  });
+  function sdFilter(panelId, q){
+    q = q.trim().toLowerCase();
+    var panel = document.getElementById(panelId);
+    var found = false;
+    if (panelId === 'sd-content'){
+      panel.querySelectorAll('.sd-content').forEach(function(card){
+        var show = !q || card.textContent.toLowerCase().indexOf(q) > -1;
+        card.style.display = show ? '' : 'none'; found = found || show;
+      });
+    } else {
+      panel.querySelectorAll('.sd__group').forEach(function(g){
+        var grid = g.nextElementSibling, any = false;
+        grid.querySelectorAll('.sd-tile').forEach(function(t){
+          var inp = t.querySelector('input');
+          var hay = ((inp.dataset.name || '') + ' ' + (inp.dataset.code || '')).toLowerCase();
+          var show = !q || hay.indexOf(q) > -1;
+          t.style.display = show ? '' : 'none'; any = any || show;
+        });
+        g.style.display = any ? '' : 'none'; grid.style.display = any ? '' : 'none';
+        found = found || any;
+      });
+    }
+    var empty = panel.querySelector('.sd__empty');
+    if (empty) empty.hidden = found;
+  }
+  document.querySelectorAll('.sd__search input').forEach(function(inp){
+    inp.addEventListener('input', function(){ sdFilter(inp.closest('.sd__panel').id, inp.value); });
+  });
+  function sdUpdateCount(pid){
+    var n = document.querySelectorAll('#' + pid + ' .sd-tile input:checked').length;
+    var btn = document.querySelector('.sd__send-btn[data-send="' + pid + '"]');
+    btn.disabled = n === 0;
+    btn.textContent = '📤 Gửi vào chat (' + n + ')';
+  }
+  ['sd-images', 'sd-video'].forEach(function(pid){
+    document.getElementById(pid).addEventListener('change', function(e){
+      if (e.target.matches('.sd-tile input')) sdUpdateCount(pid);
+    });
+  });
+  document.querySelectorAll('.sd__send-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pid = btn.dataset.send, isVideo = pid === 'sd-video';
+      var checked = document.querySelectorAll('#' + pid + ' .sd-tile input:checked');
+      if (!checked.length) return;
+      checked.forEach(function(chk){
+        var w = document.createElement('div');
+        w.className = 'msg-wrapper';
+        w.innerHTML = '<div class="msg msg--sent"><div class="msg__avatar" style="background:#16a34a;">VĐ</div>' +
+          '<div><div class="msg__image" style="max-width:190px; padding:14px 10px;">' +
+          '<div style="font-size:32px;">' + chk.dataset.emoji_ + '</div>' +
+          '<div style="font-size:12px; font-weight:600; color:var(--gray-700); margin-top:4px;"></div></div>' +
+          '<div class="msg__time">' + nowTime() + TICKS + '</div></div></div>';
+        var emoji = chk.closest('.sd-tile').querySelector('.sd-tile__emoji').textContent;
+        w.querySelector('.msg__image div:first-child').textContent = emoji + (isVideo ? ' ▶' : '');
+        w.querySelector('.msg__image div:last-child').textContent = (isVideo ? 'Video: ' : '') + chk.dataset.name;
+        document.getElementById('chatMessages').appendChild(w);
+        chk.checked = false;
+      });
+      sdUpdateCount(pid);
+      // Quay về màn chat để thấy tài liệu vừa gửi
+      while (navStack.length) navBack();
+      navOpen('view-chat');
+      chatScrollBottom();
+    });
+  });
+  document.querySelectorAll('.sd-content__copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var text = btn.closest('.sd-content').querySelector('.sd-content__text').textContent;
+      var done = function(){
+        btn.classList.add('sd-content__copy--done'); btn.textContent = '✓ Đã copy';
+        setTimeout(function(){ btn.classList.remove('sd-content__copy--done'); btn.textContent = '📋 Copy'; }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+      else done();
+    });
+  });
+
+  // ================== AI PHÂN TÍCH ==================
+  var AI_LAST_TIME = null;
+  var AI_NOTE_TEXT =
+    '👤 Chân dung: Khách mới từ Zalo cá nhân (kênh Vận Đơn TDVN), pipeline Đăng ký, Lead 0/100. Hôm nay là sinh nhật khách (18/08).\n' +
+    '💬 Hội thoại: Shop gửi 1 ảnh (13/06), hệ thống gửi thiệp sinh nhật hôm nay — khách chưa phản hồi.\n' +
+    '🎯 Cơ hội: Dùng dịp sinh nhật mở lại hội thoại, tiềm năng chuyển Đăng ký → Lead.\n' +
+    '✅ Đề xuất: 1) Chúc sinh nhật cá nhân hoá; 2) Tặng mã ưu đãi sinh nhật hạn 7 ngày; 3) Giới thiệu Trà Đinh Ngọc 100g khi khách phản hồi.';
+  document.getElementById('btnAiAnalyze').addEventListener('click', function(){
+    document.getElementById('aiModalBg').classList.add('open');
+    document.getElementById('aiLoading').hidden = false;
+    document.getElementById('aiResult').hidden = true;
+    document.getElementById('btnAiToNote').disabled = true;
+    setTimeout(function(){
+      var d = new Date();
+      AI_LAST_TIME = ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2) + '/' + d.getFullYear() + ' · ' + nowTime();
+      document.getElementById('aiTime').textContent = 'Lượt phân tích gần nhất: ' + AI_LAST_TIME;
+      document.getElementById('aiLoading').hidden = true;
+      document.getElementById('aiResult').hidden = false;
+      document.getElementById('btnAiToNote').disabled = false;
+    }, 900);
+  });
+  function aiClose(){ document.getElementById('aiModalBg').classList.remove('open'); }
+  document.getElementById('aiModalClose').addEventListener('click', aiClose);
+  document.getElementById('aiModalClose2').addEventListener('click', aiClose);
+  document.getElementById('aiModalBg').addEventListener('click', function(e){ if (e.target === this) aiClose(); });
+  document.getElementById('btnAiToNote').addEventListener('click', function(){
+    var item = document.createElement('div');
+    item.className = 'note-item note-item--ai';
+    item.innerHTML = '<div class="note-item__head"><span class="note-item__tag">🤖 AI phân tích</span>' +
+      '<span class="note-item__time">' + AI_LAST_TIME + '</span></div><div class="note-item__body"></div>';
+    item.querySelector('.note-item__body').textContent = AI_NOTE_TEXT;
+    var list = document.getElementById('notesList');
+    list.insertBefore(item, list.firstChild);
+    document.getElementById('notesEmpty').hidden = true;
+    aiClose();
+    document.querySelector('.detail-tab[data-tab="notes"]').click();
+  });
+
+  // ================== TẠO ĐƠN — logic theo CRM/tao-don.html ==================
+  var opParseNum = function(v){ return Number(String(v || '').replace(/[^\d]/g, '')) || 0; };
+  var opFmt = function(n){ return new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(n))); };
+  var opMoney = function(n){ return opFmt(n) + 'đ'; };
+  var OP_LA_RATE = 1000;
+  var opTransfer = 0, opPoints = 0, opSubtotal = 587000;
+  var OF_SELF_MODES = [
+    {name:'CHỜ VẬN ĐƠN', fee:20000},
+    {name:'Nhân viên công ty đi giao', fee:20000},
+    {name:'Gửi xe khách', fee:30000},
+    {name:'Gửi xe buýt', fee:30000}
+  ];
+  var OF_CARRIERS_HTML = document.getElementById('ofShipUnit').innerHTML;
+  function ofShipFee(){ return opParseNum(document.getElementById('ofShipCost').value); }
+  function ofOrderTotal(){
+    var disc = Math.min(100, opParseNum(document.getElementById('ofDiscount').value));
+    return Math.max(opSubtotal - Math.round(opSubtotal * disc / 100) - opPoints * OP_LA_RATE, 0) + ofShipFee();
+  }
+  function ofRenderPayment(){
+    var total = ofOrderTotal();
+    var due = Math.max(total - opTransfer, 0);
+    document.getElementById('ofPayShip').textContent = opMoney(ofShipFee());
+    document.getElementById('ofPayTotal').textContent = opFmt(total);
+    document.getElementById('ofLaMoney').textContent = opPoints > 0 ? '−' + opMoney(opPoints * OP_LA_RATE) : '0đ';
+    document.getElementById('ofDeposit').textContent = opMoney(Math.min(opTransfer, total));
+    document.getElementById('ofPayCod').textContent = opMoney(due);
+    var s = document.getElementById('ofPayStatus');
+    s.className = 'of__pay-badge';
+    if (opTransfer <= 0){ s.textContent = 'Chưa thanh toán'; }
+    else if (opTransfer < total){ s.textContent = 'Đặt cọc một phần'; s.classList.add('of__pay-badge--orange'); }
+    else if (opTransfer === total){ s.textContent = '✓ Đã thanh toán đủ'; s.classList.add('of__pay-badge--green'); }
+    else { s.textContent = '⚠ Đặt cọc vượt tổng đơn'; s.classList.add('of__pay-badge--red'); }
+  }
+  function ofRecalcProducts(){
+    var subtotal = 0, qtySum = 0, klSum = 0;
+    var items = document.querySelectorAll('#ofProdList .op-item');
+    items.forEach(function(it){
+      var q = Math.max(1, opParseNum(it.querySelector('.op-qty input').value) || 1);
+      var gia = Number(it.dataset.gia) || 0, kl = Number(it.dataset.kl) || 0, ton = Number(it.dataset.ton) || 0;
+      it.querySelector('.op-item__sum').textContent = opFmt(gia * q);
+      it.querySelector('.op-item__kl').textContent = (kl * q) + 'g';
+      it.classList.toggle('op-item--over', ton > 0 && q > ton);
+      subtotal += gia * q; qtySum += q; klSum += kl * q;
+    });
+    document.getElementById('ofProdEmpty').hidden = items.length > 0;
+    var totalRow = document.getElementById('ofProdTotal');
+    totalRow.hidden = items.length === 0;
+    totalRow.innerHTML = '<span>Tổng: ' + qtySum + ' SP · ' + klSum + 'g</span><b>' + opMoney(subtotal) + '</b>';
+    var w = document.getElementById('ofShipWeight');
+    if (w && !w.dataset.manual) w.value = klSum;
+    opSubtotal = Math.round(subtotal);
+    ofRenderPayment();
+  }
+  document.getElementById('ofShipWeight').addEventListener('input', function(){ this.dataset.manual = 1; });
+  document.getElementById('ofProdList').addEventListener('click', function(e){
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('op-item__del')){ btn.closest('.op-item').remove(); ofRecalcProducts(); }
+    else if (btn.dataset.d){
+      var input = btn.parentElement.querySelector('input');
+      input.value = Math.max(1, (parseInt(input.value || '1', 10) || 1) + Number(btn.dataset.d));
+      ofRecalcProducts();
+    }
+  });
+  document.getElementById('ofProdList').addEventListener('input', function(e){
+    if (e.target.matches('.op-qty input')) ofRecalcProducts();
+  });
+  document.getElementById('ofProdList').addEventListener('change', function(e){
+    if (e.target.matches('.op-qty input')){
+      e.target.value = Math.max(1, parseInt(e.target.value || '1', 10) || 1);
+      ofRecalcProducts();
+    }
+  });
+  document.getElementById('ofDiscount').addEventListener('input', function(){
+    var v = this.value.replace(/[^\d]/g, '');
+    if (Number(v) > 100) v = '100';
+    this.value = v; ofRenderPayment();
+  });
+  document.getElementById('ofPoints').addEventListener('input', function(){
+    opPoints = opParseNum(this.value); this.value = opFmt(opPoints); ofRenderPayment();
+  });
+  document.getElementById('ofTransfer').addEventListener('input', function(){
+    opTransfer = opParseNum(this.value); this.value = opFmt(opTransfer); ofRenderPayment();
+  });
+  function ofSyncShipSelection(){
+    var sel = document.getElementById('ofShipUnit');
+    var o = sel.options[sel.selectedIndex];
+    document.getElementById('ofShipCost').value = opFmt(Number(o.dataset.fee) || 0);
+    document.getElementById('ofShipBrand').textContent = o.text.split(' - ')[0].toUpperCase();
+    if (o.dataset.info) document.getElementById('ofShipInfo').innerHTML = 'ⓘ <b>Thông tin:</b> ' + o.dataset.info;
+    ofRenderPayment();
+  }
+  document.getElementById('ofShipUnit').addEventListener('change', ofSyncShipSelection);
+  document.getElementById('ofSelfShip').addEventListener('change', function(){
+    var sel = document.getElementById('ofShipUnit');
+    var cost = document.getElementById('ofShipCost');
+    if (this.checked){
+      sel.innerHTML = OF_SELF_MODES.map(function(m, i){
+        return '<option data-fee="' + m.fee + '"' + (i === 0 ? ' selected' : '') + '>' + m.name + '</option>';
+      }).join('');
+      document.getElementById('ofShipCostLabel').textContent = 'Chi phí Tự giao';
+      cost.disabled = false;
+      document.getElementById('ofShipInfo').style.display = 'none';
+    } else {
+      sel.innerHTML = OF_CARRIERS_HTML;
+      document.getElementById('ofShipCostLabel').textContent = 'Chi phí vận chuyển';
+      cost.disabled = true;
+      document.getElementById('ofShipInfo').style.display = '';
+    }
+    ofSyncShipSelection();
+  });
+  document.getElementById('ofShipCost').addEventListener('input', function(){
+    this.value = opFmt(opParseNum(this.value)); ofRenderPayment();
+  });
+  // Đơn đổi trả: hiện ghi chú + tự thêm vào ô Ghi chú đơn hàng
+  var RETURN_NOTE_TEXT = 'Đơn đổi trả: Thu hàng cũ đổi đơn mới & thu COD chênh lệch';
+  document.getElementById('ofReturnCheck').addEventListener('change', function(){
+    var banner = document.getElementById('ofReturnNote');
+    var note = document.getElementById('ofOrderNote');
+    if (this.checked){
+      banner.classList.add('of__return-note--show');
+      if (note.value.indexOf(RETURN_NOTE_TEXT) === -1){
+        note.value = note.value ? note.value.replace(/\s+$/, '') + '\n' + RETURN_NOTE_TEXT : RETURN_NOTE_TEXT;
+      }
+    } else {
+      banner.classList.remove('of__return-note--show');
+      note.value = note.value.split('\n').filter(function(l){ return l.trim() !== RETURN_NOTE_TEXT; }).join('\n').replace(/^\n+|\n+$/g, '');
+    }
+  });
+  document.getElementById('ofSubmit').addEventListener('click', function(){
+    if (!document.querySelector('#ofProdList .op-item:not([data-gia="0"])')){
+      alert('Chưa có sản phẩm nào trong đơn — thêm sản phẩm trước khi tạo đơn.');
+      return;
+    }
+    var total = ofOrderTotal();
+    var due = Math.max(total - opTransfer, 0);
+    alert('Giao diện mẫu — chưa nối API, đơn CHƯA được lưu.\nDữ liệu sẽ gửi đi khi nối API:\n\n' +
+      'Tổng đơn: ' + opMoney(total) + '\n' +
+      'Tiêu Lá: ' + opPoints + ' Lá (−' + opMoney(opPoints * OP_LA_RATE) + ')\n' +
+      'Đặt cọc CK: ' + opMoney(opTransfer) + '\n' +
+      'COD còn thu: ' + opMoney(due));
+  });
+  ofRecalcProducts();
+</script>
+</body>
+</html>

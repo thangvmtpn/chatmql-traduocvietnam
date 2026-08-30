@@ -1,0 +1,17 @@
+{
+  "name": "TDVN Chat — Trà Dược Việt Nam",
+  "short_name": "TDVN Chat",
+  "description": "ChatMQL bản điện thoại: hội thoại Zalo, lên đơn, hồ sơ khách, AI trợ lý.",
+  "lang": "vi",
+  "start_url": "/m/",
+  "scope": "/m/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f8fa",
+  "theme_color": "#0D6838",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
