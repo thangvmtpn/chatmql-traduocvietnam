@@ -29,7 +29,7 @@ import { buildRouterPrompt, parseRouterDecision } from '../prompts/ai-router.js'
 import { buildGeneratorPrompt, buildAgentSystemPrompt } from '../prompts/auto-reply.js'
 import { buildCriticPrompt, parseCriticVerdict } from '../prompts/critic.js'
 import { getToolsConfig, buildToolScopeNote, type ToolsConfig } from '../tools-config-service.js'
-import { buildOpenaiTools, executeTool, resolveProductImage, HANDOFF_TOOL, APPOINTMENT_TOOL, LOG_GAP_TOOL, SEND_IMAGE_TOOL, type ResolvedProductImage } from './tools-runtime.js'
+import { buildOpenaiTools, executeTool, resolveProductImage, HANDOFF_TOOL, APPOINTMENT_TOOL, ORDER_TOOL, LOG_GAP_TOOL, SEND_IMAGE_TOOL, type ResolvedProductImage } from './tools-runtime.js'
 import { recordPendingAction } from '../pending-action-service.js'
 import { recordKnowledgeGap } from '../knowledge-gap-service.js'
 import { isConfidentHit, shouldAutoLogGap } from './gap-detection.js'
@@ -173,7 +173,18 @@ async function runAgentLoop(args: {
 
       let result: string
       let hits: Array<{ label: string; score: number | null }> = []
-      if (tc.name === APPOINTMENT_TOOL) {
+      if (tc.name === ORDER_TOOL) {
+        // Action: record a draft order (staff confirms and fulfills).
+        try {
+          const rec = await recordPendingAction({
+            orgId: args.orgId, conversationId: args.convId,
+            type: 'create_order', payload: (parsedArgs ?? {}) as Record<string, unknown>,
+          })
+          result = `ĐÃ LÊN ĐƠN HÀNG NHÁP THÀNH CÔNG trên hệ thống (${rec.summary}). Trạng thái: CHỜ DUYỆT & ĐÓNG GÓI. Hãy xuất bảng HÓA ĐƠN NHÁP chi tiết cho khách kiểm tra lại thông tin (Tên, SĐT, Địa chỉ, Sản phẩm, Tổng tiền), báo khách xác nhận OK và yên tâm nhân viên/shop sẽ liên hệ đóng gói gửi hàng sớm.`
+        } catch (err) {
+          result = `Không lưu được đơn hàng: ${(err as Error).message}`
+        }
+      } else if (tc.name === APPOINTMENT_TOOL) {
         // Action: record a pending appointment (staff confirms before it books).
         try {
           const rec = await recordPendingAction({

@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../../shared/prisma-client.js'
 import { enqueueProductEmbed } from '../../shared/queue.js'
 import { uniqueSlug } from './slug.js'
+import { logger } from '../../shared/logger.js'
 
 const EMBED_FIELDS = ['name', 'keywords', 'description'] as const
 

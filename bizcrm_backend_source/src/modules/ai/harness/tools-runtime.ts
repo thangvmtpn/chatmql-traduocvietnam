@@ -122,6 +122,45 @@ const SEND_IMAGE_DEF: OpenaiToolDef = {
   },
 }
 
+// Action tool — records a draft order / pending purchase for customer confirmation and staff fulfillment.
+export const ORDER_TOOL = 'create_order'
+const ORDER_DEF: OpenaiToolDef = {
+  type: 'function',
+  function: {
+    name: ORDER_TOOL,
+    description:
+      'Lên ĐƠN HÀNG NHÁP / Ghi nhận đơn mua hàng khi khách đồng ý chốt đơn hoặc đã cung cấp thông tin nhận hàng (Tên, SĐT, Địa chỉ, Sản phẩm). ' +
+      'Lưu thông tin đơn hàng vào hệ thống để nhân viên xác nhận và gửi hàng.',
+    parameters: {
+      type: 'object',
+      properties: {
+        customer_name: { type: 'string', description: 'Họ tên người nhận hàng' },
+        phone: { type: 'string', description: 'Số điện thoại nhận hàng' },
+        address: { type: 'string', description: 'Địa chỉ nhận hàng cụ thể (số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố)' },
+        items: {
+          type: 'array',
+          description: 'Danh sách các sản phẩm khách đặt mua',
+          items: {
+            type: 'object',
+            properties: {
+              product_name: { type: 'string', description: 'Tên sản phẩm đúng theo catalog' },
+              quantity: { type: 'number', description: 'Số lượng đặt mua' },
+              price: { type: 'number', description: 'Đơn giá 1 sản phẩm (VND, đã gồm VAT)' },
+              unit: { type: 'string', description: 'Quy cách / đơn vị tính (vd: túi 100g, hộp, set...)' },
+            },
+            required: ['product_name', 'quantity', 'price'],
+          },
+        },
+        shipping_fee: { type: 'number', description: 'Phí vận chuyển nếu có (0 nếu miễn phí ship)' },
+        total_amount: { type: 'number', description: 'Tổng tiền thanh toán cuối cùng (VND)' },
+        payment_method: { type: 'string', enum: ['COD', 'BANK_TRANSFER'], description: 'Phương thức thanh toán: COD (nhận hàng thanh toán) hoặc BANK_TRANSFER (chuyển khoản)' },
+        note: { type: 'string', description: 'Ghi chú đơn hàng nếu có' },
+      },
+      required: ['customer_name', 'phone', 'address', 'items', 'total_amount'],
+    },
+  },
+}
+
 export function buildOpenaiTools(tools: ToolsConfig): OpenaiToolDef[] {
   const search = TOOL_NAMES.filter((n) => tools[n].enabled).map((n) => ({
     type: 'function' as const,
@@ -138,7 +177,7 @@ export function buildOpenaiTools(tools: ToolsConfig): OpenaiToolDef[] {
     ...search,
     ...(anySearch ? [CATALOG_OVERVIEW_DEF, LOG_GAP_DEF] : []),
     ...(canSendImage ? [SEND_IMAGE_DEF] : []),
-    HANDOFF_DEF, APPOINTMENT_DEF,
+    HANDOFF_DEF, APPOINTMENT_DEF, ORDER_DEF,
   ]
 }
 

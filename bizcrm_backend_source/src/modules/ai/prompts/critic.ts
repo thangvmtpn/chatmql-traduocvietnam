@@ -31,6 +31,7 @@ NGUYÊN TẮC ĐÁNH GIÁ (Ưu tiên hỗ trợ khách mượt mà):
 1. "action": "send", "ok": true khi:
    - Câu trả lời là lời chào hỏi, mở đầu, xin lỗi, cảm ơn, hỏi thăm nhu cầu của khách (uống hàng ngày, mua quà biếu, nhu cầu sức khỏe).
    - Câu trả lời gợi ý hoặc tư vấn dựa trên danh mục sản phẩm, tri thức hoặc kịch bản bán hàng phân tầng.
+   - Câu trả lời xuất HÓA ĐƠN NHÁP, xác nhận thông tin giao hàng hoặc chốt đơn cho khách theo đúng giá sản phẩm.
    - Câu trả lời lịch sự xin phép kiểm tra lại và báo sau khi chưa có đủ thông tin.
    - Câu trả lời không bịa đặt giá bán sai lệch hoặc cam kết sai chính sách.
 
