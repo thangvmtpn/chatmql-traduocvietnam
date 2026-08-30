@@ -580,9 +580,8 @@
 
     const btn = document.createElement('button');
     btn.id = 'chatmql-chat-backfill-btn';
-    btn.className = 'chat-main__header-btn';
     btn.type = 'button';
-    btn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 12px;font-size:12.5px;font-weight:600;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:6px;transition:all 0.15s;white-space:nowrap;';
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 12px;font-size:12.5px;font-weight:600;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:6px;transition:all 0.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);height:30px;box-sizing:border-box;';
     btn.innerHTML = '<span>📥</span><span>Kéo lịch sử</span>';
     btn.title = 'Kéo thêm tin nhắn cũ từ Zalo với khách hàng này';
 
@@ -633,7 +632,12 @@
       }
     };
 
-    headerActions.insertBefore(btn, headerActions.firstChild);
+    const aiContainer = document.getElementById('chatmql-ai-mode-container');
+    if (aiContainer && aiContainer.nextSibling) {
+      headerActions.insertBefore(btn, aiContainer.nextSibling);
+    } else {
+      headerActions.insertBefore(btn, headerActions.firstChild);
+    }
   }
 
   // ── Periodic Sync & Mutation Observer ──────────────────────────────

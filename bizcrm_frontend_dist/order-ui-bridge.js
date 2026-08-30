@@ -358,7 +358,7 @@
     if (!sidebar) return;
 
     renderLibraryButton();
-    renderHistoryBackfillButton();
+    renderAiModeSelector();
     renderResizer(sidebar);
     renderCustomerCard(sidebar);
     renderSalesDocsSidebar(sidebar);
@@ -4472,42 +4472,224 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     actions.insertBefore(btn, actions.firstChild);
   }
 
-  // Nút kéo lịch sử chat Zalo trên header chat
-  function renderHistoryBackfillButton() {
-    const actions = document.querySelector('.chat-main__header-actions');
-    if (!actions || document.getElementById('chatmql-header-backfill-btn')) return;
-    const btn = document.createElement('button');
-    btn.id = 'chatmql-header-backfill-btn';
-    btn.type = 'button';
-    btn.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 9px;font-size:12px;font-weight:600;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;margin-right:4px;';
-    btn.title = 'Kéo thêm tin nhắn cũ từ Zalo cho khách hàng này';
-    btn.innerHTML = '<span>📥</span><span>Kéo lịch sử</span>';
-    btn.onclick = async () => {
+  // ── AI Mode Selector Dropdown in Chat Header ──────────────────────
+  const AI_MODES_CONFIG = {
+    auto: {
+      key: 'auto',
+      icon: '🤖',
+      label: 'Tự động',
+      fullLabel: 'Tự động trả lời',
+      desc: 'AI tự động phản hồi tin nhắn khách hàng 24/7 theo tri thức',
+      bg: '#f0fdf4',
+      color: '#16a34a',
+      border: '#bbf7d0',
+      activeBg: '#dcfce7',
+    },
+    suggest: {
+      key: 'suggest',
+      icon: '✍️',
+      label: 'Gợi ý nháp',
+      fullLabel: 'Gợi ý câu trả lời',
+      desc: 'AI soạn sẵn câu trả lời nháp, nhân viên xem duyệt và bấm gửi',
+      bg: '#eff6ff',
+      color: '#2563eb',
+      border: '#bfdbfe',
+      activeBg: '#dbeafe',
+    },
+    manual: {
+      key: 'manual',
+      icon: '🛑',
+      label: 'Thủ công',
+      fullLabel: 'Thủ công (Tắt AI)',
+      desc: 'Tắt AI với hội thoại này, nhân viên tự chat hoàn toàn',
+      bg: '#f8fafc',
+      color: '#64748b',
+      border: '#cbd5e1',
+      activeBg: '#e2e8f0',
+    }
+  };
+
+  const convAiModeCache = {};
+  let isAiModeDropdownOpen = false;
+
+  async function setConversationAiMode(convId, newMode) {
+    if (!convId || !AI_MODES_CONFIG[newMode]) return;
+    convAiModeCache[convId] = newMode;
+    updateAiModeTriggerUI(newMode);
+    closeAiModeDropdown();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/conversations/${convId}/ai-mode`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ aiMode: newMode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Không thể đổi chế độ AI');
+      
+      const modeCfg = AI_MODES_CONFIG[newMode];
+      if (typeof showToast === 'function') {
+        showToast(`✅ Đã chuyển AI sang: ${modeCfg.fullLabel}`, 'success');
+      }
+      window.dispatchEvent(new CustomEvent('chatmql:ai-mode-changed', { detail: { convId, aiMode: newMode } }));
+    } catch (err) {
+      if (typeof showToast === 'function') {
+        showToast(`Lỗi: ${err.message}`, 'error');
+      } else {
+        alert(`Lỗi đổi chế độ AI: ${err.message}`);
+      }
+    }
+  }
+
+  function updateAiModeTriggerUI(mode) {
+    const trigger = document.getElementById('chatmql-ai-mode-trigger');
+    if (!trigger) return;
+    const cfg = AI_MODES_CONFIG[mode] || AI_MODES_CONFIG.auto;
+    trigger.style.background = cfg.bg;
+    trigger.style.color = cfg.color;
+    trigger.style.borderColor = cfg.border;
+    trigger.innerHTML = `
+      <span style="font-size:13px;line-height:1;">${cfg.icon}</span>
+      <span style="font-weight:600;font-size:12px;">${cfg.label}</span>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;margin-left:2px;"><path d="m6 9 6 6 6-6"/></svg>
+    `;
+    trigger.title = `Chế độ AI: ${cfg.fullLabel} (${cfg.desc})`;
+  }
+
+  function closeAiModeDropdown() {
+    isAiModeDropdownOpen = false;
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (menu) menu.style.display = 'none';
+  }
+
+  function toggleAiModeDropdown(e) {
+    e.stopPropagation();
+    isAiModeDropdownOpen = !isAiModeDropdownOpen;
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (!menu) return;
+
+    if (isAiModeDropdownOpen) {
       const convId = getCurrentConversationId();
-      if (!convId) {
-        alert('Chưa xác định được cuộc hội thoại đang mở.');
-        return;
+      const currentMode = convAiModeCache[convId] || 'auto';
+      renderAiModeMenuItems(currentMode);
+      menu.style.display = 'block';
+    } else {
+      menu.style.display = 'none';
+    }
+  }
+
+  function renderAiModeMenuItems(currentMode) {
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (!menu) return;
+    const convId = getCurrentConversationId();
+
+    menu.innerHTML = `
+      <div style="padding:4px 8px 6px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;margin-bottom:4px;">
+        Chế độ AI cho khách này
+      </div>
+      ${Object.values(AI_MODES_CONFIG).map(cfg => {
+        const isSelected = cfg.key === currentMode;
+        return `
+          <div class="chatmql-ai-mode-item" data-mode="${cfg.key}" style="
+            display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:6px;cursor:pointer;
+            transition:background 0.15s;background:${isSelected ? cfg.activeBg : 'transparent'};
+            margin-bottom:2px;
+          ">
+            <span style="font-size:16px;line-height:1.2;flex-shrink:0;">${cfg.icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12.5px;font-weight:${isSelected ? '700' : '600'};color:${isSelected ? cfg.color : '#1e293b'};display:flex;align-items:center;justify-content:space-between;">
+                <span>${cfg.fullLabel}</span>
+                ${isSelected ? `<span style="font-size:12px;color:${cfg.color};font-weight:bold;">✓</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:#64748b;line-height:1.3;margin-top:2px;">${cfg.desc}</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+
+    menu.querySelectorAll('.chatmql-ai-mode-item').forEach(item => {
+      item.onmouseenter = () => {
+        const mode = item.dataset.mode;
+        if (mode !== currentMode) item.style.background = '#f8fafc';
+      };
+      item.onmouseleave = () => {
+        const mode = item.dataset.mode;
+        if (mode !== currentMode) item.style.background = 'transparent';
+      };
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const mode = item.dataset.mode;
+        setConversationAiMode(convId, mode);
+      };
+    });
+  }
+
+  // Global click to close dropdown
+  if (!window._chatmqlAiModeClickAttached) {
+    window._chatmqlAiModeClickAttached = true;
+    document.addEventListener('click', (e) => {
+      if (isAiModeDropdownOpen) {
+        const container = document.getElementById('chatmql-ai-mode-container');
+        if (!container || !container.contains(e.target)) {
+          closeAiModeDropdown();
+        }
       }
-      btn.disabled = true;
-      btn.innerHTML = '<span>⏳</span><span>Đang kéo...</span>';
-      try {
-        const res = await fetch(`${API_BASE}/api/v1/conversations/${convId}/backfill`, {
-          method: 'POST',
+    });
+  }
+
+  function renderAiModeSelector() {
+    const actions = document.querySelector('.chat-main__header-actions') ||
+                    document.querySelector('.chat-header__actions') ||
+                    document.querySelector('.chat-main__header');
+    if (!actions) return;
+
+    const convId = getCurrentConversationId();
+    if (!convId) return;
+
+    let container = document.getElementById('chatmql-ai-mode-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'chatmql-ai-mode-container';
+      container.style.cssText = 'position:relative;display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;';
+      
+      const trigger = document.createElement('button');
+      trigger.id = 'chatmql-ai-mode-trigger';
+      trigger.type = 'button';
+      trigger.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 11px;font-size:12.5px;font-weight:600;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:6px;cursor:pointer;transition:all 0.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);height:30px;box-sizing:border-box;';
+      trigger.onclick = toggleAiModeDropdown;
+      container.appendChild(trigger);
+
+      const menu = document.createElement('div');
+      menu.id = 'chatmql-ai-mode-menu';
+      menu.style.cssText = 'display:none;position:absolute;top:calc(100% + 5px);right:0;width:240px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.12), 0 8px 10px -6px rgba(0,0,0,0.08);padding:6px;z-index:99999;text-align:left;';
+      container.appendChild(menu);
+
+      actions.insertBefore(container, actions.firstChild);
+    }
+
+    // Check conversation's AI mode if not cached or container newly attached
+    if (container.dataset.convId !== convId) {
+      container.dataset.convId = convId;
+      if (convAiModeCache[convId]) {
+        updateAiModeTriggerUI(convAiModeCache[convId]);
+      } else {
+        // Optimistic default: auto
+        updateAiModeTriggerUI('auto');
+        fetch(`${API_BASE}/api/v1/conversations/${convId}`, {
           headers: authHeaders(),
-          body: JSON.stringify({ maxMessages: 200 }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Lỗi kéo tin nhắn');
-        alert(`✅ Đã kéo tin nhắn cũ từ Zalo!\n• Tin mới thêm: +${data.inserted}\n• Tin đã có: ~${data.skipped}`);
-        window.location.reload();
-      } catch (err) {
-        alert(`Lỗi: ${err.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span>📥</span><span>Kéo lịch sử</span>';
+        }).then(res => res.json()).then(data => {
+          const mode = data?.conversation?.aiMode || data?.aiMode || 'auto';
+          convAiModeCache[convId] = mode;
+          if (container.dataset.convId === convId) {
+            updateAiModeTriggerUI(mode);
+          }
+        }).catch(() => {});
       }
-    };
-    actions.insertBefore(btn, actions.firstChild);
+    }
   }
 
   const CD_WIDTH_KEY = 'chatmql:detailWidth';

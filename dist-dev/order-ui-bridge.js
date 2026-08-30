@@ -3,9 +3,11 @@
  * Tích hợp Nút Lên Đơn, Lịch Sử Đơn Hàng & Nhận diện Khách hàng CRM
  */
 (function () {
-  const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:4520'
-    : (window.location.origin || '');
+  const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
+    ? window.__API_BASE__
+    : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:4520'
+        : '');
 
   // Trình duyệt KHÔNG gọi thẳng sang CRM nữa. Mọi thứ liên quan tới đơn hàng
   // đều đi qua ChatMQL backend, nơi giữ service key và kiểm tra quyền nhân viên.
@@ -16,6 +18,23 @@
   /** Token nhân viên — app lưu ở localStorage key 'token'. */
   function authToken() {
     return localStorage.getItem('token') || '';
+  }
+
+  function getCurrentUser() {
+    try {
+      const token = authToken();
+      if (!token) return null;
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
   }
 
   function authHeaders(extra) {
@@ -42,6 +61,43 @@
   let currentCrmCustomer = null;
   let customerOrdersCache = [];
   let lastFetchedPhone = '';
+
+  function formatDot(n) {
+    if (n === null || n === undefined || isNaN(n)) return '0';
+    return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function getVipLevelFromGMV(gmv) {
+    const gmvVal = Number(gmv) || 0;
+    const gmvInMillions = gmvVal / 1_000_000;
+    if (gmvInMillions < 1) return 'VIP 0';
+    if (gmvInMillions < 10) return `VIP ${Math.floor(gmvInMillions)}`;
+    if (gmvInMillions < 60) return `VIP ${Math.min(Math.floor((gmvInMillions - 10) / 5) + 10, 19)}`;
+    if (gmvInMillions < 160) return `VIP ${Math.min(Math.floor((gmvInMillions - 60) / 10) + 20, 29)}`;
+    return `VIP ${Math.min(Math.floor((gmvInMillions - 160) / 50) + 30, 39)}`;
+  }
+
+  function getAOVClass(aov) {
+    const aovVal = Number(aov) || 0;
+    if (aovVal < 500_000) return 'A';
+    if (aovVal < 1_000_000) return 'B';
+    if (aovVal < 2_000_000) return 'C';
+    if (aovVal <= 3_000_000) return 'D';
+    return 'E';
+  }
+
+  function formatCombinedVip(crm) {
+    if (!crm) return '—';
+    if (crm.cap_vip && !/^(FT|KT|NC|PL|KD|KL)\d/i.test(crm.cap_vip)) {
+      return crm.cap_vip;
+    }
+    const gmv = Number(crm.gmv_total ?? crm.gmv) || 0;
+    const aov = Number(crm.aov) || (crm.order_count ? gmv / crm.order_count : gmv);
+    const vip = getVipLevelFromGMV(gmv);
+    const aovClass = getAOVClass(aov);
+    return `${vip}${aovClass}`;
+  }
+
 
   // Inject CSS Styles
   const styleEl = document.createElement('style');
@@ -302,6 +358,7 @@
     if (!sidebar) return;
 
     renderLibraryButton();
+    renderAiModeSelector();
     renderResizer(sidebar);
     renderCustomerCard(sidebar);
     renderSalesDocsSidebar(sidebar);
@@ -332,7 +389,7 @@
       const { customer, orders } = result;
       const orderCount = orders ? orders.length : 0;
       const gmvTotal = orders ? orders.reduce((sum, o) => sum + (o.total_amount || 0), 0) : 0;
-      const formattedGmv = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(gmvTotal);
+      const formattedGmv = `${formatDot(gmvTotal)} ₫`;
 
       historyBox.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
@@ -361,7 +418,7 @@
         ` : `
           <div style="max-height:220px; overflow-y:auto; padding-right:2px;">
             ${orders.slice(0, 6).map(o => {
-              const formattedTotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(o.total_amount || 0);
+              const formattedTotal = `${formatDot(o.total_amount || 0)} ₫`;
               const isDone = o.status === 'Giao thành công';
               const dateStr = o.created_at ? new Date(o.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
               const itemsSummary = o.items && o.items.length > 0 ? o.items.map(i => `${i.name} (x${i.quantity})`).join(', ') : 'Đơn hàng trà';
@@ -495,7 +552,7 @@
     }
   }
 
-  const vnd = n => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
+  const vnd = n => formatDot(Math.round(n || 0));
 
   /** Nhãn một dòng sản phẩm trong ô chọn: tên · giá · tồn kho. */
   function productLabel(p) {
@@ -510,8 +567,7 @@
   // CRM (mã KH, nghề nghiệp, GMV, lịch hẹn). Backend đã ghép sẵn nên ở đây chỉ
   // gọi một lần.
 
-  const fmtVnd = n =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0);
+  const fmtVnd = n => `${formatDot(n || 0)} ₫`;
 
   const fmtDate = iso => {
     if (!iso) return null;
@@ -721,7 +777,6 @@
         { id: 'ghi-chu', label: `Ghi chú${notes ? ` (${notes.length})` : ''}` },
         { id: 'mua-hang', label: `Lịch sử mua hàng (${orders.length})` },
         { id: 'san-pham', label: `Sản phẩm đã mua${bought ? ` (${bought.total})` : ''}` },
-        { id: 'diem', label: 'Lịch sử tích điểm' },
         { id: 'uu-dai', label: 'Ưu đãi đang có' },
         { id: 'lich', label: 'Lịch & nhắc' },
         { id: 'ho-so', label: 'Đặc thù & nhu cầu' },
@@ -739,7 +794,8 @@
           ${infoRow('Email', cm.email)}
           ${infoRow('Nghề nghiệp', crm.occupation)}
           ${infoRow('Nguồn khách hàng', crm.referral_source || cm.source)}
-          ${infoRow('Nhóm khách hàng', crm.priority_level)}
+          ${infoRow('Cấp Vip', formatCombinedVip(crm))}
+          ${infoRow('Nhóm KH', crm.nhom_kh || crm.priority_level)}
           ${infoRow('Người phụ trách', crm.staff_in_charge)}
           ${infoRow('Địa chỉ', crm.address || cm.address)}
           ${infoRow('Địa chỉ 2', crm.address2)}
@@ -1600,7 +1656,7 @@
             ['Khách có điểm', s2.customers_with_points, '#0f172a'],
             ['Khớp', s2.matched, '#15803d'],
             ['Lệch', s2.mismatched, '#b45309'],
-            ['Tổng chênh', s2.total_gap.toLocaleString('vi-VN') + ' điểm', '#b91c1c'],
+            ['Tổng chênh', formatDot(s2.total_gap) + ' điểm', '#b91c1c'],
           ].map(([l, v, c]) => `
             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:9px 10px;">
               <div style="font-size:10.5px; color:#64748b; margin-bottom:2px;">${l}</div>
@@ -2326,39 +2382,40 @@
     // Không bịa địa chỉ. Trống thì để nhân viên tự nhập
     const defaultAddress = crmData?.address || ctx?.contact?.address || '';
     const defaultCity = crmData?.city || ctx?.contact?.city || 'Hà Nội';
-    const staffCare = crmData?.staff_in_charge || ccState.staff || 'Trà Dược CSKH';
+    const currentUser = getCurrentUser();
+    const currentUserName = currentUser?.fullName || currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : '');
+    const staffCare = currentUserName || crmData?.staff_in_charge || ccState.staff || 'Trà Dược CSKH';
 
     // Đồng bộ cache để sidebar lịch sử đơn cũng bám đúng khách này.
     if (phone) {
       currentCrmCustomer = crmData || null;
       lastFetchedPhone = '';
     }
-    const gmvFormatted = crmData?.gmv_total != null ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(crmData.gmv_total) : '0 ₫';
+    const gmvFormatted = crmData?.gmv_total != null ? `${formatDot(crmData.gmv_total)} ₫` : '0 ₫';
     const orderCount = crmData?.order_count ?? customerOrdersCache.length;
 
     // Đợt 1: kho mặc định là kho đầu tiên; danh mục lấy theo kho đó.
     let warehouseId = lookups.warehouses[0]?.id || null;
     let catalog = await loadCatalog(warehouseId);
     // Bỏ TEA_CATALOG viết cứng — giá và tồn kho giờ lấy thật từ FM.
-    const firstInStock = catalog.find(p => p.inventory > 0) || catalog[0];
-
-    let items = firstInStock
-      ? [{ code: firstInStock.code, name: firstInStock.name, price: firstInStock.price, quantity: 1 }]
-      : [];
+    // Mặc định danh sách sản phẩm để trống để nhân viên tự chọn.
+    let items = [];
     let orderStatusId = lookups.statuses[0]?.id || 1;
     let provinceId = null;
     let wardId = null;
     let wards = [];
-    let discount = 0;
+    let discountType = 'pct'; // 'pct' | 'vnd'
     let discountPercent = 0;
+    let discountAmount = 0;
     let usedPoints = 0;
-    let sellerName = staffCare || 'Trần Trang';
+    let sellerName = currentUserName || staffCare || 'Trà Dược CSKH';
     let pkgWeight = null;
     let pkgLength = '';
     let pkgWidth = '';
     let pkgHeight = '';
-    let shippingFee = 25000;
-    let shippingProvider = 'vnpost';
+    let shippingFee = 30000;
+    let shippingProvider = 'jt_express';
+    let typeFeeDelivery = 'CC_CASH'; // 'CC_CASH' (Khách trả ship) | 'PP_CASH' (Shop trả ship / Hỗ trợ ship)
     let selfShipping = false;
     let promoCode = '';
     let promoApplied = null;
@@ -2369,7 +2426,7 @@
     let orderType = 'Đơn sỉ';
 
     function vnd(num) {
-      return new Intl.NumberFormat('vi-VN').format(Math.round(num || 0));
+      return formatDot(Math.round(num || 0));
     }
     function esc(s) {
       return String(s ?? '').replace(/[&<>"']/g, c =>
@@ -2427,17 +2484,18 @@
     }
     function calcDiscountAmount() {
       const sub = calcSubtotal();
-      if (discountPercent > 0) {
-        return Math.round((sub * discountPercent) / 100);
+      if (discountType === 'pct') {
+        return Math.round((sub * Math.max(0, Math.min(100, discountPercent || 0))) / 100);
       }
-      return discount || 0;
+      return Math.max(0, discountAmount || 0);
     }
     function calculateTotal() {
       const subtotal = calcSubtotal();
       const promoOff = promoApplied?.discount_amount || 0;
       const discountAmt = calcDiscountAmount();
       const pointsOff = (usedPoints || 0) * 1000;
-      const ship = (selfShipping || promoApplied?.free_shipping) ? 0 : shippingFee;
+      const isCustomerPayShip = typeFeeDelivery === 'CC_CASH' && !selfShipping && !promoApplied?.free_shipping;
+      const ship = isCustomerPayShip ? shippingFee : 0;
       return Math.max(0, subtotal - discountAmt - promoOff - pointsOff + ship);
     }
 
@@ -2445,14 +2503,29 @@
     modalOverlay.className = 'chatmql-modal-overlay';
     modalOverlay.id = 'chatmql-order-modal-root';
 
+    function getScrollContainer() {
+      if (mountEl) return mountEl;
+      const modalBody = modalOverlay.querySelector('.chatmql-modal-body');
+      if (modalBody && modalBody.scrollHeight > modalBody.clientHeight) return modalBody;
+      let p = modalOverlay.parentElement;
+      while (p && p !== document.body) {
+        if (p && p.scrollHeight > p.clientHeight) return p;
+        p = p ? p.parentElement : null;
+      }
+      return document.scrollingElement || document.documentElement;
+    }
+
     function renderModalContent() {
       captureForm();
+      const scrollContainer = getScrollContainer();
+      const savedScroll = scrollContainer ? scrollContainer.scrollTop : 0;
+
       const subtotal = calcSubtotal();
       const total = calculateTotal();
       const totalWeight = pkgWeight != null ? pkgWeight : calcTotalWeight();
       const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-      const formattedTotal = new Intl.NumberFormat('vi-VN').format(total);
-      const formattedSubtotal = new Intl.NumberFormat('vi-VN').format(subtotal);
+      const formattedTotal = formatDot(total);
+      const formattedSubtotal = formatDot(subtotal);
 
       modalOverlay.innerHTML = `
         <div class="chatmql-modal" onclick="event.stopPropagation()" style="font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -2473,7 +2546,8 @@
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
-                  <span style="font-weight:700; font-size:12px; color:#15803d;">Nhóm: <span id="order-crm-group">${crmData?.priority_level || '—'}</span></span>
+                  <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${formatCombinedVip(crmData)}</span></span>
+                  <span style="font-weight:600; font-size:12px; color:#475569; margin-left:8px;">Nhóm KH: <b style="color:#0f172a;">${crmData?.nhom_kh || crmData?.priority_level || '—'}</b></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
                   👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
@@ -2516,7 +2590,7 @@
                   </label>
                     <select id="order-seller" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
                     <option value="">Chọn nhân viên</option>
-                    ${['Trần Trang', 'Lê Nga', 'Lê Tuấn', 'Vũ Đức Văn', 'Nguyễn Thị Huệ', 'Trà Dược CSKH', sellerName].filter((v, i, a) => v && a.indexOf(v) === i).map(st => `
+                    ${[sellerName, 'Lộc Thị Hạnh', 'Dương Hoài Chang', 'Dương Thu Trang', 'Đỗ Tuấn Anh', 'Hoàng Phương Anh', 'Ngọc Thị Thảo', 'Ngô Thị Ngân', 'Ngô Văn Tuấn', 'Nguyễn Nam Khánh', 'Nguyễn Thị Vân Anh', 'Trà Dược CSKH'].filter((v, i, a) => v && a.indexOf(v) === i).map(st => `
                       <option value="${esc(st)}" ${st === sellerName ? 'selected' : ''}>${esc(st)}</option>
                     `).join('')}
                   </select>
@@ -2626,7 +2700,7 @@
                   <div id="prod-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-product" placeholder="Tìm sản phẩm" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
-                  <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
+                  <div id="prod-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:330px; max-width:calc(100vw - 32px); max-height:280px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
                 </div>
 
                 <!-- Input Tìm quà tặng -->
@@ -2634,7 +2708,7 @@
                   <div id="gift-search-wrap" style="display:flex; align-items:center; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:0 10px; height:38px;">
                     <input type="text" id="input-search-gift" placeholder="Tìm quà tặng" style="width:100%; border:none; outline:none; font-size:12.5px; color:#0f172a; background:transparent;" autocomplete="off" />
                   </div>
-                  <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
+                  <div id="gift-search-results" style="display:none; position:absolute; top:calc(100% + 4px); right:0; left:auto; width:330px; max-width:calc(100vw - 32px); max-height:280px; overflow-y:auto; background:#fff; border:1px solid #cbd5e1; border-radius:8px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.18); z-index:999; padding:4px;"></div>
                 </div>
               </div>
 
@@ -2661,9 +2735,9 @@
                   const p = findProd(item.code) || item;
                   const isGift = !!item.isGift;
                   const lineTotal = isGift ? 0 : item.price * item.quantity;
-                  const formattedLineTotal = isGift ? '0' : new Intl.NumberFormat('vi-VN').format(lineTotal);
+                  const formattedLineTotal = isGift ? '0' : formatDot(lineTotal);
                   const unitStr = p.unit || 'Túi';
-                  const unitPriceStr = isGift ? `0 đ/Gói` : `${new Intl.NumberFormat('vi-VN').format(item.price)} đ/${unitStr}`;
+                  const unitPriceStr = isGift ? `0 đ/Gói` : `${formatDot(item.price)} đ/${unitStr}`;
                   const weightStr = p.weight ? `${p.weight}g` : '';
                   const vatStr = p.vat_note ? ` · ${p.vat_note}` : (isGift ? '' : ' · Đã có VAT 8%');
                   const subtitleText = isGift
@@ -2744,15 +2818,24 @@
                   <span>🚚</span> Chọn đơn vị vận chuyển
                 </label>
                 <select id="order-carrier" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#334155; padding:0 10px;">
-                  <option value="vnpost" ${shippingProvider === 'vnpost' ? 'selected' : ''}>VN Post - 25.000đ</option>
                   <option value="jt_express" ${shippingProvider === 'jt_express' ? 'selected' : ''}>J&T Express - 30.000đ</option>
+                  <option value="vnpost" ${shippingProvider === 'vnpost' ? 'selected' : ''}>VN Post - 25.000đ</option>
                   <option value="viettel_post" ${shippingProvider === 'viettel_post' ? 'selected' : ''}>Viettel Post - 28.000đ</option>
                 </select>
               </div>
 
-              <div style="margin-bottom:6px;">
-                <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chi phí vận chuyển</label>
-                <input type="number" id="order-shipping-fee" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${shippingFee}" />
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:6px;">
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Chi phí vận chuyển</label>
+                  <input type="number" id="order-shipping-fee" class="chatmql-form-input" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12.5px; color:#0f172a; padding:0 12px; box-sizing:border-box;" value="${shippingFee}" />
+                </div>
+                <div>
+                  <label class="chatmql-form-label" style="font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">Loại phí ship</label>
+                  <select id="order-type-fee-delivery" class="chatmql-form-select" style="width:100%; height:38px; border-radius:8px; border:1px solid #e2e8f0; background:#f8fafc; font-size:12px; color:#0f172a; font-weight:600; padding:0 10px; box-sizing:border-box;">
+                    <option value="CC_CASH" ${typeFeeDelivery === 'CC_CASH' ? 'selected' : ''}>CC_CASH (Khách trả ship)</option>
+                    <option value="PP_CASH" ${typeFeeDelivery === 'PP_CASH' ? 'selected' : ''}>PP_CASH (Hỗ trợ ship)</option>
+                  </select>
+                </div>
               </div>
 
               <div style="font-size:11.5px; color:#64748b; margin-bottom:10px; display:flex; align-items:center; gap:4px;">
@@ -2793,12 +2876,25 @@
 
               <!-- Chiết khấu -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <span style="font-size:12.5px; font-weight:600; color:#334155;">Chiết khấu</span>
-                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
-                  <input type="number" id="order-discount-pct" value="${discountPercent}" min="0" max="100" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
-                  <span style="font-size:12px; color:#64748b; margin-left:4px;">%</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:12.5px; font-weight:600; color:#334155;">Chiết khấu</span>
+                  <div style="display:inline-flex; background:#e2e8f0; border-radius:6px; padding:2px; gap:2px;">
+                    <button type="button" id="btn-discount-pct" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${discountType === 'pct' ? '#2563eb' : 'transparent'}; color:${discountType === 'pct' ? '#fff' : '#64748b'};">%</button>
+                    <button type="button" id="btn-discount-vnd" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:4px; border:none; cursor:pointer; background:${discountType === 'vnd' ? '#2563eb' : 'transparent'}; color:${discountType === 'vnd' ? '#fff' : '#64748b'};">VNĐ</button>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:140px;">
+                  <input type="number" id="order-discount-val" value="${discountType === 'pct' ? (discountPercent || '') : (discountAmount || '')}" min="0" ${discountType === 'pct' ? 'max="100"' : ''} placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <span id="order-discount-unit" style="font-size:12px; color:#64748b; margin-left:4px;">${discountType === 'pct' ? '%' : 'đ'}</span>
                 </div>
               </div>
+
+              <!-- Tiền chiết khấu (khi dùng %) -->
+              ${discountType === 'pct' && discountPercent > 0 ? `
+              <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b; margin:-4px 0 10px;">
+                <span>Tiền giảm (${discountPercent}%)</span>
+                <span id="summary-discount" style="font-weight:700; color:#dc2626;">-${vnd(calcDiscountAmount())}đ</span>
+              </div>` : ''}
 
               <!-- Mã ưu đãi -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -2819,7 +2915,7 @@
                   <span style="font-size:11px; color:#94a3b8; margin-left:4px;">1 Lá = 1.000đ</span>
                 </div>
                 <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:120px;">
-                  <input type="number" id="order-points" value="${usedPoints}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <input type="number" id="order-points" value="${usedPoints || ''}" min="0" placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
                   <span style="font-size:12px; color:#64748b; margin-left:4px;">Lá</span>
                 </div>
               </div>
@@ -2827,26 +2923,26 @@
               <!-- Quy đổi Lá -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
                 <span>Quy đổi Lá</span>
-                <span style="font-weight:700; color:#0f172a;">-${vnd(usedPoints * 1000)}đ</span>
+                <span id="summary-points" style="font-weight:700; color:#0f172a;">-${vnd(usedPoints * 1000)}đ</span>
               </div>
 
               <!-- Phí vận chuyển -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:12px;">
                 <span>Phí vận chuyển</span>
-                <span style="font-weight:700; color:#0f172a;">${vnd(selfShipping || promoApplied?.free_shipping ? 0 : shippingFee)}đ</span>
+                <span id="summary-shipping" style="font-weight:700; color:#0f172a;">${vnd(selfShipping || promoApplied?.free_shipping ? 0 : shippingFee)}đ</span>
               </div>
 
               <!-- Highlight Box: Tổng thanh toán -->
               <div style="background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <span style="font-size:13.5px; font-weight:700; color:#1e3a8a;">Tổng thanh toán</span>
-                <span style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}</span>
+                <span id="summary-total" style="font-size:18px; font-weight:800; color:#2563eb; font-variant-numeric:tabular-nums;">${formattedTotal}đ</span>
               </div>
 
               <!-- Chuyển khoản đặt cọc -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <span style="font-size:12.5px; font-weight:600; color:#334155;">Chuyển khoản (đặt cọc)</span>
                 <div style="display:flex; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0 8px; height:34px; width:140px;">
-                  <input type="number" id="order-deposit" value="${depositAmount}" min="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
+                  <input type="number" id="order-deposit" value="${depositAmount || ''}" min="0" placeholder="0" style="width:100%; border:none; background:transparent; font-size:12.5px; font-weight:700; color:#0f172a; text-align:right; outline:none;" />
                   <span style="font-size:12px; color:#64748b; margin-left:4px;">đ</span>
                 </div>
               </div>
@@ -2854,19 +2950,19 @@
               <!-- Đã đặt cọc -->
               <div style="display:flex; justify-content:space-between; font-size:12.5px; color:#334155; margin-bottom:8px;">
                 <span>Đã đặt cọc</span>
-                <span style="font-weight:700; color:#16a34a;">${vnd(depositAmount)}đ</span>
+                <span id="summary-deposit" style="font-weight:700; color:#16a34a;">${vnd(depositAmount)}đ</span>
               </div>
 
               <!-- Còn phải thu (COD) -->
               <div style="display:flex; justify-content:space-between; font-size:13px; color:#334155; margin-bottom:10px;">
                 <span>Còn phải thu (COD)</span>
-                <span style="font-weight:700; color:#ea580c; font-size:14px;">${vnd(Math.max(0, total - depositAmount))}đ</span>
+                <span id="summary-cod" style="font-weight:700; color:#ea580c; font-size:14px;">${vnd(Math.max(0, total - depositAmount))}đ</span>
               </div>
 
               <!-- Trạng thái thanh toán -->
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:#334155; padding-top:8px; border-top:1px dashed #e2e8f0;">
                 <span>Trạng thái thanh toán</span>
-                <span style="background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:11.5px; font-weight:600;">
+                <span id="summary-pay-status" style="background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:11.5px; font-weight:600;">
                   ${depositAmount >= total && total > 0 ? 'Đã thanh toán' : depositAmount > 0 ? 'Đã cọc một phần' : 'Chưa thanh toán'}
                 </span>
               </div>
@@ -3039,10 +3135,9 @@
           };
           if (dangTra) { set('order-crm-badge', 'ĐANG TRA CRM…'); return; }
           set('order-crm-badge', crm ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM');
-          set('order-crm-group', crm?.priority_level || '—');
-          set('order-crm-staff', crm?.staff_in_charge || 'Trà Dược CSKH');
-          set('order-crm-gmv', new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-            .format(crm?.gmv_total || 0));
+          set('order-crm-group', formatCombinedVip(crm));
+          set('order-crm-staff', currentUserName || crm?.staff_in_charge || 'Trà Dược CSKH');
+          set('order-crm-gmv', `${formatDot(crm?.gmv_total || 0)} ₫`);
           set('order-crm-count', `${crm?.order_count || 0} đơn`);
           set('order-crm-taste', crm?.thich_dung_hang || '—');
         };
@@ -3171,12 +3266,75 @@
       const hEl = modalOverlay.querySelector('#order-pkg-height');
       if (hEl) hEl.oninput = e => { pkgHeight = e.target.value; };
 
-      // Chiết khấu %
-      const discountPctInput = modalOverlay.querySelector('#order-discount-pct');
-      if (discountPctInput) {
-        discountPctInput.oninput = e => {
-          discountPercent = Math.max(0, Math.min(100, Number(e.target.value) || 0));
-          renderModalContent();
+      function updateSummary() {
+        const sub = calcSubtotal();
+        const disc = calcDiscountAmount();
+        const promoOff = promoApplied?.discount_amount || 0;
+        const pointsOff = (usedPoints || 0) * 1000;
+        const isCustomerPayShip = typeFeeDelivery === 'CC_CASH' && !selfShipping && !promoApplied?.free_shipping;
+        const ship = isCustomerPayShip ? shippingFee : 0;
+        const tot = Math.max(0, sub - disc - promoOff - pointsOff + ship);
+        const cod = Math.max(0, tot - (depositAmount || 0));
+
+        const totEl = modalOverlay.querySelector('#summary-total');
+        if (totEl) totEl.textContent = `${vnd(tot)}đ`;
+
+        const discEl = modalOverlay.querySelector('#summary-discount');
+        if (discEl) discEl.textContent = `-${vnd(disc)}đ`;
+
+        const ptsEl = modalOverlay.querySelector('#summary-points');
+        if (ptsEl) ptsEl.textContent = `-${vnd(pointsOff)}đ`;
+
+        const shipEl = modalOverlay.querySelector('#summary-shipping');
+        if (shipEl) {
+          if (typeFeeDelivery === 'PP_CASH') {
+            shipEl.textContent = `${vnd(shippingFee)}đ (Shop hỗ trợ)`;
+          } else {
+            shipEl.textContent = `${vnd(ship)}đ`;
+          }
+        }
+
+        const depEl = modalOverlay.querySelector('#summary-deposit');
+        if (depEl) depEl.textContent = `${vnd(depositAmount)}đ`;
+
+        const codEl = modalOverlay.querySelector('#summary-cod');
+        if (codEl) codEl.textContent = `${vnd(cod)}đ`;
+
+        const payStatusEl = modalOverlay.querySelector('#summary-pay-status');
+        if (payStatusEl) {
+          payStatusEl.textContent = depositAmount >= tot && tot > 0 ? 'Đã thanh toán' : depositAmount > 0 ? 'Đã cọc một phần' : 'Chưa thanh toán';
+        }
+      }
+
+      // Chiết khấu (Giá trị & Toggle Loại)
+      const discValInput = modalOverlay.querySelector('#order-discount-val');
+      if (discValInput) {
+        discValInput.oninput = e => {
+          const val = Math.max(0, Number(e.target.value) || 0);
+          if (discountType === 'pct') {
+            discountPercent = Math.min(100, val);
+          } else {
+            discountAmount = val;
+          }
+          updateSummary();
+        };
+      }
+      const btnPct = modalOverlay.querySelector('#btn-discount-pct');
+      if (btnPct) {
+        btnPct.onclick = () => {
+          if (discountType !== 'pct') {
+            discountType = 'pct';
+            renderModalContent();
+          }
+        };
+      }
+      const btnVnd = modalOverlay.querySelector('#btn-discount-vnd');
+      if (btnVnd) {
+        btnVnd.onclick = () => {
+          if (discountType !== 'vnd') {
+            discountType = 'vnd';
+            renderModalContent();
+          }
         };
       }
 
@@ -3185,7 +3343,7 @@
       if (pointsInput) {
         pointsInput.oninput = e => {
           usedPoints = Math.max(0, Number(e.target.value) || 0);
-          renderModalContent();
+          updateSummary();
         };
       }
 
@@ -3194,7 +3352,7 @@
       if (depEl) {
         depEl.oninput = e => {
           depositAmount = Math.max(0, Number(e.target.value) || 0);
-          renderModalContent();
+          updateSummary();
         };
       }
 
@@ -3203,7 +3361,16 @@
       if (feeInput) {
         feeInput.oninput = e => {
           shippingFee = Number(e.target.value) || 0;
-          renderModalContent();
+          updateSummary();
+        };
+      }
+
+      // Loại phí ship: CC_CASH hoặc PP_CASH
+      const typeFeeSel = modalOverlay.querySelector('#order-type-fee-delivery');
+      if (typeFeeSel) {
+        typeFeeSel.onchange = e => {
+          typeFeeDelivery = e.target.value;
+          updateSummary();
         };
       }
 
@@ -3293,7 +3460,7 @@
         const custPhone = (form.phone || '').trim();
         const custAddr = (form.addr || '').trim();
         const payMethod = depositAmount > 0 ? 'vietqr' : 'cod';
-        const carrier = shippingProvider || 'vnpost';
+        const carrier = shippingProvider || 'jt_express';
         const notes = (form.notes || '').trim();
 
         const thieu = [];
@@ -3367,6 +3534,7 @@
           selfShipping: selfShipping,
           isFragile: isFragile,
           isExchange: isExchange,
+          typeFeeDelivery: typeFeeDelivery,
           sellerName: sellerName,
           // ── Đợt 5 ──
           promoCode: promoApplied?.promotion?.code || null,
@@ -3422,14 +3590,11 @@
           modalOverlay.remove();
           if (inlineHost) window.openChatMqlOrderModal(inlineHost);
 
-          const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(total);
+          const money = `${formatDot(total)} ₫`;
           if (result.replayed) {
-            alert(`ℹ️ ĐƠN NÀY ĐÃ ĐƯỢC TẠO TRƯỚC ĐÓ [${result.order_code}]\n\n• Tổng tiền: ${money}\n\nHệ thống không tạo đơn trùng.`);
-          } else if (fmOk) {
-            alert(`🎉 LÊN ĐƠN THÀNH CÔNG [${result.order_code}]!\n\n• Tổng tiền: ${money}\n• Đã ghi vào CRM (hoa_don)\n• Đã ghi vào Hệ thống FM (invoice)`);
+            alert(`ℹ️ ĐƠN HÀNG ĐÃ ĐƯỢC TẠO TRƯỚC ĐÓ!\n\n• Mã hóa đơn: ${result.order_code}\n• Khách hàng: ${custName}\n• Tổng tiền: ${money}`);
           } else {
-            // KHÔNG báo thành công trọn vẹn khi mới ghi được một nửa.
-            alert(`⚠️ ĐƠN ĐÃ TẠO NHƯNG CHƯA ĐỦ [${result.order_code}]\n\n• Tổng tiền: ${money}\n• Đã ghi vào CRM (hoa_don) ✅\n• CHƯA ghi được vào Hệ thống FM ❌\n\nHệ thống sẽ tự đẩy lại sang FM. Báo bộ phận kỹ thuật nếu sau ít phút vẫn chưa thấy đơn bên FM.\n\nChi tiết: ${result.fm_error || 'không rõ'}`);
+            alert(`🎉 LÊN ĐƠN THÀNH CÔNG!\n\n• Mã hóa đơn: ${result.order_code}\n• Khách hàng: ${custName}\n• Tổng tiền: ${money}`);
           }
 
           // Làm mới lịch sử đơn ở sidebar — GMV và số đơn vừa thay đổi nên phải
@@ -3458,6 +3623,12 @@
           resetBtn();
         }
       };
+
+      if (scrollContainer && scrollContainer.scrollTop !== undefined) {
+        requestAnimationFrame(() => {
+          scrollContainer.scrollTop = savedScroll;
+        });
+      }
     }
 
     try {
@@ -3656,8 +3827,8 @@
 .chat-list__action-btn:hover{background:var(--gray-100);}
 .search-input{display:flex; align-items:center; gap:8px; background:var(--gray-100); border-radius:8px; padding:0 10px;}
 .search-input__field{border:none; background:none; outline:none; font-size:13px; padding:8px 0; width:100%; font-family:inherit;}
-.filter-bar{display:flex; gap:6px; margin:10px 0;}
-.filter-bar__btn{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:12px; padding:4px 12px; border-radius:14px; cursor:pointer;}
+.filter-bar{display:flex; gap:5px; margin:10px 0; overflow-x:auto; flex-wrap:wrap;}
+.filter-bar__btn{border:1px solid var(--gray-200); background:#fff; color:var(--gray-600); font-size:12px; padding:4px 10px; border-radius:14px; cursor:pointer; white-space:nowrap; transition:all .15s ease;}
 .filter-bar__btn--active{background:var(--primary); border-color:var(--primary); color:#fff; font-weight:600;}
 .chat-list__account-filter{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--gray-200); border-radius:8px; cursor:pointer; margin-bottom:10px; font-size:12.5px;}
 .chat-list__account-avatar{width:20px; height:20px; border-radius:6px; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
@@ -4301,6 +4472,226 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     actions.insertBefore(btn, actions.firstChild);
   }
 
+  // ── AI Mode Selector Dropdown in Chat Header ──────────────────────
+  const AI_MODES_CONFIG = {
+    auto: {
+      key: 'auto',
+      icon: '🤖',
+      label: 'Tự động',
+      fullLabel: 'Tự động trả lời',
+      desc: 'AI tự động phản hồi tin nhắn khách hàng 24/7 theo tri thức',
+      bg: '#f0fdf4',
+      color: '#16a34a',
+      border: '#bbf7d0',
+      activeBg: '#dcfce7',
+    },
+    suggest: {
+      key: 'suggest',
+      icon: '✍️',
+      label: 'Gợi ý nháp',
+      fullLabel: 'Gợi ý câu trả lời',
+      desc: 'AI soạn sẵn câu trả lời nháp, nhân viên xem duyệt và bấm gửi',
+      bg: '#eff6ff',
+      color: '#2563eb',
+      border: '#bfdbfe',
+      activeBg: '#dbeafe',
+    },
+    manual: {
+      key: 'manual',
+      icon: '🛑',
+      label: 'Thủ công',
+      fullLabel: 'Thủ công (Tắt AI)',
+      desc: 'Tắt AI với hội thoại này, nhân viên tự chat hoàn toàn',
+      bg: '#f8fafc',
+      color: '#64748b',
+      border: '#cbd5e1',
+      activeBg: '#e2e8f0',
+    }
+  };
+
+  const convAiModeCache = {};
+  let isAiModeDropdownOpen = false;
+
+  async function setConversationAiMode(convId, newMode) {
+    if (!convId || !AI_MODES_CONFIG[newMode]) return;
+    convAiModeCache[convId] = newMode;
+    updateAiModeTriggerUI(newMode);
+    closeAiModeDropdown();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/conversations/${convId}/ai-mode`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ aiMode: newMode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Không thể đổi chế độ AI');
+      
+      const modeCfg = AI_MODES_CONFIG[newMode];
+      if (typeof showToast === 'function') {
+        showToast(`✅ Đã chuyển AI sang: ${modeCfg.fullLabel}`, 'success');
+      }
+      window.dispatchEvent(new CustomEvent('chatmql:ai-mode-changed', { detail: { convId, aiMode: newMode } }));
+    } catch (err) {
+      if (typeof showToast === 'function') {
+        showToast(`Lỗi: ${err.message}`, 'error');
+      } else {
+        alert(`Lỗi đổi chế độ AI: ${err.message}`);
+      }
+    }
+  }
+
+  function updateAiModeTriggerUI(mode) {
+    const trigger = document.getElementById('chatmql-ai-mode-trigger');
+    if (!trigger) return;
+    const cfg = AI_MODES_CONFIG[mode] || AI_MODES_CONFIG.auto;
+    trigger.style.background = cfg.bg;
+    trigger.style.color = cfg.color;
+    trigger.style.borderColor = cfg.border;
+    trigger.innerHTML = `
+      <span style="font-size:13px;line-height:1;">${cfg.icon}</span>
+      <span style="font-weight:600;font-size:12px;">${cfg.label}</span>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;margin-left:2px;"><path d="m6 9 6 6 6-6"/></svg>
+    `;
+    trigger.title = `Chế độ AI: ${cfg.fullLabel} (${cfg.desc})`;
+  }
+
+  function closeAiModeDropdown() {
+    isAiModeDropdownOpen = false;
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (menu) menu.style.display = 'none';
+  }
+
+  function toggleAiModeDropdown(e) {
+    e.stopPropagation();
+    isAiModeDropdownOpen = !isAiModeDropdownOpen;
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (!menu) return;
+
+    if (isAiModeDropdownOpen) {
+      const convId = getCurrentConversationId();
+      const currentMode = convAiModeCache[convId] || 'auto';
+      renderAiModeMenuItems(currentMode);
+      menu.style.display = 'block';
+    } else {
+      menu.style.display = 'none';
+    }
+  }
+
+  function renderAiModeMenuItems(currentMode) {
+    const menu = document.getElementById('chatmql-ai-mode-menu');
+    if (!menu) return;
+    const convId = getCurrentConversationId();
+
+    menu.innerHTML = `
+      <div style="padding:4px 8px 6px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #f1f5f9;margin-bottom:4px;">
+        Chế độ AI cho khách này
+      </div>
+      ${Object.values(AI_MODES_CONFIG).map(cfg => {
+        const isSelected = cfg.key === currentMode;
+        return `
+          <div class="chatmql-ai-mode-item" data-mode="${cfg.key}" style="
+            display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:6px;cursor:pointer;
+            transition:background 0.15s;background:${isSelected ? cfg.activeBg : 'transparent'};
+            margin-bottom:2px;
+          ">
+            <span style="font-size:16px;line-height:1.2;flex-shrink:0;">${cfg.icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12.5px;font-weight:${isSelected ? '700' : '600'};color:${isSelected ? cfg.color : '#1e293b'};display:flex;align-items:center;justify-content:space-between;">
+                <span>${cfg.fullLabel}</span>
+                ${isSelected ? `<span style="font-size:12px;color:${cfg.color};font-weight:bold;">✓</span>` : ''}
+              </div>
+              <div style="font-size:11px;color:#64748b;line-height:1.3;margin-top:2px;">${cfg.desc}</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    `;
+
+    menu.querySelectorAll('.chatmql-ai-mode-item').forEach(item => {
+      item.onmouseenter = () => {
+        const mode = item.dataset.mode;
+        if (mode !== currentMode) item.style.background = '#f8fafc';
+      };
+      item.onmouseleave = () => {
+        const mode = item.dataset.mode;
+        if (mode !== currentMode) item.style.background = 'transparent';
+      };
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const mode = item.dataset.mode;
+        setConversationAiMode(convId, mode);
+      };
+    });
+  }
+
+  // Global click to close dropdown
+  if (!window._chatmqlAiModeClickAttached) {
+    window._chatmqlAiModeClickAttached = true;
+    document.addEventListener('click', (e) => {
+      if (isAiModeDropdownOpen) {
+        const container = document.getElementById('chatmql-ai-mode-container');
+        if (!container || !container.contains(e.target)) {
+          closeAiModeDropdown();
+        }
+      }
+    });
+  }
+
+  function renderAiModeSelector() {
+    const actions = document.querySelector('.chat-main__header-actions') ||
+                    document.querySelector('.chat-header__actions') ||
+                    document.querySelector('.chat-main__header');
+    if (!actions) return;
+
+    const convId = getCurrentConversationId();
+    if (!convId) return;
+
+    let container = document.getElementById('chatmql-ai-mode-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'chatmql-ai-mode-container';
+      container.style.cssText = 'position:relative;display:inline-flex;align-items:center;margin-right:6px;vertical-align:middle;';
+      
+      const trigger = document.createElement('button');
+      trigger.id = 'chatmql-ai-mode-trigger';
+      trigger.type = 'button';
+      trigger.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:5px 11px;font-size:12.5px;font-weight:600;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:6px;cursor:pointer;transition:all 0.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.05);height:30px;box-sizing:border-box;';
+      trigger.onclick = toggleAiModeDropdown;
+      container.appendChild(trigger);
+
+      const menu = document.createElement('div');
+      menu.id = 'chatmql-ai-mode-menu';
+      menu.style.cssText = 'display:none;position:absolute;top:calc(100% + 5px);right:0;width:240px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 10px 25px -5px rgba(0,0,0,0.12), 0 8px 10px -6px rgba(0,0,0,0.08);padding:6px;z-index:99999;text-align:left;';
+      container.appendChild(menu);
+
+      actions.insertBefore(container, actions.firstChild);
+    }
+
+    // Check conversation's AI mode if not cached or container newly attached
+    if (container.dataset.convId !== convId) {
+      container.dataset.convId = convId;
+      if (convAiModeCache[convId]) {
+        updateAiModeTriggerUI(convAiModeCache[convId]);
+      } else {
+        // Optimistic default: auto
+        updateAiModeTriggerUI('auto');
+        fetch(`${API_BASE}/api/v1/conversations/${convId}`, {
+          headers: authHeaders(),
+        }).then(res => res.json()).then(data => {
+          const mode = data?.conversation?.aiMode || data?.aiMode || 'auto';
+          convAiModeCache[convId] = mode;
+          if (container.dataset.convId === convId) {
+            updateAiModeTriggerUI(mode);
+          }
+        }).catch(() => {});
+      }
+    }
+  }
+
   const CD_WIDTH_KEY = 'chatmql:detailWidth';
   const CD_DEFAULT = 365, CD_MIN = 300, CD_MAX = 620;
 
@@ -4358,7 +4749,7 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   }
   function ccFmtMoney(v) {
     if (v == null) return '—';
-    return new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+    return formatDot(v) + 'đ';
   }
   function ccInitials(name) {
     const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
@@ -4520,7 +4911,8 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${row('Điểm', points, 'color:#16a34a;')}
               ${row('Tổng chi tiêu', ccFmtMoney(crm.gmv_total))}
               ${row('Nghề nghiệp', crm.occupation)}
-              ${row('Nhóm ưu tiên', crm.priority_level)}
+              ${row('Cấp Vip', formatCombinedVip(crm))}
+              ${row('Nhóm KH', crm.nhom_kh || crm.priority_level)}
               ${row('Giới tính', crm.gender)}
               ${row('Ngày sinh', crm.birthday ? ccFmtDate(crm.birthday) : null)}
               ${row('Email', chat.email)}
@@ -4738,6 +5130,9 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
   const ICON_FILTERS = {
     'Chat':             { kind: 'app', btn: 'Tất cả' },
     'Chưa đọc':         { kind: 'app', btn: 'Chưa đọc' },
+    'Của tôi':          { kind: 'app', btn: 'Của tôi' },
+    'Cá nhân':          { kind: 'app', btn: 'Cá nhân' },
+    'Zalo OA':          { kind: 'app', btn: 'Zalo OA' },
     'Được gán cho tôi': { kind: 'api', param: 'assignedTo=me',  label: 'được gán cho tôi' },
     'Auto':             { kind: 'api', param: 'aiMode=auto',    label: 'AI đang tự trả lời' },
     'Chờ':              { kind: 'api', param: 'unreplied=true', label: 'chờ nhân viên trả lời' },
@@ -4899,9 +5294,9 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
     if (v == null) return '—';
     if (v >= 1e9) return (v / 1e9).toFixed(2).replace(/\.?0+$/, '') + ' tỷ';
     if (v >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + ' tr';
-    return new Intl.NumberFormat('vi-VN').format(v) + 'đ';
+    return formatDot(v) + 'đ';
   }
-  function dnum(v) { return new Intl.NumberFormat('vi-VN').format(v ?? 0); }
+  function dnum(v) { return formatDot(v ?? 0); }
 
   function dashCard(label, value, sub, tone) {
     const c = tone || '#0f172a';
