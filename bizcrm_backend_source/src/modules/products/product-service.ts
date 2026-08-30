@@ -116,7 +116,11 @@ export async function createProduct(orgId: string, data: ProductInput, createdBy
     })
     // Single add → embed now (one product = one call). Bulk import passes
     // skipEmbed and batches all rows in one pass (see importProducts).
-    if (!opts.skipEmbed) enqueueProductEmbed(orgId, p.id).catch(() => { /* non-fatal */ })
+    if (!opts.skipEmbed) {
+      enqueueProductEmbed(orgId, p.id).catch((err) => {
+        logger.warn({ err: err?.message, orgId, productId: p.id }, '[product] enqueue embed failed')
+      })
+    }
     return serialize(p)
   } catch (err) {
     throw mapDup(err)
@@ -147,7 +151,9 @@ export async function updateProduct(orgId: string, id: string, data: Partial<Pro
   try {
     const p = await prisma.product.update({ where: { id }, data: patch, select: SELECT })
     if (!opts.skipEmbed && EMBED_FIELDS.some((f) => (d as Record<string, unknown>)[f] !== undefined)) {
-      enqueueProductEmbed(orgId, id).catch(() => { /* non-fatal */ })
+      enqueueProductEmbed(orgId, id).catch((err) => {
+        logger.warn({ err: err?.message, orgId, productId: id }, '[product] enqueue embed failed')
+      })
     }
     return serialize(p)
   } catch (err) {

@@ -349,18 +349,19 @@ try {
   // ── ZNS mass-send worker (rate-limited) ──
   initZnsSendWorker(processZnsSendJob)
 
-  // ── KB embedding worker (generate + store vectors for knowledge entries) ──
+  // ── KB & Product embedding worker (generate + store vectors) ──
   initEmbeddingWorker(async (job) => {
     const { orgId, entryId, productId, kind } = job.data
     if (kind === 'product' && productId) {
-      await embedAndStoreProduct(orgId, productId)
+      const ok = await embedAndStoreProduct(orgId, productId)
+      if (!ok) throw new Error(`Product embed failed for product ${productId}`)
       return
     }
     if (!entryId) return
     // Shared embed path — keeps on-save embeds consistent with the backfill.
     await embedAndStoreKbEntry(orgId, entryId)
   })
-  console.log('🧬 KB embedding worker started')
+  console.log('🧬 KB & Product embedding worker started')
 
   // ── AI auto-reply orchestrator (debounced, per-conversation) ──
   initAiReplyOrchestrator()

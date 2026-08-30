@@ -164,10 +164,11 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ── Backfill product embeddings (owner/admin/manager) ───────────────
-  app.post('/api/v1/products/embeddings/backfill', async (request, reply) => {
+  app.post<{ Body: { force?: boolean } }>('/api/v1/products/embeddings/backfill', async (request, reply) => {
     const u = request.user as AuthUser
     if (!canManage(u.role)) return err(reply, 403, 'Không có quyền', 'FORBIDDEN')
-    const result = await backfillProductEmbeddings(u.orgId)
+    const force = request.body?.force === true
+    const result = await backfillProductEmbeddings(u.orgId, { force })
     return { success: true, data: result }
   })
 

@@ -237,7 +237,7 @@ export async function enqueueEmbed(orgId: string, entryId: string): Promise<stri
   const job = await embeddingQueue.add(
     'embed',
     { orgId, entryId, kind: 'kb' },
-    { jobId: `embed-${entryId}`, removeOnComplete: true, removeOnFail: false },
+    { jobId: `embed-${entryId}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: false },
   )
   logger.debug({ jobId: job.id, orgId, entryId }, '[queue] Embed job enqueued')
   return job.id!
@@ -248,7 +248,7 @@ export async function enqueueProductEmbed(orgId: string, productId: string): Pro
   const job = await embeddingQueue.add(
     'embed',
     { orgId, productId, kind: 'product' },
-    { jobId: `embed-product-${productId}`, removeOnComplete: true, removeOnFail: false },
+    { jobId: `embed-product-${productId}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: false },
   )
   logger.debug({ jobId: job.id, orgId, productId }, '[queue] Product embed job enqueued')
   return job.id!
@@ -405,7 +405,7 @@ export function initEmbeddingWorker(processor: (job: Job<EmbedJobData>) => Promi
     logger.debug({ jobId: job.id, entryId: job.data.entryId }, '[queue] Embed job completed')
   })
   embeddingWorker.on('failed', (job, err) => {
-    logger.warn({ jobId: job?.id, entryId: job?.data?.entryId, err: err.message }, '[queue] Embed job failed')
+    logger.error({ jobId: job?.id, data: job?.data, err: err.message }, '[queue] Embed job failed')
   })
 
   logger.info({ prefix: REDIS_PREFIX }, '[queue] Embedding worker initialized')
