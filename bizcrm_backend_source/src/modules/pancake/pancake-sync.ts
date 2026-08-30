@@ -223,6 +223,7 @@ async function syncSingleConversation(
         lastMessageAt: convTime,
         unreadCount: 0,
         isReplied: true, // Historical sync — don't mark as unread
+        aiMode: 'auto',
       },
     })
   } else {

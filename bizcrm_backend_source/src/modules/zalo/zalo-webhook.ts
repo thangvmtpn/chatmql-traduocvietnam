@@ -116,6 +116,7 @@ export async function zaloWebhookRoutes(app: FastifyInstance): Promise<void> {
             lastMessageAt: new Date(),
             unreadCount: 1,
             isReplied: false,
+            aiMode: 'auto',
           },
         })
       } else {

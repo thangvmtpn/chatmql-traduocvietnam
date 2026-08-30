@@ -511,6 +511,7 @@ async function insertSystemMessage(
           externalThreadId: userUid,
           threadType: 'user',
           displayName: text,
+          aiMode: 'auto',
         },
         select: { id: true, orgId: true },
       });

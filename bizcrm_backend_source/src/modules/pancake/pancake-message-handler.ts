@@ -148,6 +148,7 @@ export async function processPancakeEvent(
         lastMessageAt: sentAt,
         unreadCount: 1,
         isReplied: false,
+        aiMode: 'auto',
       },
     })
     logger.info({ convId: conv.id, externalId: convExternalId }, '[pancake-handler] Created new conversation')
