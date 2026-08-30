@@ -38,15 +38,39 @@ function replyCrmError(reply: any, err: unknown, context: string) {
     // 5xx từ CRM là lỗi hạ tầng phía ta, không phải lỗi người dùng nhập sai.
     const status = err.status >= 500 || err.status === 401 || err.status === 503 ? 502 : err.status
     logger.error({ err, status: err.status }, `[orders] ${context}`)
-    return reply.status(status).send({
-      success: false,
-      error: err.message,
-      crmStatus: err.status,
-    })
+    return reply.status(status).send({ error: err.message, detail: err.detail })
   }
-  logger.error({ err }, `[orders] ${context} — lỗi không xác định`)
-  return reply.status(500).send({ success: false, error: 'Lỗi hệ thống khi xử lý đơn hàng' })
+  const msg = err instanceof Error ? err.message : String(err)
+  logger.error({ err }, `[orders] ${context}`)
+  return reply.status(500).send({ error: `Lỗi hệ thống khi ${context}: ${msg}` })
 }
+
+function calculateVipLevel(gmv: number, aov?: number): string {
+  const gmvInMillions = (Number(gmv) || 0) / 1_000_000
+  let vip = 'VIP 0'
+  if (gmvInMillions < 1) {
+    vip = 'VIP 0'
+  } else if (gmvInMillions < 10) {
+    vip = `VIP ${Math.floor(gmvInMillions)}`
+  } else if (gmvInMillions < 60) {
+    vip = `VIP ${Math.min(Math.floor((gmvInMillions - 10) / 5) + 10, 19)}`
+  } else if (gmvInMillions < 160) {
+    vip = `VIP ${Math.min(Math.floor((gmvInMillions - 60) / 10) + 20, 29)}`
+  } else {
+    vip = `VIP ${Math.min(Math.floor((gmvInMillions - 160) / 50) + 30, 39)}`
+  }
+
+  const aovVal = Number(aov) || (Number(gmv) || 0)
+  let aovClass = 'A'
+  if (aovVal < 500_000) aovClass = 'A'
+  else if (aovVal < 1_000_000) aovClass = 'B'
+  else if (aovVal < 2_000_000) aovClass = 'C'
+  else if (aovVal <= 3_000_000) aovClass = 'D'
+  else aovClass = 'E'
+
+  return `${vip}${aovClass}`
+}
+
 
 export async function orderRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware)
@@ -345,7 +369,10 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
           phone2: rawCrm.phone2 || rawCrm.sdt2 || null,
           purchase_frequency: rawCrm.purchase_frequency || rawCrm.tan_suat_mua || null,
           profile_note: rawCrm.profile_note || rawCrm.ghi_chu || '',
-          cap_vip: rawCrm.cap_vip || rawCrm.priority_level || rawCrm.nhom_kh || null,
+          nhom_kh: rawCrm.nhom_kh || rawCrm.priority_level || null,
+          cap_vip: (rawCrm.cap_vip && !/^(FT|KT|NC|PL|KD|KL)\d/i.test(rawCrm.cap_vip))
+            ? rawCrm.cap_vip
+            : calculateVipLevel(rawCrm.gmv_total || rawCrm.gmv || 0, rawCrm.aov || 0),
         }
       }
 

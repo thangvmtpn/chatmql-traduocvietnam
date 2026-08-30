@@ -67,6 +67,38 @@
     return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
+  function getVipLevelFromGMV(gmv) {
+    const gmvVal = Number(gmv) || 0;
+    const gmvInMillions = gmvVal / 1_000_000;
+    if (gmvInMillions < 1) return 'VIP 0';
+    if (gmvInMillions < 10) return `VIP ${Math.floor(gmvInMillions)}`;
+    if (gmvInMillions < 60) return `VIP ${Math.min(Math.floor((gmvInMillions - 10) / 5) + 10, 19)}`;
+    if (gmvInMillions < 160) return `VIP ${Math.min(Math.floor((gmvInMillions - 60) / 10) + 20, 29)}`;
+    return `VIP ${Math.min(Math.floor((gmvInMillions - 160) / 50) + 30, 39)}`;
+  }
+
+  function getAOVClass(aov) {
+    const aovVal = Number(aov) || 0;
+    if (aovVal < 500_000) return 'A';
+    if (aovVal < 1_000_000) return 'B';
+    if (aovVal < 2_000_000) return 'C';
+    if (aovVal <= 3_000_000) return 'D';
+    return 'E';
+  }
+
+  function formatCombinedVip(crm) {
+    if (!crm) return '—';
+    if (crm.cap_vip && !/^(FT|KT|NC|PL|KD|KL)\d/i.test(crm.cap_vip)) {
+      return crm.cap_vip;
+    }
+    const gmv = Number(crm.gmv_total ?? crm.gmv) || 0;
+    const aov = Number(crm.aov) || (crm.order_count ? gmv / crm.order_count : gmv);
+    const vip = getVipLevelFromGMV(gmv);
+    const aovClass = getAOVClass(aov);
+    return `${vip}${aovClass}`;
+  }
+
+
   // Inject CSS Styles
   const styleEl = document.createElement('style');
   styleEl.textContent = `
@@ -762,7 +794,8 @@
           ${infoRow('Email', cm.email)}
           ${infoRow('Nghề nghiệp', crm.occupation)}
           ${infoRow('Nguồn khách hàng', crm.referral_source || cm.source)}
-          ${infoRow('Cấp Vip', crm.cap_vip || crm.priority_level || crm.nhom_kh)}
+          ${infoRow('Cấp Vip', formatCombinedVip(crm))}
+          ${infoRow('Nhóm KH', crm.nhom_kh || crm.priority_level)}
           ${infoRow('Người phụ trách', crm.staff_in_charge)}
           ${infoRow('Địa chỉ', crm.address || cm.address)}
           ${infoRow('Địa chỉ 2', crm.address2)}
@@ -2513,7 +2546,8 @@
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
-                  <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${crmData?.cap_vip || crmData?.priority_level || '—'}</span></span>
+                  <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${formatCombinedVip(crmData)}</span></span>
+                  <span style="font-weight:600; font-size:12px; color:#475569; margin-left:8px;">Nhóm KH: <b style="color:#0f172a;">${crmData?.nhom_kh || crmData?.priority_level || '—'}</b></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
                   👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
@@ -3101,7 +3135,7 @@
           };
           if (dangTra) { set('order-crm-badge', 'ĐANG TRA CRM…'); return; }
           set('order-crm-badge', crm ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM');
-          set('order-crm-group', crm?.cap_vip || crm?.priority_level || '—');
+          set('order-crm-group', formatCombinedVip(crm));
           set('order-crm-staff', currentUserName || crm?.staff_in_charge || 'Trà Dược CSKH');
           set('order-crm-gmv', `${formatDot(crm?.gmv_total || 0)} ₫`);
           set('order-crm-count', `${crm?.order_count || 0} đơn`);
@@ -4695,7 +4729,8 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${row('Điểm', points, 'color:#16a34a;')}
               ${row('Tổng chi tiêu', ccFmtMoney(crm.gmv_total))}
               ${row('Nghề nghiệp', crm.occupation)}
-              ${row('Cấp Vip', crm.cap_vip || crm.priority_level || crm.nhom_kh)}
+              ${row('Cấp Vip', formatCombinedVip(crm))}
+              ${row('Nhóm KH', crm.nhom_kh || crm.priority_level)}
               ${row('Giới tính', crm.gender)}
               ${row('Ngày sinh', crm.birthday ? ccFmtDate(crm.birthday) : null)}
               ${row('Email', chat.email)}
