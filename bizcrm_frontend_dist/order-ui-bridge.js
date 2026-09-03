@@ -795,7 +795,6 @@
           ${infoRow('Nghề nghiệp', crm.occupation)}
           ${infoRow('Nguồn khách hàng', crm.referral_source || cm.source)}
           ${infoRow('Cấp Vip', formatCombinedVip(crm))}
-          ${infoRow('Nhóm KH', crm.nhom_kh || crm.priority_level)}
           ${infoRow('Người phụ trách', crm.staff_in_charge)}
           ${infoRow('Địa chỉ', crm.address || cm.address)}
           ${infoRow('Địa chỉ 2', crm.address2)}
@@ -2547,7 +2546,6 @@
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
                   <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${formatCombinedVip(crmData)}</span></span>
-                  <span style="font-weight:600; font-size:12px; color:#475569; margin-left:8px;">Nhóm KH: <b style="color:#0f172a;">${crmData?.nhom_kh || crmData?.priority_level || '—'}</b></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
                   👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
@@ -4912,7 +4910,6 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${row('Tổng chi tiêu', ccFmtMoney(crm.gmv_total))}
               ${row('Nghề nghiệp', crm.occupation)}
               ${row('Cấp Vip', formatCombinedVip(crm))}
-              ${row('Nhóm KH', crm.nhom_kh || crm.priority_level)}
               ${row('Giới tính', crm.gender)}
               ${row('Ngày sinh', crm.birthday ? ccFmtDate(crm.birthday) : null)}
               ${row('Email', chat.email)}
