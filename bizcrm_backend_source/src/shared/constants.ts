@@ -21,6 +21,7 @@ export const Platform = {
   PANCAKE_IG:    31,   // Pancake — Instagram
   PANCAKE_TIKTOK:32,   // Pancake — TikTok
   PANCAKE_OTHER: 39,   // Pancake — other/unknown sub-platform
+  TIKTOK_SHOP:   40,   // native TikTok Shop Open Platform (official)
 } as const;
 export type PlatformId = (typeof Platform)[keyof typeof Platform];
 
@@ -36,6 +37,7 @@ export const PlatformLabel: Record<number, string> = {
   [Platform.PANCAKE_IG]:    'Pancake (Instagram)',
   [Platform.PANCAKE_TIKTOK]:'Pancake (TikTok)',
   [Platform.PANCAKE_OTHER]: 'Pancake',
+  [Platform.TIKTOK_SHOP]:   'TikTok Shop',
 };
 
 /** Check if a platform ID belongs to the Pancake family */
@@ -46,6 +48,11 @@ export function isPancakePlatform(platform: number): boolean {
 /** Check if a platform ID is the native (official) Facebook Page channel */
 export function isFacebookPage(platform: number): boolean {
   return platform === Platform.FACEBOOK_PAGE;
+}
+
+/** Check if a platform ID is the native (official) TikTok Shop channel */
+export function isTikTokShop(platform: number): boolean {
+  return platform === Platform.TIKTOK_SHOP;
 }
 
 /** Map Pancake's platform string to our PlatformId */

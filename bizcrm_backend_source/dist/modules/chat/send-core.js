@@ -13,6 +13,7 @@ import { getPoolEntry, sendViaPool } from '../zalo/zalo-pool.js';
 import { sendTextViaOa, isCsWindowError } from '../zalo-oa/oa-pool.js';
 import { sendViaPancake } from '../pancake/pancake-send.js';
 import { sendTextViaFb, isFbCsWindowError } from '../facebook-page/fb-pool.js';
+import { sendTextViaTikTok } from '../tiktok-shop/tiktok-pool.js';
 import { checkLimits, recordAction } from '../zalo/zalo-rate-limiter.js';
 import { logger } from '../../shared/logger.js';
 import { transformMessageForFrontend } from './chat-routes.js';
@@ -54,6 +55,20 @@ async function sendChunk(conv, text, quote) {
             errorCode: result.errorCode,
             externalMsgId: result.messageId,
             csWindowExpired: !result.sent && isFbCsWindowError(result.errorSubcode),
+        };
+    }
+    // ── TikTok Shop (official TTS Open Platform) ────────────────────
+    if (conv.channelAccount?.platform === Platform.TIKTOK_SHOP) {
+        if (!conv.externalThreadId) {
+            logger.debug('[send-core] No externalThreadId for TikTok Shop — local message only');
+            return { sent: false };
+        }
+        const result = await sendTextViaTikTok(conv.channelAccountId, conv.externalThreadId, text);
+        return {
+            sent: result.sent,
+            error: result.error,
+            externalMsgId: result.messageId,
+            csWindowExpired: result.csWindowExpired,
         };
     }
     const isOa = conv.channelAccount?.platform === Platform.ZALO_OA;

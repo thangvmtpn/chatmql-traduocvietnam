@@ -16,7 +16,7 @@ export interface IncomingMessage {
     albumIndex?: number | null;
     albumTotal?: number | null;
     isBackfill?: boolean;
-    identityField?: 'zaloUid' | 'fbPsid';
+    identityField?: 'zaloUid' | 'fbPsid' | 'tiktokUid';
     source?: string;
 }
 export interface HandleMessageResult {

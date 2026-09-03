@@ -21,9 +21,9 @@
   const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:4520'
+        ? 'https://chatmql-dev.traduocvietnam.com'
         : (window.location.hostname.includes('traduoc')
-            ? 'https://tracrm-api.bizino.ai'
+            ? 'https://chatmql-dev.traduocvietnam.com'
             : (window.location.hostname.includes('chatmql-dev')
                 ? 'https://chatmql-dev.traduocvietnam.com'
                 : '')));

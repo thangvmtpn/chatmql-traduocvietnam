@@ -39,8 +39,8 @@ export interface IncomingMessage {
   albumTotal?: number | null
   isBackfill?: boolean     // true for old_messages / sync backfill — skip automations
   // Which Contact column keys identity for this channel. Defaults to 'zaloUid'
-  // (Zalo personal + Zalo OA reuse it); native Facebook Page uses 'fbPsid'.
-  identityField?: 'zaloUid' | 'fbPsid'
+  // (Zalo personal + Zalo OA reuse it); native Facebook Page uses 'fbPsid'; native TikTok Shop uses 'tiktokUid'.
+  identityField?: 'zaloUid' | 'fbPsid' | 'tiktokUid'
   source?: string          // Contact.source label on first create (default 'Zalo')
 }
 
@@ -328,9 +328,14 @@ async function upsertContact(msg: IncomingMessage, orgId: string): Promise<strin
   const contactUid = msg.isSelf ? msg.threadId : msg.senderUid
   const contactName = msg.isSelf ? '' : msg.senderName
 
-  // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid.
-  const isZalo = (msg.identityField ?? 'zaloUid') === 'zaloUid'
-  const idWhere = isZalo ? { zaloUid: contactUid } : { fbPsid: contactUid }
+  // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid, TikTok Shop → tiktokUid.
+  const identityField = msg.identityField ?? 'zaloUid'
+  const isZalo = identityField === 'zaloUid'
+  const idWhere = identityField === 'tiktokUid'
+    ? { tiktokUid: contactUid }
+    : identityField === 'fbPsid'
+      ? { fbPsid: contactUid }
+      : { zaloUid: contactUid }
 
   let contact = await prisma.contact.findFirst({
     where: { ...idWhere, orgId },

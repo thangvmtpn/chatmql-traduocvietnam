@@ -203,6 +203,7 @@ model Contact {
   zaloUid               String?   @map("zalo_uid")
   pancakeUid            String?   @map("pancake_uid")  // Pancake page_customer_id
   fbPsid                String?   @map("fb_psid")      // Facebook Page-scoped ID (native Messenger)
+  tiktokUid             String?   @map("tiktok_uid")   // TikTok Buyer UID / OpenID (native TikTok Shop)
   phone                 String?
   email                 String?
   fullName              String?   @map("full_name")
@@ -254,6 +255,7 @@ model Contact {
   @@index([orgId, zaloUid])
   @@index([orgId, pancakeUid])
   @@index([orgId, fbPsid])
+  @@index([orgId, tiktokUid])
   @@index([orgId, mergedInto])
   @@index([orgId, lifecycleStage])
   @@index([orgId, companyId])

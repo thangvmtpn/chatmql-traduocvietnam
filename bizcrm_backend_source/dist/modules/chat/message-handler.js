@@ -256,9 +256,14 @@ async function upsertContact(msg, orgId) {
     // For self messages on user threads, the contact is the thread recipient
     const contactUid = msg.isSelf ? msg.threadId : msg.senderUid;
     const contactName = msg.isSelf ? '' : msg.senderName;
-    // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid.
-    const isZalo = (msg.identityField ?? 'zaloUid') === 'zaloUid';
-    const idWhere = isZalo ? { zaloUid: contactUid } : { fbPsid: contactUid };
+    // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid, TikTok Shop → tiktokUid.
+    const identityField = msg.identityField ?? 'zaloUid';
+    const isZalo = identityField === 'zaloUid';
+    const idWhere = identityField === 'tiktokUid'
+        ? { tiktokUid: contactUid }
+        : identityField === 'fbPsid'
+            ? { fbPsid: contactUid }
+            : { zaloUid: contactUid };
     let contact = await prisma.contact.findFirst({
         where: { ...idWhere, orgId },
         select: { id: true, fullName: true, avatarUrl: true },

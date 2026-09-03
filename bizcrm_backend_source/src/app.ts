@@ -73,6 +73,8 @@ import { registerPerfexIntegration } from './modules/integrations/perfex/perfex-
 import { perfexRoutes } from './modules/integrations/perfex/perfex-routes.js'
 import { pancakeWebhookRoutes } from './modules/pancake/pancake-webhook.js'
 import { pancakeRoutes } from './modules/pancake/pancake-routes.js'
+import { tiktokOAuthRoutes } from './modules/tiktok-shop/oauth-routes.js'
+import { tiktokWebhookRoutes } from './modules/tiktok-shop/tiktok-webhook.js'
 import { platformAuthRoutes } from './modules/platform/platform-auth-routes.js'
 import { platformOrgRoutes } from './modules/platform/org-admin-routes.js'
 import { platformProvisioningRoutes } from './modules/platform/provisioning-routes.js'
@@ -272,6 +274,8 @@ await app.register(traceRoutes)
 await app.register(simulateRoutes)
 await app.register(pancakeWebhookRoutes)  // Public webhook — no JWT
 await app.register(pancakeRoutes)         // JWT-protected settings
+await app.register(tiktokWebhookRoutes)   // Public TikTok Shop webhook — no JWT
+await app.register(tiktokOAuthRoutes)     // TikTok Shop OAuth routes
 
 // ── Platform (super admin / multi-tenant control plane) ──────────────
 await app.register(platformAuthRoutes)

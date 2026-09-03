@@ -6,7 +6,7 @@
   const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:4520'
+        ? 'https://chatmql-dev.traduocvietnam.com'
         : '');
 
   // Trình duyệt KHÔNG gọi thẳng sang CRM nữa. Mọi thứ liên quan tới đơn hàng
@@ -3733,10 +3733,10 @@
       }
       const currentSrc = img.src || '';
       // Fix local vs live uploads origin mismatch
-      if (window.location.protocol === 'https:' && currentSrc.includes('http://localhost:4520/uploads/')) {
-        img.src = currentSrc.replace('http://localhost:4520/uploads/', `${API_BASE}/uploads/`);
-      } else if (window.location.hostname === 'localhost' && currentSrc.includes('https://tracrm-api.bizino.ai/uploads/')) {
-        img.src = currentSrc.replace('https://tracrm-api.bizino.ai/uploads/', 'http://localhost:4520/uploads/');
+      if (window.location.protocol === 'https:' && currentSrc.includes('https://chatmql-dev.traduocvietnam.com/uploads/')) {
+        img.src = currentSrc.replace('https://chatmql-dev.traduocvietnam.com/uploads/', `${API_BASE}/uploads/`);
+      } else if (window.location.hostname === 'localhost' && currentSrc.includes('https://chatmql-dev.traduocvietnam.com/uploads/')) {
+        img.src = currentSrc.replace('https://chatmql-dev.traduocvietnam.com/uploads/', 'https://chatmql-dev.traduocvietnam.com/uploads/');
       }
 
       // If image failed and span error exists, attempt proxy recovery
