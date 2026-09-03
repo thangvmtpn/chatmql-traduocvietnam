@@ -20,6 +20,14 @@ export type DomainEventType =
   | 'company.created'
   | 'company.updated'
   | 'company.deleted'
+  | 'quote.created'
+  | 'quote.updated'
+  | 'quote.deleted'
+  | 'quote.sent'
+  | 'quote.viewed'
+  | 'quote.accepted'
+  | 'quote.rejected'
+  | 'quote.status_changed'
 
 export interface DomainEvent {
   type: DomainEventType

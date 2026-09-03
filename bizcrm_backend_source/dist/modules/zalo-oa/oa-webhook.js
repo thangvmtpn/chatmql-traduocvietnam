@@ -456,6 +456,7 @@ async function insertSystemMessage(accountId, orgId, userUid, contactId, text, t
                     externalThreadId: userUid,
                     threadType: 'user',
                     displayName: text,
+                    aiMode: 'auto',
                 },
                 select: { id: true, orgId: true },
             });

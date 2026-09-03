@@ -6,6 +6,7 @@ export declare const LOG_GAP_TOOL = "log_knowledge_gap";
 export declare const CATALOG_OVERVIEW_TOOL = "catalog_overview";
 /** Build OpenAI tool defs: enabled search tools + overview + always-on action tools. */
 export declare const SEND_IMAGE_TOOL = "send_product_image";
+export declare const ORDER_TOOL = "create_order";
 export declare function buildOpenaiTools(tools: ToolsConfig): OpenaiToolDef[];
 export declare function isToolName(name: string): name is ToolName;
 /** One retrieved hit surfaced for observability (label + relevance score). */

@@ -1,4 +1,4 @@
-export type PendingActionType = 'request_appointment';
+export type PendingActionType = 'request_appointment' | 'create_order';
 export type PendingActionStatus = 'pending' | 'confirmed' | 'rejected';
 /** Record a pending action from a responder tool call. Resolves contactId from the conversation. */
 export declare function recordPendingAction(input: {

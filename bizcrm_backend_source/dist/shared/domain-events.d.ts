@@ -1,5 +1,5 @@
 export type DomainEntityType = 'contact' | 'company';
-export type DomainEventType = 'contact.created' | 'contact.updated' | 'contact.deleted' | 'company.created' | 'company.updated' | 'company.deleted';
+export type DomainEventType = 'contact.created' | 'contact.updated' | 'contact.deleted' | 'company.created' | 'company.updated' | 'company.deleted' | 'quote.created' | 'quote.updated' | 'quote.deleted' | 'quote.sent' | 'quote.viewed' | 'quote.accepted' | 'quote.rejected' | 'quote.status_changed';
 export interface DomainEvent {
     type: DomainEventType;
     orgId: string;

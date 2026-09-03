@@ -6,9 +6,9 @@ export declare function listProductCategories(orgId: string): Promise<{
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
+    slug: string;
     sortOrder: number;
     parentId: string | null;
-    slug: string;
     icon: string | null;
     specSchema: import("@prisma/client/runtime/library").JsonValue;
     importConfig: import("@prisma/client/runtime/library").JsonValue;
@@ -19,9 +19,9 @@ export declare function getProductCategory(orgId: string, id: string): Promise<{
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
+    slug: string;
     sortOrder: number;
     parentId: string | null;
-    slug: string;
     icon: string | null;
     specSchema: import("@prisma/client/runtime/library").JsonValue;
     importConfig: import("@prisma/client/runtime/library").JsonValue;
@@ -41,9 +41,9 @@ export declare function createProductCategory(orgId: string, data: ProductCatego
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
+    slug: string;
     sortOrder: number;
     parentId: string | null;
-    slug: string;
     icon: string | null;
     specSchema: import("@prisma/client/runtime/library").JsonValue;
     importConfig: import("@prisma/client/runtime/library").JsonValue;
@@ -54,9 +54,9 @@ export declare function updateProductCategory(orgId: string, id: string, data: P
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
+    slug: string;
     sortOrder: number;
     parentId: string | null;
-    slug: string;
     icon: string | null;
     specSchema: import("@prisma/client/runtime/library").JsonValue;
     importConfig: import("@prisma/client/runtime/library").JsonValue;

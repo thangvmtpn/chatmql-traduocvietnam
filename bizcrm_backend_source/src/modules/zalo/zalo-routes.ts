@@ -224,11 +224,11 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
 
   // ── Backfill Chat History ───────────────────────────────────────────
   // POST /api/v1/zalo-accounts/:id/backfill — Trigger full historical backfill for an account
-  app.post<{ Params: { id: string }; Body: { maxMessages?: number } }>(
+  app.post<{ Params: { id: string }; Body: { maxMessages?: number; includeFriends?: boolean } }>(
     '/api/v1/zalo-accounts/:id/backfill',
     async (request, reply) => {
       const user = request.user as { orgId: string }
-      const { maxMessages = 200 } = request.body || {}
+      const { maxMessages = 200, includeFriends = false } = request.body || {}
 
       const account = await prisma.channelAccount.findFirst({
         where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
@@ -241,18 +241,67 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Start backfill in background
-      const { backfillAllAccountConversations } = await import('./zalo-message-sync.js')
+      const { backfillAllAccountConversations, backfillFriendThreads } = await import('./zalo-message-sync.js')
       backfillAllAccountConversations(poolEntry.api, account.id, user.orgId, maxMessages)
-        .then(result => {
+        .then(async result => {
           logger.info(`[zalo-routes] Backfill finished for ${account.id}: +${result.totalInserted} messages`)
+          // Quét bạn bè chạy NỐI TIẾP, không song song: hai vòng lặp cùng bắn vào
+          // một tài khoản Zalo là cách nhanh nhất để bị khoá tạm.
+          if (includeFriends) {
+            logger.info(`[zalo-routes] Tiếp tục quét theo danh sách bạn bè cho ${account.id}`)
+            const fr = await backfillFriendThreads(poolEntry.api, account.id, user.orgId, maxMessages)
+            logger.info(`[zalo-routes] Quét bạn bè xong ${account.id}: ${fr.withHistory} người có lịch sử, +${fr.totalInserted} tin`)
+          }
         })
         .catch(err => {
           logger.error(`[zalo-routes] Backfill failed for ${account.id}:`, err.message)
         })
 
       return {
-        message: 'Đã bắt đầu kéo lịch sử hội thoại. Theo dõi tiến độ qua sự kiện zalo:backfill-progress trên Socket.IO.',
+        message: includeFriends
+          ? 'Đã bắt đầu kéo lịch sử hội thoại, xong sẽ quét tiếp theo danh sách bạn bè. Theo dõi qua zalo:backfill-progress.'
+          : 'Đã bắt đầu kéo lịch sử hội thoại. Theo dõi tiến độ qua sự kiện zalo:backfill-progress trên Socket.IO.',
         accountId: account.id,
+        includeFriends,
+      }
+    }
+  )
+
+  // POST /api/v1/zalo-accounts/:id/backfill-friends — Kéo lịch sử theo DANH SÁCH BẠN BÈ
+  // Khác /backfill ở chỗ: đi theo bạn bè đã đồng bộ, nên lấy được cả khách chưa
+  // từng có hội thoại trong hệ thống (chat từ trước khi kết nối rồi im lặng).
+  app.post<{ Params: { id: string }; Body: { maxMessages?: number; maxFriends?: number } }>(
+    '/api/v1/zalo-accounts/:id/backfill-friends',
+    async (request, reply) => {
+      const user = request.user as { orgId: string }
+      const { maxMessages = 200, maxFriends = 0 } = request.body || {}
+
+      const account = await prisma.channelAccount.findFirst({
+        where: { id: request.params.id, orgId: user.orgId, deletedAt: null },
+      })
+      if (!account) return reply.status(404).send({ error: 'Account not found' })
+
+      const poolEntry = getPoolEntry(account.id)
+      if (!poolEntry || !poolEntry.api || poolEntry.status !== 'connected') {
+        return reply.status(400).send({ error: 'Tài khoản Zalo chưa kết nối' })
+      }
+
+      const friendCount = await prisma.channelContact.count({ where: { channelAccountId: account.id } })
+      if (friendCount === 0) {
+        return reply.status(400).send({
+          error: 'Chưa có danh sách bạn bè cho tài khoản này — kết nối lại để hệ thống đồng bộ bạn bè trước.',
+        })
+      }
+
+      const { backfillFriendThreads } = await import('./zalo-message-sync.js')
+      backfillFriendThreads(poolEntry.api, account.id, user.orgId, maxMessages, maxFriends)
+        .then(r => logger.info(`[zalo-routes] Backfill bạn bè xong ${account.id}: ${r.withHistory} người có lịch sử, +${r.totalInserted} tin`))
+        .catch(err => logger.error(`[zalo-routes] Backfill bạn bè lỗi ${account.id}:`, err.message))
+
+      return {
+        message: 'Đã bắt đầu quét lịch sử theo danh sách bạn bè. Theo dõi qua sự kiện zalo:backfill-progress (mode=friends).',
+        accountId: account.id,
+        friendCount,
       }
     }
   )

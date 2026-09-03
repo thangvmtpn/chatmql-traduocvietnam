@@ -11,8 +11,45 @@ import { recordStep } from '../observability/trace-recorder.js';
 import { emitAiTyping } from '../../realtime/socket-gateway.js';
 import { sendTypingViaPool } from '../../zalo/zalo-pool.js';
 import { Platform } from '../../../shared/constants.js';
-async function processAiReplyJob(job) {
-    const { convId } = job.data;
+const activeAiConversations = new Set();
+const ORCHESTRATOR_TIMEOUT_MS = 40_000;
+/**
+ * Execute AI reply pipeline for a conversation with timeout protection and concurrency lock.
+ */
+export async function processAiReply(convId) {
+    if (activeAiConversations.has(convId)) {
+        logger.info({ convId }, '[orchestrator] conversation already processing — scheduling follow-up retry');
+        setTimeout(() => {
+            import('../../../shared/queue.js').then(({ enqueueAiReply }) => {
+                enqueueAiReply(convId, 0).catch(() => { });
+            });
+        }, 1500);
+        return;
+    }
+    activeAiConversations.add(convId);
+    // Hard timeout to prevent hanging LLM calls from freezing execution
+    let timeoutId = null;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            reject(new Error(`AI processing timed out after ${ORCHESTRATOR_TIMEOUT_MS}ms`));
+        }, ORCHESTRATOR_TIMEOUT_MS);
+    });
+    try {
+        await Promise.race([
+            executeAiReplyPipeline(convId),
+            timeoutPromise,
+        ]);
+    }
+    catch (err) {
+        logger.error({ err: err.message, convId }, '[orchestrator] execution failed or timed out');
+    }
+    finally {
+        if (timeoutId)
+            clearTimeout(timeoutId);
+        activeAiConversations.delete(convId);
+    }
+}
+async function executeAiReplyPipeline(convId) {
     try {
         // ── 1. Load conversation ────────────────────────────────────────────────
         const conv = await prisma.conversation.findUnique({
@@ -77,7 +114,7 @@ async function processAiReplyJob(job) {
                 ...(cursorSentAt ? { sentAt: { gt: cursorSentAt } } : {}),
             },
             orderBy: { sentAt: 'asc' },
-            select: { id: true, content: true, sentAt: true },
+            select: { id: true, content: true, contentType: true, sentAt: true },
         });
         if (unprocessedMessages.length === 0) {
             logger.info({ convId, cursorSentAt }, '[orchestrator] no unprocessed messages — skipping');
@@ -92,7 +129,15 @@ async function processAiReplyJob(job) {
             data: { lastAiProcessedMessageId: lastMessageId },
         });
         const turnText = unprocessedMessages
-            .map(m => m.content?.trim())
+            .map(m => {
+            if (m.contentType === 'sticker' || (m.content?.startsWith('{') && m.content?.includes('"catId"'))) {
+                return '[Khách gửi nhãn dán biểu cảm]';
+            }
+            if (m.contentType === 'image' || (m.content?.startsWith('{') && m.content?.includes('"href"'))) {
+                return '[Khách gửi hình ảnh]';
+            }
+            return m.content?.trim();
+        })
             .filter(Boolean)
             .join('\n');
         if (!turnText) {
@@ -118,6 +163,16 @@ async function processAiReplyJob(job) {
             const result = await runHarness(orgId, convId, turnText, effectiveMode);
             // ── 5. Branch on result ────────────────────────────────────────────────
             if (result.handoff?.should) {
+                if (effectiveMode === 'auto') {
+                    await sendMessageCore({
+                        orgId,
+                        conversationId: convId,
+                        text: 'Dạ em đã ghi nhận thông tin và chuyển cho chuyên viên tư vấn của Trà Dược Việt Nam liên hệ hỗ trợ mình ngay nhé ạ.',
+                        sender: 'ai',
+                        aiReplyRunId: result.runId,
+                        triggerAutomation: false,
+                    }).catch(() => { });
+                }
                 await applyHandoff(orgId, convId, result.handoff.reason);
             }
             else if (effectiveMode === 'suggest') {
@@ -213,7 +268,9 @@ async function processAiReplyJob(job) {
  * Initialize the AI reply worker. Call once from app.ts on startup.
  */
 export function initAiReplyOrchestrator() {
-    initAiReplyWorker(processAiReplyJob);
+    initAiReplyWorker(async (job) => {
+        await processAiReply(job.data.convId);
+    });
     logger.info('[orchestrator] AI reply orchestrator started');
 }
 //# sourceMappingURL=auto-reply-orchestrator.js.map

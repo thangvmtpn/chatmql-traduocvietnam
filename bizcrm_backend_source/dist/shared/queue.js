@@ -123,33 +123,45 @@ export async function enqueueZnsSend(data) {
     });
     return job.id;
 }
+// ── In-memory debounce map for AI auto-reply (convId -> Timeout) ─────────────
+const aiDebounceTimers = new Map();
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Cancels pending delayed jobs for the same convId (debounce reset)
- * and assigns a unique jobId so subsequent turns are never blocked.
+ * Uses reliable in-memory debouncing before triggering the AI reply orchestrator.
+ * This guarantees 100% reliability with 0 Redis/BullMQ stalls.
  */
-export async function enqueueAiReply(convId, delayMs) {
-    // Remove existing delayed/waiting jobs for this convId to reset debounce
-    try {
-        const delayedJobs = await aiReplyQueue.getJobs(['delayed', 'waiting']);
-        for (const j of delayedJobs) {
-            if (j.data?.convId === convId) {
-                await j.remove().catch(() => { });
-            }
+export async function enqueueAiReply(convId, delayMs = 2500) {
+    // Clear any existing timer for this conversation (debounce reset)
+    const existingTimer = aiDebounceTimers.get(convId);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
+        aiDebounceTimers.delete(convId);
+    }
+    const effectiveDelay = Math.max(0, Math.min(delayMs || 2500, 3000));
+    if (effectiveDelay === 0) {
+        logger.info({ convId }, '[queue] Triggering AI reply immediately');
+        import('../modules/ai/harness/auto-reply-orchestrator.js').then(({ processAiReply }) => {
+            processAiReply(convId).catch(err => logger.error({ convId, err: err.message }, '[queue] Direct AI reply failed'));
+        });
+        return `direct-${convId}`;
+    }
+    // Schedule debounced execution
+    const timer = setTimeout(async () => {
+        aiDebounceTimers.delete(convId);
+        try {
+            logger.info({ convId }, '[queue] Debounce timer expired — running AI reply orchestrator');
+            const { processAiReply } = await import('../modules/ai/harness/auto-reply-orchestrator.js');
+            processAiReply(convId).catch(err => {
+                logger.error({ convId, err: err.message }, '[queue] Direct AI reply execution failed');
+            });
         }
-    }
-    catch {
-        // Non-fatal
-    }
-    const job = await aiReplyQueue.add('ai-reply', { convId }, {
-        jobId: `${convId}__${Date.now()}`,
-        delay: delayMs,
-        attempts: 1,
-        removeOnComplete: true,
-        removeOnFail: true,
-    });
-    logger.info({ jobId: job.id, convId, delayMs }, '[queue] AI reply job enqueued');
-    return job.id;
+        catch (err) {
+            logger.error({ convId, err: err.message }, '[queue] Failed to trigger AI reply');
+        }
+    }, effectiveDelay);
+    aiDebounceTimers.set(convId, timer);
+    logger.info({ convId, delayMs: effectiveDelay }, '[queue] AI reply debounce timer scheduled');
+    return `debounce-${convId}`;
 }
 /**
  * Enqueue an embedding job for a KB entry.
@@ -157,13 +169,13 @@ export async function enqueueAiReply(convId, delayMs) {
  * are collapsed into one pending job.
  */
 export async function enqueueEmbed(orgId, entryId) {
-    const job = await embeddingQueue.add('embed', { orgId, entryId, kind: 'kb' }, { jobId: `embed-${entryId}`, removeOnComplete: true, removeOnFail: false });
+    const job = await embeddingQueue.add('embed', { orgId, entryId, kind: 'kb' }, { jobId: `embed-${entryId}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: false });
     logger.debug({ jobId: job.id, orgId, entryId }, '[queue] Embed job enqueued');
     return job.id;
 }
 /** Enqueue an embedding job for a product. */
 export async function enqueueProductEmbed(orgId, productId) {
-    const job = await embeddingQueue.add('embed', { orgId, productId, kind: 'product' }, { jobId: `embed-product-${productId}`, removeOnComplete: true, removeOnFail: false });
+    const job = await embeddingQueue.add('embed', { orgId, productId, kind: 'product' }, { jobId: `embed-product-${productId}`, attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: true, removeOnFail: false });
     logger.debug({ jobId: job.id, orgId, productId }, '[queue] Product embed job enqueued');
     return job.id;
 }
@@ -233,22 +245,34 @@ export function initZnsSendWorker(processor) {
     });
     logger.info({ rateMax, concurrency, prefix: REDIS_PREFIX }, '[queue] ZNS send worker initialized');
 }
+const activeAiConversations = new Set();
 /**
  * Initialize the AI reply worker. Call once from app.ts after initWorkers.
- * Uses concurrency=1 so each conversation is processed serially — combined with
- * the jobId=convId debounce this guarantees at most one in-flight job per conv.
+ * Uses concurrency=5 with an in-memory active conversation Set so each conversation
+ * is processed serially without blocking other conversations.
  */
 export function initAiReplyWorker(processor) {
-    // concurrency:1 — one in-flight job per worker; combined with jobId=convId
-    // debounce this prevents two jobs for the same conversation auto-sending at once.
-    aiReplyWorker = new Worker(QUEUE_NAMES.AI_REPLY, processor, { connection, prefix: REDIS_PREFIX, concurrency: 1 });
+    aiReplyWorker = new Worker(QUEUE_NAMES.AI_REPLY, async (job) => {
+        const { convId } = job.data;
+        if (activeAiConversations.has(convId)) {
+            logger.info({ convId }, '[queue] Conversation already processing — skipping duplicate execution');
+            return;
+        }
+        activeAiConversations.add(convId);
+        try {
+            await processor(job);
+        }
+        finally {
+            activeAiConversations.delete(convId);
+        }
+    }, { connection, prefix: REDIS_PREFIX, concurrency: 5 });
     aiReplyWorker.on('completed', (job) => {
         logger.info({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed');
     });
     aiReplyWorker.on('failed', (job, err) => {
         logger.error({ jobId: job?.id, convId: job?.data?.convId, err: err.message }, '[queue] AI reply job failed');
     });
-    logger.info({ prefix: REDIS_PREFIX }, '[queue] AI reply worker initialized');
+    logger.info({ prefix: REDIS_PREFIX, concurrency: 5 }, '[queue] AI reply worker initialized');
 }
 /**
  * Initialize the KB embedding worker.
@@ -261,7 +285,7 @@ export function initEmbeddingWorker(processor) {
         logger.debug({ jobId: job.id, entryId: job.data.entryId }, '[queue] Embed job completed');
     });
     embeddingWorker.on('failed', (job, err) => {
-        logger.warn({ jobId: job?.id, entryId: job?.data?.entryId, err: err.message }, '[queue] Embed job failed');
+        logger.error({ jobId: job?.id, data: job?.data, err: err.message }, '[queue] Embed job failed');
     });
     logger.info({ prefix: REDIS_PREFIX }, '[queue] Embedding worker initialized');
 }

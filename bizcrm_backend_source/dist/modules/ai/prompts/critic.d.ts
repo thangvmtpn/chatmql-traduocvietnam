@@ -6,6 +6,7 @@
  * whether the reply is safe to send or should be handed off to a human.
  * Fail-OPEN on parse errors (don't block legit replies on critic infra issues).
  */
+import type { ScenarioSnippet } from '../harness/harness-types.js';
 export type CriticVerdict = {
     ok: boolean;
     action: 'send' | 'handoff';
@@ -15,6 +16,9 @@ export declare function buildCriticPrompt(input: {
     customerMessage: string;
     reply: string;
     criteria: string | null;
+    persona?: string | null;
+    playbook?: string | null;
+    scenarios?: ScenarioSnippet[];
     grounding: string;
 }): string;
 export declare function parseCriticVerdict(raw: string): CriticVerdict;

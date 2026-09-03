@@ -10,14 +10,16 @@ from utils.tiktok import download_tiktok_shipping_document, auto_arrange_tiktok_
 from doanh_so.run_doanhso import bien_dong_doanhso_v3
 from utils.security import check_token
 from utils.lark import send_lark_message
-from database import conn_fm
-from datetime import datetime, date, timedelta
+from database import conn_fm, get_conn_fm
+from datetime import datetime, date, timedelta, time
 from pydantic import BaseModel
 from typing import List
 import traceback
 import random
 import string
 from schema.invoice_schema import Invoice, InvoiceDetail, DeliveryInformation, CreateInvoicePayload, UpdateInvoicePayload
+from utils.config import get_system_config
+from utils.hrm_webhook import send_hrm_order_webhook, send_hrm_delivery_webhook
 import pytz
 import requests
 import re
@@ -62,8 +64,8 @@ async def get_active_deal_shock_today():
                 # Kiểm tra thời gian: nếu có start_time và end_time, phải nằm trong khoảng cho phép
                 if start_time or end_time:
                     # Convert time objects to comparable format
-                    start_time_obj = start_time if isinstance(start_time, datetime.time) else None
-                    end_time_obj = end_time if isinstance(end_time, datetime.time) else None
+                    start_time_obj = start_time if isinstance(start_time, time) else None
+                    end_time_obj = end_time if isinstance(end_time, time) else None
                     
                     # Nếu cả start_time và end_time đều có, kiểm tra current_time có nằm trong khoảng không
                     if start_time_obj and end_time_obj:
@@ -243,19 +245,29 @@ async def process_deal_shock_for_invoice(invoice_details: List[InvoiceDetail], c
         deal_shock_config = deal_shock.get('config_data')
         deal_shock_id = deal_shock.get('id')
         
-        # Lấy thông tin invoice để gửi thông báo Lark
+        # Lấy thông tin invoice để kiểm tra tài khoản sàn shop và gửi thông báo Lark
         with conn_fm.cursor() as cur:
             cur.execute(
                 """
-                SELECT name_seller, name_salechannel
+                SELECT name_seller, name_salechannel, code_seller, code_creator
                 FROM invoice
                 WHERE code_invoice = %s
                 """,
                 (code_invoice,)
             )
             invoice_info = cur.fetchone()
-            seller_name = invoice_info[0] if invoice_info else "N/A"
-            sale_channel = invoice_info[1] if invoice_info else "N/A"
+            
+        if invoice_info:
+            seller_name, sale_channel, code_seller, code_creator = invoice_info
+            code_seller = str(code_seller or '').upper()
+            code_creator = str(code_creator or '').upper()
+            
+            # Không tính cho tài khoản sàn shop (mã TMDT hoặc tên Sàn/Shop)
+            if code_seller == 'TMDT' or code_creator == 'TMDT' or seller_name == 'Sàn/Shop':
+                print(f"ℹ️ Đơn hàng {code_invoice} thuộc tài khoản Sàn/Shop ({code_seller}/{code_creator}), bỏ qua xử lý Deal Sốc")
+                return
+        else:
+            seller_name, sale_channel = "N/A", "N/A"
         
         # Lấy danh sách invoice_detail_id đã insert
         with conn_fm.cursor() as cur:
@@ -310,13 +322,16 @@ async def process_deal_shock_for_invoice(invoice_details: List[InvoiceDetail], c
                         
                         # Gửi thông báo lên Lark
                         try:
+                            remaining_limit = max(0, deal_info.get('deal_limit', 0) - max_deal_quantity)
                             deal_shock_data = {
                                 'code_invoice': code_invoice,
                                 'seller_name': seller_name,
                                 'product_name': product_name,
                                 'quantity': max_deal_quantity,
                                 'sale_channel': sale_channel,
-                                'reward_amount': reward_amount
+                                'reward_amount': reward_amount,
+                                'deal_title': deal_shock.get('title'),
+                                'remaining_limit': remaining_limit
                             }
                             await send_deal_shock_notification_to_lark(deal_shock_data)
                         except Exception as lark_error:
@@ -332,7 +347,7 @@ async def process_deal_shock_for_invoice(invoice_details: List[InvoiceDetail], c
 
 async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
     """
-    Gửi thông báo deal shock lên Lark webhook
+    Gửi thông báo deal shock lên Lark webhook (sử dụng template màu xanh turquoise)
     """
     print("📤 Gửi thông báo deal shock lên Lark:", deal_shock_data)
     webhook_url = "https://open.larksuite.com/open-apis/bot/v2/hook/dd0c7fb8-0d15-4c82-b3eb-19ae6a78f19e"
@@ -341,16 +356,52 @@ async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
         vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
         current_time = datetime.now(vietnam_tz)
         
-        # Format message theo Lark card format
+        deal_title = deal_shock_data.get('deal_title')
+        if deal_title:
+            raw_title = str(deal_title).strip()
+            if not raw_title.upper().startswith("DEAL") and not raw_title.startswith("📣"):
+                header_text = f"📣 DEAL {raw_title}"
+            elif raw_title.upper().startswith("DEAL") and not raw_title.startswith("📣"):
+                header_text = f"📣 {raw_title}"
+            else:
+                header_text = raw_title
+        else:
+            header_text = f"📣 DEAL SHOCK - {current_time.strftime('%d/%m/%Y')}"
+            
+        reward_amount = deal_shock_data.get('reward_amount', 0)
+        reward_str = f"{reward_amount:,.0f} VNĐ"
+        
+        remaining = deal_shock_data.get('remaining_limit')
+        qty_sell = deal_shock_data.get('quantity', 0)
+
+        qty_fields = [
+            {
+                "is_short": True,
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**🛒 Số lượng bán:** {qty_sell}"
+                }
+            }
+        ]
+        if remaining is not None:
+            qty_fields.append({
+                "is_short": True,
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**📌 Số lượng còn lại:** {remaining}"
+                }
+            })
+
+        # Format message theo Lark card format với header template "turquoise" (màu xanh ngọc/xanh lá)
         message = {
             "msg_type": "interactive",
             "card": {
                 "header": {
                     "title": {
                         "tag": "plain_text",
-                        "content": "🎉 DEAL SHOCK - ĐƠN HÀNG MỚI"
+                        "content": header_text
                     },
-                    "template": "red"
+                    "template": "turquoise"
                 },
                 "elements": [
                     {
@@ -360,14 +411,14 @@ async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
                                 "is_short": True,
                                 "text": {
                                     "tag": "lark_md",
-                                    "content": f"**📋 Mã hóa đơn:**\n{deal_shock_data['code_invoice']}"
+                                    "content": f"**⏰ Giờ bán:** {current_time.strftime('%H:%M:%S')}"
                                 }
                             },
                             {
                                 "is_short": True,
                                 "text": {
                                     "tag": "lark_md",
-                                    "content": f"**🕐 Thời gian:**\n{current_time.strftime('%H:%M %d/%m/%Y')}"
+                                    "content": f"**🔸 Kênh bán:** {deal_shock_data.get('sale_channel', 'N/A')}"
                                 }
                             }
                         ]
@@ -379,33 +430,14 @@ async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
                                 "is_short": True,
                                 "text": {
                                     "tag": "lark_md",
-                                    "content": f"**👤 Nhân viên:**\n{deal_shock_data['seller_name']}"
+                                    "content": f"**🎉 Người bán:** {deal_shock_data.get('seller_name', 'N/A')}"
                                 }
                             },
                             {
                                 "is_short": True,
                                 "text": {
                                     "tag": "lark_md",
-                                    "content": f"**📱 Kênh bán:**\n{deal_shock_data['sale_channel']}"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "tag": "div",
-                        "fields": [
-                            {
-                                "is_short": True,
-                                "text": {
-                                    "tag": "lark_md",
-                                    "content": f"**📦 Sản phẩm:**\n{deal_shock_data['product_name']}"
-                                }
-                            },
-                            {
-                                "is_short": True,
-                                "text": {
-                                    "tag": "lark_md",
-                                    "content": f"**🔢 Số lượng:**\n{deal_shock_data['quantity']}"
+                                    "content": f"**🔥 Mã hóa đơn:** {deal_shock_data.get('code_invoice', 'N/A')}"
                                 }
                             }
                         ]
@@ -417,20 +449,24 @@ async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
                                 "is_short": False,
                                 "text": {
                                     "tag": "lark_md",
-                                    "content": f"**💰 Tiền thưởng:**\n{deal_shock_data['reward_amount']:,.0f} VNĐ"
+                                    "content": f"**🏷️ Tên sản phẩm:** {deal_shock_data.get('product_name', 'N/A')}"
                                 }
                             }
                         ]
                     },
                     {
-                        "tag": "hr"
+                        "tag": "div",
+                        "fields": qty_fields
                     },
                     {
-                        "tag": "note",
-                        "elements": [
+                        "tag": "div",
+                        "fields": [
                             {
-                                "tag": "plain_text",
-                                "content": "Hệ thống CRM - Trà Dược Việt Nam"
+                                "is_short": False,
+                                "text": {
+                                    "tag": "lark_md",
+                                    "content": f"**💵 Thưởng:** {reward_str}"
+                                }
                             }
                         ]
                     }
@@ -447,6 +483,37 @@ async def send_deal_shock_notification_to_lark(deal_shock_data: dict):
         print(f"⚠️ Lỗi gửi thông báo deal shock lên Lark: {str(e)}")
         traceback.print_exc()
         return False
+
+
+async def send_external_status_webhook(code_invoice: str, id_status: Optional[int], status_value: str):
+    """
+    Gửi webhook báo cáo trạng thái đơn hàng (code_invoice, id_status, status_value) sang hệ thống ngoài khi cập nhật thủ công.
+    """
+    try:
+        webhook_url = get_system_config('external_status_webhook_url') or os.environ.get('EXTERNAL_STATUS_WEBHOOK_URL', '')
+        if not webhook_url:
+            print(f"ℹ️ Chưa cấu hình EXTERNAL_STATUS_WEBHOOK_URL cho webhook trạng thái đơn {code_invoice}")
+            return
+            
+        payload = {
+            "code_invoice": code_invoice,
+            "id_status": id_status,
+            "status_value": status_value,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        headers = {"Content-Type": "application/json"}
+        secret_key = os.environ.get("EXTERNAL_WEBHOOK_SECRET", "")
+        if secret_key:
+            headers["Authorization"] = f"Bearer {secret_key}"
+            
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(webhook_url, json=payload, headers=headers)
+            print(f"🚀 [Webhook Trạng Thái] Đã gửi webhook cho đơn {code_invoice}: id_status={id_status}, status_value='{status_value}' (HTTP {response.status_code})")
+    except Exception as e:
+        print(f"⚠️ Lỗi khi gửi webhook trạng thái đơn hàng {code_invoice} sang hệ thống ngoài: {str(e)}")
+        traceback.print_exc()
+
 
 
 async def put_lichsu_dt(data):
@@ -522,12 +589,12 @@ async def insert_invoice(invoice: Invoice, code_invoice: str) -> bool:
                     id_customer, code_customer, name_customer, phone_number,
                     id_salechannel, name_salechannel, 
                     subtotal, gift_amount, discount, total_amount, 
-                    fee_delivery, type_fee_delivery, shipping_method, cod_need_payment,
+                    fee_delivery, fee_delivery_customer, type_fee_delivery, shipping_method, cod_need_payment,
                     description, send_zns, id_status, status_value, fee_platform,
                     is_doi_hang
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
             """
             values = (
@@ -552,6 +619,7 @@ async def insert_invoice(invoice: Invoice, code_invoice: str) -> bool:
                 float(invoice.discount),
                 float(invoice.total_amount),
                 float(invoice.fee_delivery),
+                float(invoice.fee_delivery_customer),
                 invoice.type_fee_delivery,
                 invoice.shipping_method,
                 float(invoice.cod_need_payment),
@@ -768,7 +836,7 @@ async def search_invoices(
                     id_seller, code_seller, name_seller, id_customer,
                     code_customer, phone_number, id_salechannel, name_salechannel,
                     subtotal, gift_amount, discount, total_amount,
-                    fee_delivery, type_fee_delivery, cod_need_payment, description,
+                    fee_delivery, fee_delivery_customer, type_fee_delivery, cod_need_payment, description,
                     send_zns, id_status, status_value, name_customer,
                     id_subchannel, subchannel, type_channel, fee_platform
                 FROM invoice
@@ -785,7 +853,7 @@ async def search_invoices(
                 "id_seller", "code_seller", "name_seller", "id_customer",
                 "code_customer", "phone_number", "id_salechannel", "name_salechannel",
                 "subtotal", "gift_amount", "discount", "total_amount",
-                "fee_delivery", "type_fee_delivery", "cod_need_payment", "description",
+                "fee_delivery", "fee_delivery_customer", "type_fee_delivery", "cod_need_payment", "description",
                 "send_zns", "id_status", "status_value", "name_customer",
                 "id_subchannel", "subchannel", "type_channel", "fee_platform"
             ]
@@ -945,6 +1013,55 @@ async def create_invoice_endpoint(
             print(f"⚠️ Lỗi gửi Lark message: {str(lark_error)}")
             traceback.print_exc()
         
+        try:
+            employee_code = payload.invoice.code_creator
+            if employee_code:
+                asyncio.create_task(
+                    send_hrm_order_webhook(
+                        order_code=code_invoice,
+                        employee_code=employee_code,
+                        order_value=int(payload.invoice.subtotal),
+                        status="created"
+                    )
+                )
+        except Exception as webhook_err:
+            print(f"⚠️ Lỗi trigger Webhook HRM (Created): {str(webhook_err)}")
+
+        # ====== Gửi ZNS xác nhận tạo đơn thành công (581716) ======
+        try:
+            from model.hoadon import sendByZNS
+            phone_number = payload.invoice.phone_number
+            if phone_number:
+                # Format SĐT thành 84xxx
+                sdt = f"84{''.join(filter(str.isdigit, phone_number))[-9:]}"
+                customer_code = payload.invoice.code_customer if payload.invoice.code_customer else "KH001"
+                
+                # Format time_create -> order_date DD/MM/YYYY
+                t_create = payload.invoice.time_create
+                if isinstance(t_create, str):
+                    try:
+                        t_obj = datetime.fromisoformat(t_create)
+                        order_date = t_obj.strftime("%d/%m/%Y")
+                    except Exception:
+                        order_date = datetime.now().strftime("%d/%m/%Y")
+                elif hasattr(t_create, 'strftime'):
+                    order_date = t_create.strftime("%d/%m/%Y")
+                else:
+                    order_date = datetime.now().strftime("%d/%m/%Y")
+
+                data_send_zns = {
+                    "order_code": code_invoice,
+                    "customer_name": payload.invoice.name_customer,
+                    "customer_code": customer_code,
+                    "order_date": order_date
+                }
+                template_id = get_system_config('zns_template_xac_nhan_don', '581716')
+                asyncio.create_task(sendByZNS(sdt, data_send_zns, template_id))
+                print(f"🚀 [CRM] Đã trigger ZNS {template_id} (Tạo đơn) cho {code_invoice}")
+        except Exception as zns_err:
+            print(f"⚠️ Lỗi gửi ZNS tạo đơn: {str(zns_err)}")
+        # ==========================================================
+
         print(f"✅ Tạo hóa đơn thành công: {code_invoice}")
         return {
             "success": True,
@@ -977,8 +1094,6 @@ async def get_all_invoices(
     """
     Lấy danh sách tất cả hoá đơn (admin xem tất cả, nhân viên chỉ xem của mình)
     """
-    conn_fm.rollback()  # Rollback any failed transaction
-    
     try:
         role_id = token.get("role_id")
         id_acc = token.get("id_acc")
@@ -986,7 +1101,7 @@ async def get_all_invoices(
 
         offset = (page - 1) * limit
 
-        where_conditions = []
+        where_conditions = ["invoice.id_status IS NOT NULL"]
         params_list = []
 
         # Nhân viên (không phải admin/manager và không phải id_acc 34) chỉ thấy đơn của mình
@@ -998,28 +1113,71 @@ async def get_all_invoices(
 
         # Lọc theo trạng thái (hỗ trợ nhiều giá trị, phân cách bằng dấu phẩy)
         if status_value:
+            STATUS_MAPPING = {
+                "Chờ xử lý": 1,
+                "Đang lấy hàng": 2,
+                "Chờ lấy lại": 3,
+                "Đã lấy hàng": 4,
+                "Đang giao hàng": 5,
+                "Chờ giao lại": 6,
+                "Giao thành công": 7,
+                "Chờ chuyển hoàn": 8,
+                "Đang chuyển hoàn": 9,
+                "Chờ chuyển hoàn lại": 10,
+                "Đã chuyển hoàn": 11,
+                "Đã hủy": 12,
+            }
             status_values = [s.strip() for s in status_value.split(",") if s.strip()]
-            if len(status_values) == 1:
-                where_conditions.append("invoice.status_value = %s")
-                params_list.append(status_values[0])
-            elif len(status_values) > 1:
-                placeholders = ", ".join(["%s"] * len(status_values))
-                where_conditions.append(f"invoice.status_value IN ({placeholders})")
-                params_list.extend(status_values)
+            status_conds = []
+            final_status_values = []
+            
+            for s in status_values:
+                if s in STATUS_MAPPING:
+                    status_conds.append(f"invoice.id_status = {STATUS_MAPPING[s]}")
+                else:
+                    final_status_values.append(s)
+                    
+            if final_status_values:
+                if len(final_status_values) == 1:
+                    status_conds.append("invoice.status_value = %s")
+                    params_list.append(final_status_values[0])
+                else:
+                    placeholders = ", ".join(["%s"] * len(final_status_values))
+                    status_conds.append(f"invoice.status_value IN ({placeholders})")
+                    params_list.extend(final_status_values)
+                    
+            if status_conds:
+                where_conditions.append("(" + " OR ".join(status_conds) + ")")
 
         # Lọc theo kênh bán (hỗ trợ nhiều giá trị qua id_salechannel_list)
         if id_salechannel_list:
-            try:
-                channel_ids = [int(i.strip()) for i in id_salechannel_list.split(",") if i.strip()]
-                if len(channel_ids) == 1:
-                    where_conditions.append("invoice.id_salechannel = %s")
-                    params_list.append(channel_ids[0])
-                elif len(channel_ids) > 1:
-                    placeholders = ", ".join(["%s"] * len(channel_ids))
-                    where_conditions.append(f"invoice.id_salechannel IN ({placeholders})")
-                    params_list.extend(channel_ids)
-            except ValueError:
-                pass
+            items = [i.strip() for i in id_salechannel_list.split(",") if i.strip()]
+            channel_ids = []
+            has_zalo_live = False
+            for item in items:
+                if item.lower() == 'zalo_live':
+                    has_zalo_live = True
+                else:
+                    try:
+                        channel_ids.append(int(item))
+                    except ValueError:
+                        pass
+            
+            channel_conds = []
+            if len(channel_ids) == 1:
+                channel_conds.append("invoice.id_salechannel = %s")
+                params_list.append(channel_ids[0])
+            elif len(channel_ids) > 1:
+                placeholders = ", ".join(["%s"] * len(channel_ids))
+                channel_conds.append(f"invoice.id_salechannel IN ({placeholders})")
+                params_list.extend(channel_ids)
+                
+            if has_zalo_live:
+                channel_conds.append("invoice.name_salechannel ILIKE %s")
+                params_list.append('%zalo live%')
+                
+            if channel_conds:
+                where_conditions.append("(" + " OR ".join(channel_conds) + ")")
         elif id_salechannel is not None and id_salechannel > 0:
             where_conditions.append("invoice.id_salechannel = %s")
             params_list.append(id_salechannel)
@@ -1046,61 +1204,62 @@ async def get_all_invoices(
             "id_seller", "code_seller", "name_seller", "id_customer",
             "code_customer", "phone_number", "id_salechannel", "name_salechannel",
             "subtotal", "gift_amount", "discount", "total_amount",
-            "fee_delivery", "type_fee_delivery", "cod_need_payment", "description",
+            "fee_delivery", "fee_delivery_customer", "type_fee_delivery", "cod_need_payment", "description",
             "send_zns", "id_status", "status_value", "name_customer",
             "id_subchannel", "subchannel", "type_channel", "fee_platform",
-            "shipping_method", "code_delivery"
+            "shipping_method", "code_delivery", "partner_delivery"
         ]
 
-        select_cols = ", ".join([f"invoice.{col}" for col in columns if col != "code_delivery"])
-        select_cols += ", delivery_information.code_delivery"
+        select_cols = ", ".join([f"invoice.{col}" for col in columns if col not in ("code_delivery", "partner_delivery")])
+        select_cols += ", delivery_information.code_delivery, delivery_information.partner_delivery"
 
-        with conn_fm.cursor() as cur:
-            # Get total count
-            count_query = f"SELECT COUNT(*) FROM invoice{where_clause}"
-            cur.execute(count_query, params_list)
-            total = cur.fetchone()[0]
+        # Dùng connection riêng cho request này để tránh kẹt transaction
+        with get_conn_fm() as db_conn:
+            with db_conn.cursor() as cur:
+                # Get total count
+                count_query = f"SELECT COUNT(*) FROM invoice{where_clause}"
+                cur.execute(count_query, params_list)
+                total = cur.fetchone()[0]
 
-            # Get paginated data
-            query = f"""
-                SELECT {select_cols}
-                FROM invoice
-                LEFT JOIN delivery_information ON invoice.code_invoice = delivery_information.code_invoice
-                {where_clause}
-                ORDER BY invoice.time_create DESC
-                LIMIT %s OFFSET %s
-            """
-            cur.execute(query, params_list + [limit, offset])
-            rows = cur.fetchall()
+                # Get paginated data
+                query = f"""
+                    SELECT {select_cols}
+                    FROM invoice
+                    LEFT JOIN delivery_information ON invoice.code_invoice = delivery_information.code_invoice
+                    {where_clause}
+                    ORDER BY invoice.time_create DESC
+                    LIMIT %s OFFSET %s
+                """
+                cur.execute(query, params_list + [limit, offset])
+                rows = cur.fetchall()
 
-            invoices = []
-            for row in rows:
-                invoice_dict = {}
-                for idx, col in enumerate(columns):
-                    value = row[idx]
-                    if isinstance(value, datetime):
-                        invoice_dict[col] = value.isoformat()
-                    elif isinstance(value, date):
-                        invoice_dict[col] = value.isoformat()
-                    else:
-                        invoice_dict[col] = value
-                invoices.append(invoice_dict)
+                invoices = []
+                for row in rows:
+                    invoice_dict = {}
+                    for idx, col in enumerate(columns):
+                        value = row[idx]
+                        if isinstance(value, datetime):
+                            invoice_dict[col] = value.isoformat()
+                        elif isinstance(value, date):
+                            invoice_dict[col] = value.isoformat()
+                        else:
+                            invoice_dict[col] = value
+                    invoices.append(invoice_dict)
 
-            return {
-                "success": True,
-                "data": invoices,
-                "pagination": {
-                    "total": total,
-                    "page": page,
-                    "limit": limit,
-                    "total_pages": (total + limit - 1) // limit
+                return {
+                    "success": True,
+                    "data": invoices,
+                    "pagination": {
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                        "total_pages": (total + limit - 1) // limit
+                    }
                 }
-            }
 
     except HTTPException:
         raise
     except Exception as e:
-        conn_fm.rollback()
         traceback.print_exc()
         print(f"❌ Lỗi lấy danh sách hoá đơn: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
@@ -1120,27 +1279,59 @@ async def get_my_orders(
     Lấy danh sách đơn hàng của nhân viên theo code_seller
     """
     try:
-        # Lấy code_seller từ token (mã nhân viên bán hàng)
-        code_seller = token.get("code_seller") or token.get("user_id")
+        # Lấy seller identifiers từ token
+        code_seller = token.get("code_seller") or token.get("user_id") or ""
+        name_seller = token.get("name") or token.get("full_name") or ""
+        id_seller = token.get("id_acc") or token.get("id") or 0
         
-        if not code_seller:
+        if not code_seller and not name_seller:
             raise HTTPException(status_code=401, detail="Không tìm thấy thông tin nhân viên")
 
         offset = (page - 1) * limit
 
         # Build WHERE clause
-        where_conditions = ["i.code_seller = %s"]
-        params = [code_seller]
+        where_conditions = [
+            "(i.code_seller = %s OR (i.name_seller ILIKE %s AND %s != '') OR (i.id_seller = %s AND %s > 0))",
+            "i.id_status IS NOT NULL"
+        ]
+        params = [code_seller, f"%{name_seller}%", name_seller, id_seller, id_seller]
 
         if status:
+            STATUS_MAPPING = {
+                "Chờ xử lý": 1,
+                "Đang lấy hàng": 2,
+                "Chờ lấy lại": 3,
+                "Đã lấy hàng": 4,
+                "Đang giao hàng": 5,
+                "Chờ giao lại": 6,
+                "Giao thành công": 7,
+                "Chờ chuyển hoàn": 8,
+                "Đang chuyển hoàn": 9,
+                "Chờ chuyển hoàn lại": 10,
+                "Đã chuyển hoàn": 11,
+                "Đã hủy": 12,
+            }
             status_values = [s.strip() for s in status.split(",") if s.strip()]
-            if len(status_values) == 1:
-                where_conditions.append("i.status_value = %s")
-                params.append(status_values[0])
-            elif len(status_values) > 1:
-                placeholders = ", ".join(["%s"] * len(status_values))
-                where_conditions.append(f"i.status_value IN ({placeholders})")
-                params.extend(status_values)
+            status_conds = []
+            final_status_values = []
+            
+            for s in status_values:
+                if s in STATUS_MAPPING:
+                    status_conds.append(f"i.id_status = {STATUS_MAPPING[s]}")
+                else:
+                    final_status_values.append(s)
+                    
+            if final_status_values:
+                if len(final_status_values) == 1:
+                    status_conds.append("i.status_value = %s")
+                    params.append(final_status_values[0])
+                else:
+                    placeholders = ", ".join(["%s"] * len(final_status_values))
+                    status_conds.append(f"i.status_value IN ({placeholders})")
+                    params.extend(final_status_values)
+                    
+            if status_conds:
+                where_conditions.append("(" + " OR ".join(status_conds) + ")")
 
         if code_invoice:
             search_term = code_invoice.strip()
@@ -1192,6 +1383,7 @@ async def get_my_orders(
                     i.discount,
                     i.total_amount,
                     i.fee_delivery,
+                    i.fee_delivery_customer,
                     i.type_fee_delivery,
                     i.cod_need_payment,
                     i.description,
@@ -1203,7 +1395,8 @@ async def get_my_orders(
                     i.subchannel,
                     i.type_channel,
                     i.fee_platform,
-                    di.address
+                    di.address,
+                    di.partner_delivery
                 FROM invoice i
                 LEFT JOIN delivery_information di ON i.code_invoice = di.code_invoice
                 WHERE {where_clause}
@@ -1222,10 +1415,10 @@ async def get_my_orders(
                 "id_seller", "code_seller", "name_seller", "id_customer",
                 "code_customer", "phone_number", "id_salechannel", "name_salechannel",
                 "subtotal", "gift_amount", "discount", "total_amount",
-                "fee_delivery", "type_fee_delivery", "cod_need_payment", "description",
+                "fee_delivery", "fee_delivery_customer", "type_fee_delivery", "cod_need_payment", "description",
                 "send_zns", "id_status", "status_value", "name_customer",
                 "id_subchannel", "subchannel", "type_channel", "fee_platform",
-                "address"
+                "address", "partner_delivery"
             ]
 
             invoices = []
@@ -1269,14 +1462,18 @@ async def get_my_orders_stats(
     """
     try:
         from database import conn_fm
-        code_seller = token.get("code_seller") or token.get("user_id")
+        code_seller = token.get("code_seller") or token.get("user_id") or ""
+        name_seller = token.get("name") or token.get("full_name") or ""
+        id_seller = token.get("id_acc") or token.get("id") or 0
         
-        if not code_seller:
+        if not code_seller and not name_seller:
             raise HTTPException(status_code=401, detail="Không tìm thấy thông tin nhân viên")
 
         # Build WHERE clause
-        where_conditions = ["code_seller = %s"]
-        params = [code_seller]
+        where_conditions = [
+            "(code_seller = %s OR (name_seller ILIKE %s AND %s != '') OR (id_seller = %s AND %s > 0))"
+        ]
+        params = [code_seller, f"%{name_seller}%", name_seller, id_seller, id_seller]
 
         if from_date:
             where_conditions.append("DATE(time_create AT TIME ZONE 'Asia/Ho_Chi_Minh') >= %s")
@@ -1287,14 +1484,41 @@ async def get_my_orders_stats(
             params.append(to_date)
 
         if status:
+            STATUS_MAPPING = {
+                "Chờ xử lý": 1,
+                "Đang lấy hàng": 2,
+                "Chờ lấy lại": 3,
+                "Đã lấy hàng": 4,
+                "Đang giao hàng": 5,
+                "Chờ giao lại": 6,
+                "Giao thành công": 7,
+                "Chờ chuyển hoàn": 8,
+                "Đang chuyển hoàn": 9,
+                "Chờ chuyển hoàn lại": 10,
+                "Đã chuyển hoàn": 11,
+                "Đã hủy": 12,
+            }
             status_values = [s.strip() for s in status.split(",") if s.strip()]
-            if len(status_values) == 1:
-                where_conditions.append("status_value = %s")
-                params.append(status_values[0])
-            elif len(status_values) > 1:
-                placeholders = ", ".join(["%s"] * len(status_values))
-                where_conditions.append(f"status_value IN ({placeholders})")
-                params.extend(status_values)
+            status_conds = []
+            final_status_values = []
+            
+            for s in status_values:
+                if s in STATUS_MAPPING:
+                    status_conds.append(f"id_status = {STATUS_MAPPING[s]}")
+                else:
+                    final_status_values.append(s)
+                    
+            if final_status_values:
+                if len(final_status_values) == 1:
+                    status_conds.append("status_value = %s")
+                    params.append(final_status_values[0])
+                else:
+                    placeholders = ", ".join(["%s"] * len(final_status_values))
+                    status_conds.append(f"status_value IN ({placeholders})")
+                    params.extend(final_status_values)
+                    
+            if status_conds:
+                where_conditions.append("(" + " OR ".join(status_conds) + ")")
 
         # Loại trừ các đơn hàng đã huỷ
         where_conditions.append("id_status != 12")
@@ -1367,6 +1591,7 @@ async def get_invoice_detail(
                     discount,
                     total_amount,
                     fee_delivery,
+                    fee_delivery_customer,
                     type_fee_delivery,
                     cod_need_payment,
                     description,
@@ -1395,7 +1620,7 @@ async def get_invoice_detail(
                 "id_seller", "code_seller", "name_seller", "id_customer",
                 "code_customer", "phone_number", "id_salechannel", "name_salechannel",
                 "subtotal", "gift_amount", "discount", "total_amount",
-                "fee_delivery", "type_fee_delivery", "cod_need_payment", "description",
+                "fee_delivery", "fee_delivery_customer", "type_fee_delivery", "cod_need_payment", "description",
                 "send_zns", "id_status", "status_value", "name_customer",
                 "id_subchannel", "subchannel", "type_channel", "fee_platform"
             ]
@@ -1498,33 +1723,121 @@ async def get_invoice_detail(
                         delivery_info[col] = value
                 
                 if delivery_info.get("id_partner_delivery") == 8:
+                    # 1. Tìm dòng trạng thái mới nhất có lưu employee_phone chuyên dụng
                     vtp_query = """
-                        SELECT creator, note 
+                        SELECT creator, note, employee_phone 
                         FROM vtp_tracking_history 
                         WHERE code_delivery = %s 
-                        AND creator IS NOT NULL AND creator != ''
-                        AND (note ILIKE '%%bưu tá%%' OR note ILIKE '%%phát%%' OR note ILIKE '%%nhận%%')
-                        ORDER BY created_at DESC LIMIT 1
+                        AND employee_phone IS NOT NULL AND employee_phone != ''
+                        ORDER BY created_at DESC, id DESC LIMIT 1
                     """
                     cur.execute(vtp_query, (delivery_info["code_delivery"],))
                     vtp_row = cur.fetchone()
+                    
+                    # 2. Tương thích ngược: Nếu chưa có cột/chưa lưu employee_phone, dùng logic cũ
+                    if not vtp_row:
+                        vtp_query_old = """
+                            SELECT creator, note, NULL as employee_phone
+                            FROM vtp_tracking_history 
+                            WHERE code_delivery = %s 
+                            AND creator IS NOT NULL AND creator != ''
+                            AND (note ILIKE '%%bưu tá%%' OR note ILIKE '%%phát%%' OR note ILIKE '%%nhận%%')
+                            ORDER BY created_at DESC LIMIT 1
+                        """
+                        cur.execute(vtp_query_old, (delivery_info["code_delivery"],))
+                        vtp_row = cur.fetchone()
+
                     if vtp_row:
                         import re
-                        creator, note = vtp_row
+                        creator, note, employee_phone = vtp_row
                         delivery_info["postman_name"] = creator
                         
-                        po_match = re.search(r'Tại:\s*[^,]+,\s*[^,]+,\s*(.*?),\s*(\d{10,11}),', note)
+                        po_match = re.search(r'Tại:\s*[^,]+,\s*[^,]+,\s*(.*?),\s*(\d{9,11})', note)
                         if po_match:
-                            delivery_info["post_office_name"] = po_match.group(1)
-                            delivery_info["postman_phone"] = po_match.group(2)
-                            delivery_info["post_office_phone"] = ""
+                            delivery_info["post_office_name"] = po_match.group(1).strip()
+                            delivery_info["post_office_phone"] = po_match.group(2)
                         else:
-                            phone_match = re.search(r'\b0\d{9,10}\b', note)
-                            if phone_match:
-                                delivery_info["postman_phone"] = phone_match.group(0)
-                            else:
-                                delivery_info["postman_phone"] = ""
                             delivery_info["post_office_phone"] = ""
+
+                        if employee_phone:
+                            delivery_info["postman_phone"] = employee_phone
+                        else:
+                            pm_phone_match = re.search(r'SĐT bưu tá:\s*(\d{9,11})', note, re.IGNORECASE)
+                            if pm_phone_match:
+                                delivery_info["postman_phone"] = pm_phone_match.group(1)
+                            else:
+                                if not po_match:
+                                    phone_match = re.search(r'\b0\d{9,10}\b', note)
+                                    if phone_match:
+                                        delivery_info["postman_phone"] = phone_match.group(0)
+                                    else:
+                                        delivery_info["postman_phone"] = ""
+                                else:
+                                    delivery_info["postman_phone"] = ""
+
+                elif delivery_info.get("id_partner_delivery") == 7:
+                    # VNPost
+                    import re
+                    vnpost_history = await api_vnpost_get_history(delivery_info["code_delivery"])
+                    
+                    postman_name = ""
+                    postman_phone = ""
+                    post_office_name = ""
+                    
+                    for event in vnpost_history:
+                        status_text = event.get("status") or ""
+                        
+                        if not post_office_name and "Tại bưu cục" in status_text:
+                            po_match = re.search(r'Tại bưu cục\s+[\d]+\s*-\s*(.+)', status_text)
+                            if po_match:
+                                post_office_name = po_match.group(1).strip()
+                                
+                        if "Bưu tá" in status_text:
+                            pm_match = re.search(r'Bưu tá\s+([^\(0-9]+)\s*\(([\d\.]+)\)', status_text)
+                            if pm_match and not postman_name:
+                                postman_name = pm_match.group(1).strip()
+                                postman_phone = pm_match.group(2).strip()
+                    
+                    if postman_name:
+                        delivery_info["postman_name"] = postman_name
+                        delivery_info["postman_phone"] = postman_phone
+                    if post_office_name:
+                        delivery_info["post_office_name"] = post_office_name
+
+                elif delivery_info.get("id_partner_delivery") == 3:
+                    # J&T Express: Lấy trực tiếp từ API/DB đã cập nhật
+                    import re
+                    jt_history = await api_jt_get_history(delivery_info["code_delivery"])
+                    
+                    postman_name = ""
+                    postman_phone = ""
+                    post_office_name = ""
+                    
+                    for event in jt_history:
+                        creator = event.get("creator") or ""
+                        phone = event.get("employee_phone") or ""
+                        detail = event.get("detail") or ""
+                        
+                        if not post_office_name:
+                            po_match = re.search(r'\[([^\]]+)\]', detail) or re.search(r'Tại:\s*([^\-]+)', detail)
+                            if po_match:
+                                post_office_name = po_match.group(1).strip()
+
+                        if not postman_name:
+                            is_facility = any(creator.startswith(p) for p in ["TTKT ", "(TNN)", "(LCI)", "(HNI)", "(SGN)", "Bưu cục"])
+                            if creator and creator not in ("J&T System", "J&T Express System") and not is_facility:
+                                postman_name = creator
+                                postman_phone = phone
+                            elif phone:
+                                postman_phone = phone
+
+                    if postman_name:
+                        delivery_info["postman_name"] = postman_name
+                    if postman_phone:
+                        delivery_info["postman_phone"] = postman_phone
+                    if post_office_name:
+                        delivery_info["post_office_name"] = post_office_name
+
             
             return {
                 "success": True,
@@ -1567,7 +1880,7 @@ class Invoice(BaseModel):
     send_zns: bool = False
     id_status: int
     status_value: str
-    id_subchannel: int = None
+    id_subchannel: Optional[str] = None
     subchannel: str = None
     type_channel: str = None
     fee_platform: float = 0
@@ -1635,7 +1948,8 @@ async def get_sale_channels(token: dict = Depends(check_token)):
         6: "TIKTOK LIVE (HẢI HÀ)",
         8: "FACEBOOK DATA",
         10: "Google/Website",
-        12: "ZALO LIVE",
+        11: "Zalo",
+        12: "ZALO MINI APP",
         13: "ZALO ADS",
         15: "Bán trực tiếp",
         17: "B2B (SỈ)",
@@ -1667,6 +1981,12 @@ async def get_sale_channels(token: dict = Depends(check_token)):
                     "type": None,
                     "icon": None
                 })
+            channels.append({
+                "id_salechannel": "zalo_live",
+                "name_salechannel": "ZALO LIVE",
+                "type": None,
+                "icon": None
+            })
             
             return channels
     except Exception as e:
@@ -1733,7 +2053,7 @@ async def create_invoice(
                     id_customer, code_customer, name_customer, phone_number,
                     id_salechannel, name_salechannel,
                     subtotal, gift_amount, discount, total_amount,
-                    fee_delivery, type_fee_delivery, shipping_method, cod_need_payment,
+                    fee_delivery, fee_delivery_customer, type_fee_delivery, shipping_method, cod_need_payment,
                     description, send_zns, id_status, status_value,
                     id_subchannel, subchannel, type_channel, fee_platform
                 ) VALUES (
@@ -1743,7 +2063,7 @@ async def create_invoice(
                     %s, %s, %s, %s,
                     %s, %s,
                     %s, %s, %s, %s,
-                    %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
                     %s, %s, %s, %s,
                     %s, %s, %s, %s
                 )
@@ -1758,7 +2078,7 @@ async def create_invoice(
                 invoice_data.id_salechannel, invoice_data.name_salechannel,
                 invoice_data.subtotal, invoice_data.gift_amount, 
                 invoice_data.discount, invoice_data.total_amount,
-                invoice_data.fee_delivery, invoice_data.type_fee_delivery,
+                invoice_data.fee_delivery, invoice_data.fee_delivery_customer, invoice_data.type_fee_delivery,
                 invoice_data.shipping_method,
                 invoice_data.cod_need_payment,
                 invoice_data.description, invoice_data.send_zns, 
@@ -1888,6 +2208,10 @@ async def update_invoice(
             if request.fee_delivery is not None:
                 updates.append("fee_delivery = %s")
                 values.append(float(request.fee_delivery))
+                
+            if request.fee_delivery_customer is not None:
+                updates.append("fee_delivery_customer = %s")
+                values.append(float(request.fee_delivery_customer))
             
             if request.receiver is not None:
                 updates.append("name_customer = %s")
@@ -1919,6 +2243,18 @@ async def update_invoice(
             if request.name_salechannel is not None:
                 updates.append("name_salechannel = %s")
                 values.append(request.name_salechannel)
+            
+            if request.discount is not None:
+                updates.append("discount = %s")
+                values.append(request.discount)
+            
+            if request.total_amount is not None:
+                updates.append("total_amount = %s")
+                values.append(request.total_amount)
+                
+            if request.subtotal is not None:
+                updates.append("subtotal = %s")
+                values.append(request.subtotal)
             
             # Thêm time_update
             updates.append("time_update = %s")
@@ -1980,17 +2316,65 @@ async def update_invoice(
             
             conn_fm.commit()
             
+            # Kích hoạt webhook miniapp / hệ thống ngoài nếu đổi trạng thái
+            if request.status_value is not None:
+                # Gửi Webhook trạng thái sang hệ thống ngoài
+                id_status_val = STATUS_MAPPING.get(request.status_value)
+                asyncio.create_task(
+                    send_external_status_webhook(code_invoice, id_status_val, request.status_value)
+                )
+                
+                try:
+                    cur.execute("SELECT phone_number, name_salechannel, name_customer, total_amount, id_subchannel, type_channel FROM invoice WHERE code_invoice = %s", (code_invoice,))
+                    inv_info_webhook = cur.fetchone()
+                    if inv_info_webhook:
+                        inv_phone_wh, inv_salechannel_wh, inv_customer_name, inv_total_amount, id_subchannel, type_channel = inv_info_webhook
+                        is_miniapp = (inv_salechannel_wh == "ZALO MINI APP")
+                        inv_sdt_wh = f"84{''.join(filter(str.isdigit, str(inv_phone_wh)))[-9:]}" if inv_phone_wh else ""
+                        
+                        if is_miniapp:
+                            from model.hoadon import update_status_miniapp
+                            asyncio.create_task(update_status_miniapp(code_invoice, request.status_value, inv_sdt_wh))
+                            
+                        # Gửi yêu cầu hủy đơn hàng lên Evotech qua REST API
+                        if type_channel == "EVOTECH" and id_subchannel and request.status_value == "Đã hủy":
+                            from routes.hoa_don import cancel_evotech_order
+                            asyncio.create_task(cancel_evotech_order(id_subchannel))
+                        
+                        if request.status_value == "Giao thành công":
+                            from model.hoadon import process_order_delivered
+                            asyncio.create_task(process_order_delivered(code_invoice, inv_phone_wh, inv_customer_name, inv_total_amount, is_miniapp))
+                        elif request.status_value in ["Đã hủy", "Đã chuyển hoàn", "Đang chuyển hoàn", "Chờ chuyển hoàn"]:
+                            from model.hoadon import process_order_cancelled_or_returned
+                            asyncio.create_task(process_order_cancelled_or_returned(code_invoice, inv_phone_wh, request.status_value))
+                except Exception as wh_err:
+                    print(f"Lỗi trigger webhook miniapp / cộng điểm: {wh_err}")
+            
             # Gửi thông báo Lark nếu trạng thái là Đã hủy
             if request.status_value == "Đã hủy":
                 try:
                     cur.execute("""
-                        SELECT time_create, name_salechannel, code_seller, name_seller, description
+                        SELECT time_create, name_salechannel, code_seller, name_seller, description, code_creator
                         FROM invoice WHERE code_invoice = %s
                     """, (code_invoice,))
                     inv_row = cur.fetchone()
                     
                     if inv_row:
-                        time_create, name_salechannel, code_seller, name_seller, description = inv_row
+                        time_create, name_salechannel, code_seller, name_seller, description, inv_code_creator = inv_row
+                        
+                        try:
+                            employee_code = inv_code_creator or code_seller
+                            if employee_code:
+                                asyncio.create_task(
+                                    send_hrm_order_webhook(
+                                        order_code=code_invoice,
+                                        employee_code=employee_code,
+                                        order_value=0,
+                                        status="cancelled"
+                                    )
+                                )
+                        except Exception as webhook_err:
+                            print(f"⚠️ Lỗi trigger Webhook HRM (Cancelled): {str(webhook_err)}")
                         
                         cur.execute("""
                             SELECT name_product, quantity, type_product
@@ -2040,6 +2424,47 @@ async def update_invoice(
                     print(f"⚠️ Lỗi gửi Lark message khi hủy đơn: {str(lark_error)}")
                     traceback.print_exc()
             
+            elif request.status_value in ["Đang giao hàng", "Giao thành công"]:
+                try:
+                    cur.execute("""
+                        SELECT phone_number, name_customer, code_customer, name_salechannel
+                        FROM invoice WHERE code_invoice = %s
+                    """, (code_invoice,))
+                    inv_info = cur.fetchone()
+                    if inv_info:
+                        inv_phone, inv_name, inv_code, inv_salechannel = inv_info
+                        inv_sdt = f"84{''.join(filter(str.isdigit, inv_phone))[-9:]}"
+                        
+                        is_miniapp = (inv_salechannel == "ZALO MINI APP")
+                        
+                        from model.hoadon import sendByZNS
+                        if request.status_value == "Đang giao hàng":
+                            data_send_zns = {
+                                "order_code": code_invoice,
+                                "customer_name": inv_name,
+                                "customer_code": inv_code if inv_code else "KH001"
+                            }
+                            template_id = get_system_config('zns_template_dang_giao', '581723')
+                            asyncio.create_task(sendByZNS(inv_sdt, data_send_zns, template_id, bypass_config=is_miniapp))
+                            print(f"🚀 [CRM] Đã trigger ZNS {template_id} Đang giao hàng cho đơn {code_invoice}")
+                            
+                        elif request.status_value == "Giao thành công":
+                            data_send_zns = {
+                                "order_code": code_invoice,
+                                "customer_name": inv_name,
+                                "customer_code": inv_code if inv_code else "KH001"
+                            }
+                            template_id = get_system_config('zns_template_giao_thanh_cong', '581726')
+                            asyncio.create_task(sendByZNS(inv_sdt, data_send_zns, template_id, bypass_config=is_miniapp))
+                            print(f"🚀 [CRM] Đã trigger ZNS {template_id} Giao thành công cho đơn {code_invoice}")
+                            
+                            # Cả HRM webhook
+                            asyncio.create_task(send_hrm_delivery_webhook(order_code=code_invoice))
+                            print(f"🚀 [CRM] Trigger gửi Webhook HRM (Delivered) cho đơn {code_invoice}")
+                            
+                except Exception as zns_err:
+                    print(f"⚠️ Lỗi trigger ZNS/HRM khi cập nhật thủ công: {str(zns_err)}")
+
             return {
                 "message": "Cập nhật đơn hàng thành công",
                 "code_invoice": code_invoice
@@ -2124,12 +2549,12 @@ async def api_vnpost_get_history(code_delivery: str) -> list:
 
             result_list = []
             for event in status_history:
-                date_str = event.get("createdDate", "")
+                date_str = event.get("createdDate") or ""
                 time_str = event.get("createHour") or event.get("createdHour") or event.get("time") or ""
                 time_display = f"{time_str} {date_str}".strip()
 
-                raw_status = event.get("statusName", "")
-                location = event.get("locateName") or event.get("LocateName")
+                raw_status = event.get("statusName") or ""
+                location = event.get("locateName") or event.get("LocateName") or ""
                 detail_info = f"{location} - {raw_status}" if location else raw_status
 
                 result_list.append({
@@ -2187,6 +2612,167 @@ async def api_vtp_get_history(code_delivery: str) -> list:
         return []
 
 
+async def api_jt_get_history(code_delivery: str) -> list:
+    """Lấy lịch sử vận chuyển J&T từ API live (đồng thời sync vào DB), nếu lỗi API thì đọc DB nội bộ"""
+    code_delivery_str = str(code_delivery).strip()
+    if not code_delivery_str or code_delivery_str in ("null", "undefined"):
+        return []
+
+    # 1. Ưu tiên gọi API live để cập nhật thông tin mới nhất
+    try:
+        import hashlib
+        import base64
+        import json
+        import time
+        import httpx
+
+        PARTNER_APIACC_JT = os.getenv("PARTNER_APIACC_JT", "")
+        PARTNER_PRIVATEKEY_JT = os.getenv("PARTNER_PRIVATEKEY_JT", "")
+        JT_URL_BASE = os.getenv("JT_URL_BASE", "https://ylopenapi.jtexpress.vn/webopenplatformapi/api")
+        CUSTOMER_CODE_JT = os.getenv("CUSTOMER_CODE_JT", "")
+        PARTNER_KEY_JT = os.getenv("PARTNER_KEY_JT", "")
+
+        if PARTNER_APIACC_JT and PARTNER_PRIVATEKEY_JT:
+            url = f"{JT_URL_BASE}/logistics/trace"
+            sign_str = PARTNER_KEY_JT + "jadada369t3"
+            password = hashlib.md5(sign_str.encode("utf-8")).hexdigest().upper()
+
+            biz_json = json.dumps(
+                {
+                    "billCodes": code_delivery_str,
+                    "txlogisticId": "",
+                    "customerCode": CUSTOMER_CODE_JT,
+                    "password": password
+                },
+                ensure_ascii=False,
+                separators=(",", ":")
+            )
+
+            raw = biz_json + PARTNER_PRIVATEKEY_JT
+            md5_hash = hashlib.md5(raw.encode("utf-8")).digest()
+            digest = base64.b64encode(md5_hash).decode()
+            timestamp = str(int(time.time() * 1000))
+
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "digest": digest,
+                "timestamp": timestamp,
+                "apiAccount": PARTNER_APIACC_JT
+            }
+            data = {"bizContent": biz_json}
+
+            async with httpx.AsyncClient(timeout=10, verify=False) as client:
+                response = await client.post(url, headers=headers, data=data)
+                if response.status_code == 200:
+                    res_json = response.json()
+                    if str(res_json.get("code")) == "1":
+                        data_list = res_json.get("data", [])
+                        bill_data = None
+                        for item in data_list:
+                            if item.get("billCode") == code_delivery_str:
+                                bill_data = item
+                                break
+                        if not bill_data and data_list:
+                            bill_data = data_list[0]
+
+                        if bill_data:
+                            details = bill_data.get("details", [])
+                            if details:
+                                result_list = []
+                                with conn_fm.cursor() as cur:
+                                    for event in details:
+                                        time_str = event.get("scanTime", "")
+                                        raw_status = event.get("scanTypeName", "")
+                                        desc = event.get("desc", "")
+                                        network_name = event.get("scanNetworkName", "")
+                                        staff_name = event.get("staffName", "")
+                                        staff_contact = event.get("staffContact", "")
+                                        scan_type_code = event.get("scanTypeCode", 0)
+
+                                        detail_info = f"[{network_name}] {desc}" if network_name else desc
+                                        creator = staff_name if staff_name else (network_name if network_name else "J&T Express System")
+
+                                        result_list.append({
+                                            "time": time_str,
+                                            "trackingCode": code_delivery_str,
+                                            "partner": "J&T Express",
+                                            "status": raw_status,
+                                            "statusText": raw_status,
+                                            "detail": detail_info,
+                                            "creator": creator,
+                                            "employee_phone": staff_contact or "",
+                                        })
+
+                                        try:
+                                            cur.execute("""
+                                                UPDATE jt_tracking_history
+                                                SET status_value = %s,
+                                                    note = %s,
+                                                    creator = CASE 
+                                                        WHEN creator IS NULL OR creator = '' OR creator = 'J&T System' OR creator = 'J&T Express System' OR creator LIKE '%%中心到件%%' OR creator LIKE '%%发件扫描%%' OR creator LIKE '%%快件揽收%%' OR creator LIKE '%%下单%%'
+                                                        THEN %s
+                                                        ELSE creator
+                                                    END,
+                                                    employee_phone = COALESCE(NULLIF(%s, ''), employee_phone)
+                                                WHERE code_delivery = %s AND time_delivery = %s
+                                            """, (raw_status, detail_info, creator, staff_contact or '', code_delivery_str, time_str))
+
+                                            cur.execute("""
+                                                INSERT INTO jt_tracking_history (code_delivery, id_status, status_value, note, time_delivery, creator, employee_phone)
+                                                SELECT %s, %s, %s, %s, %s, %s, %s
+                                                WHERE NOT EXISTS (
+                                                    SELECT 1 FROM jt_tracking_history 
+                                                    WHERE code_delivery = %s AND time_delivery = %s
+                                                )
+                                            """, (code_delivery_str, scan_type_code, raw_status, detail_info, time_str, creator, staff_contact or '', code_delivery_str, time_str))
+                                        except Exception as db_e:
+                                            print(f"⚠️ Lỗi upsert DB jt_tracking_history: {db_e}")
+                                    conn_fm.commit()
+
+                                return result_list
+    except Exception as e:
+        print(f"⚠️ Gọi API J&T live thất bại, sẽ đọc DB fallback: {e}")
+
+    # 2. Fallback: Đọc từ DB nội bộ nếu không gọi được API live
+    try:
+        query = """
+            SELECT time_delivery, id_status, status_value, note, creator, employee_phone
+            FROM jt_tracking_history
+            WHERE code_delivery = %s
+            ORDER BY time_delivery DESC, id DESC
+        """
+        with conn_fm.cursor() as cur:
+            cur.execute(query, (code_delivery_str,))
+            rows = cur.fetchall()
+
+        if rows:
+            result_list = []
+            for row in rows:
+                time_delivery, id_status, status_value, note, creator, employee_phone = row
+                full_text = note if note else status_value
+                if isinstance(time_delivery, datetime):
+                    time_str = time_delivery.strftime("%H:%M:%S %d/%m/%Y")
+                else:
+                    time_str = str(time_delivery) if time_delivery else ""
+
+                result_list.append({
+                    "time": time_str,
+                    "trackingCode": code_delivery_str,
+                    "partner": "J&T Express",
+                    "status": full_text,
+                    "statusText": full_text,
+                    "detail": note,
+                    "creator": creator or "J&T System",
+                    "employee_phone": employee_phone or "",
+                })
+            return result_list
+    except Exception as e:
+        print(f"❌ Lỗi Select lịch sử J&T từ DB: {e}")
+
+    return []
+
+
+
 async def get_delivery_history_handler(code_delivery: str, partner_id: int = None) -> list:
     if not code_delivery or code_delivery in ("null", "undefined"):
         return []
@@ -2197,9 +2783,14 @@ async def get_delivery_history_handler(code_delivery: str, partner_id: int = Non
     if partner_id == 7:
         return await api_vnpost_get_history(code_delivery)
 
+    if partner_id == 3:
+        return await api_jt_get_history(code_delivery)
+
     if code_delivery.isdigit() and len(code_delivery) > 10:
         return await api_vtp_get_history(code_delivery)
 
+    # Thử check prefix để định tuyến nếu partner_id None (J&T thường có prefix như 84...)
+    # Tạm thời cứ mặc định VNPost nếu không match
     return await api_vnpost_get_history(code_delivery)
 
 

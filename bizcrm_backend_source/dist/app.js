@@ -58,6 +58,7 @@ import { initZnsSendWorker, initEmbeddingWorker } from './shared/queue.js';
 import { processTriggerJob, processDelayJob } from './modules/automation/automation-engine.js';
 import { initWorkers, shutdownQueue } from './shared/queue.js';
 import { embedAndStoreKbEntry } from './modules/knowledge/embedding-service.js';
+import { prisma as _prisma } from './shared/prisma-client.js';
 import { initAiReplyOrchestrator } from './modules/ai/harness/auto-reply-orchestrator.js';
 import { traceRoutes } from './modules/ai/observability/trace-routes.js';
 import { simulateRoutes } from './modules/ai/simulate-routes.js';
@@ -276,6 +277,13 @@ try {
     autoReconnectSavedAccounts().catch(err => console.error('Auto-reconnect failed:', err.message));
     // Ensure pgvector HNSW indexes exist (fire-and-forget; non-fatal if unsupported)
     ensureVectorIndexes().catch(err => console.error('Vector index ensure failed:', err.message));
+    // Auto-backfill missing product and KB embeddings on startup (fire-and-forget)
+    _prisma.organization.findMany({ select: { id: true } }).then(async (orgs) => {
+        for (const org of orgs) {
+            import('./modules/products/product-embedding.js').then(({ backfillProductEmbeddings }) => backfillProductEmbeddings(org.id).catch(() => { }));
+            import('./modules/knowledge/embedding-service.js').then(({ backfillEmbeddings }) => backfillEmbeddings(org.id).catch(() => { }));
+        }
+    }).catch(() => { });
     // ── BullMQ Workers — process automation triggers & delays via Redis ──
     initWorkers(async (job) => {
         const { trigger, context } = job.data;
@@ -286,11 +294,13 @@ try {
     console.log('📦 BullMQ automation workers started');
     // ── ZNS mass-send worker (rate-limited) ──
     initZnsSendWorker(processZnsSendJob);
-    // ── KB embedding worker (generate + store vectors for knowledge entries) ──
+    // ── KB & Product embedding worker (generate + store vectors) ──
     initEmbeddingWorker(async (job) => {
         const { orgId, entryId, productId, kind } = job.data;
         if (kind === 'product' && productId) {
-            await embedAndStoreProduct(orgId, productId);
+            const ok = await embedAndStoreProduct(orgId, productId);
+            if (!ok)
+                throw new Error(`Product embed failed for product ${productId}`);
             return;
         }
         if (!entryId)
@@ -298,7 +308,7 @@ try {
         // Shared embed path — keeps on-save embeds consistent with the backfill.
         await embedAndStoreKbEntry(orgId, entryId);
     });
-    console.log('🧬 KB embedding worker started');
+    console.log('🧬 KB & Product embedding worker started');
     // ── AI auto-reply orchestrator (debounced, per-conversation) ──
     initAiReplyOrchestrator();
     console.log('🤖 AI reply orchestrator started');

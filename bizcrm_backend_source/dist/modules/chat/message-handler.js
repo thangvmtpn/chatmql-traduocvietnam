@@ -511,12 +511,12 @@ async function findOrCreateConversation(msg, orgId, contactId, displayName) {
         return existing;
     }
     // Materialize the org's default AI mode at creation. Without this the schema
-    // default ('manual') wins and "Chế độ mặc định cho hội thoại mới" never
+    // default ('auto') wins and "Chế độ mặc định cho hội thoại mới" never
     // applies to new conversations (resolveConversationMode only falls back on
-    // NULL, and the column is non-null). Best-effort: fall back to 'manual'.
-    let defaultAiMode = 'manual';
+    // NULL, and the column is non-null). Best-effort: fall back to 'auto'.
+    let defaultAiMode = 'auto';
     try {
-        defaultAiMode = (await getAiReplyConfig(orgId)).defaultAiMode || 'manual';
+        defaultAiMode = (await getAiReplyConfig(orgId)).defaultAiMode || 'auto';
     }
     catch { /* config unreadable → safe default */ }
     return prisma.conversation.create({

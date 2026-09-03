@@ -494,4 +494,17 @@ export async function analyticsRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   )
+
+  // ── GET /api/v1/analytics/quotes ──────────────────────────────────────
+  app.get<{ Querystring: { from?: string; to?: string } }>(
+    '/api/v1/analytics/quotes',
+    async (request) => {
+      const user = request.user as { orgId: string }
+      const { from, to } = request.query
+      const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400_000)
+      const toDate = to ? new Date(to) : new Date()
+      const { getQuoteAnalytics } = await import('./quote-analytics-service.js')
+      return getQuoteAnalytics(user.orgId, fromDate, toDate)
+    },
+  )
 }

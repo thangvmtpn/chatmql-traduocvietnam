@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma-client.js';
 import { enqueueProductEmbed } from '../../shared/queue.js';
 import { uniqueSlug } from './slug.js';
+import { logger } from '../../shared/logger.js';
 const EMBED_FIELDS = ['name', 'keywords', 'description'];
 const SELECT = {
     id: true, categoryId: true, name: true, code: true, slug: true,
@@ -84,8 +85,11 @@ export async function createProduct(orgId, data, createdById, opts = {}) {
         });
         // Single add → embed now (one product = one call). Bulk import passes
         // skipEmbed and batches all rows in one pass (see importProducts).
-        if (!opts.skipEmbed)
-            enqueueProductEmbed(orgId, p.id).catch(() => { });
+        if (!opts.skipEmbed) {
+            enqueueProductEmbed(orgId, p.id).catch((err) => {
+                logger.warn({ err: err?.message, orgId, productId: p.id }, '[product] enqueue embed failed');
+            });
+        }
         return serialize(p);
     }
     catch (err) {
@@ -133,7 +137,9 @@ export async function updateProduct(orgId, id, data, opts = {}) {
     try {
         const p = await prisma.product.update({ where: { id }, data: patch, select: SELECT });
         if (!opts.skipEmbed && EMBED_FIELDS.some((f) => d[f] !== undefined)) {
-            enqueueProductEmbed(orgId, id).catch(() => { });
+            enqueueProductEmbed(orgId, id).catch((err) => {
+                logger.warn({ err: err?.message, orgId, productId: id }, '[product] enqueue embed failed');
+            });
         }
         return serialize(p);
     }

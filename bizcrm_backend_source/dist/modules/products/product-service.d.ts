@@ -22,22 +22,22 @@ export declare function listProducts(orgId: string, q?: ProductListQuery): Promi
         notes: string | null;
         source: string;
         tags: string[];
-        code: string | null;
-        description: string | null;
-        sortOrder: number;
+        price: Prisma.Decimal | null;
+        categoryId: string | null;
+        keywords: string | null;
         category: {
             id: string;
             name: string;
         } | null;
+        description: string | null;
+        code: string | null;
         slug: string;
-        price: Prisma.Decimal | null;
-        categoryId: string | null;
-        keywords: string | null;
         priceType: string;
         priceMax: Prisma.Decimal | null;
         currency: string;
         specs: Prisma.JsonValue;
         images: string[];
+        sortOrder: number;
     } & {
         price: number | null;
         priceMax: number | null;
@@ -58,22 +58,22 @@ export declare function getProduct(orgId: string, id: string): Promise<({
     notes: string | null;
     source: string;
     tags: string[];
-    code: string | null;
-    description: string | null;
-    sortOrder: number;
+    price: Prisma.Decimal | null;
+    categoryId: string | null;
+    keywords: string | null;
     category: {
         id: string;
         name: string;
     } | null;
+    description: string | null;
+    code: string | null;
     slug: string;
-    price: Prisma.Decimal | null;
-    categoryId: string | null;
-    keywords: string | null;
     priceType: string;
     priceMax: Prisma.Decimal | null;
     currency: string;
     specs: Prisma.JsonValue;
     images: string[];
+    sortOrder: number;
 } & {
     price: number | null;
     priceMax: number | null;
@@ -107,22 +107,22 @@ export declare function createProduct(orgId: string, data: ProductInput, created
     notes: string | null;
     source: string;
     tags: string[];
-    code: string | null;
-    description: string | null;
-    sortOrder: number;
+    price: Prisma.Decimal | null;
+    categoryId: string | null;
+    keywords: string | null;
     category: {
         id: string;
         name: string;
     } | null;
+    description: string | null;
+    code: string | null;
     slug: string;
-    price: Prisma.Decimal | null;
-    categoryId: string | null;
-    keywords: string | null;
     priceType: string;
     priceMax: Prisma.Decimal | null;
     currency: string;
     specs: Prisma.JsonValue;
     images: string[];
+    sortOrder: number;
 } & {
     price: number | null;
     priceMax: number | null;
@@ -138,22 +138,22 @@ export declare function updateProduct(orgId: string, id: string, data: Partial<P
     notes: string | null;
     source: string;
     tags: string[];
-    code: string | null;
-    description: string | null;
-    sortOrder: number;
+    price: Prisma.Decimal | null;
+    categoryId: string | null;
+    keywords: string | null;
     category: {
         id: string;
         name: string;
     } | null;
+    description: string | null;
+    code: string | null;
     slug: string;
-    price: Prisma.Decimal | null;
-    categoryId: string | null;
-    keywords: string | null;
     priceType: string;
     priceMax: Prisma.Decimal | null;
     currency: string;
     specs: Prisma.JsonValue;
     images: string[];
+    sortOrder: number;
 } & {
     price: number | null;
     priceMax: number | null;

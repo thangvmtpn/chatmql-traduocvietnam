@@ -30,8 +30,8 @@ export declare function listKnowledgeGaps(orgId: string, status?: GapStatus, lim
         conversationId: string | null;
         aiReplyRunId: string | null;
         messageId: string | null;
-        gapType: string;
         question: string;
+        gapType: string;
         suggestion: string | null;
         occurrences: number;
         resolvedBy: string | null;

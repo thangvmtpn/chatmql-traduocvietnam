@@ -172,6 +172,7 @@ async function syncSingleConversation(orgId, channelAccountId, pageId, pageToken
                 lastMessageAt: convTime,
                 unreadCount: 0,
                 isReplied: true, // Historical sync — don't mark as unread
+                aiMode: 'auto',
             },
         });
     }

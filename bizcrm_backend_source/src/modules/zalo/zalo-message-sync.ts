@@ -381,7 +381,7 @@ export async function backfillConversation(
         await sleep(DELAY_BETWEEN_PAGES_MS);
       }
     } catch (err: any) {
-      logger.error(`[backfill:${accountId}] Error backfilling thread ${threadId}: ${err.message || err}`, { stack: err.stack, error: String(err) });
+      logger.error({ stack: err.stack, error: String(err) }, `[backfill:${accountId}] Error backfilling thread ${threadId}: ${err.message || err}`);
       hasMore = false;
     }
   }
@@ -464,6 +464,83 @@ export async function backfillAllAccountConversations(
   });
 
   logger.info(`[backfill:${accountId}] Completed backfill: +${result.totalInserted} new, ~${result.totalSkipped} skipped, ${result.errors.length} errors`);
+  return result;
+}
+
+/**
+ * Quét theo DANH SÁCH BẠN BÈ — kéo lịch sử cả những người CHƯA có hội thoại.
+ *
+ * backfillAllAccountConversations chỉ đi qua hội thoại đã có trong CSDL, nên
+ * khách từng chat trước khi kết nối ChatMQL rồi im lặng sẽ không bao giờ được
+ * kéo về. Hàm này duyệt bạn bè đã đồng bộ lúc kết nối (ChannelContact), bỏ qua
+ * ai đã có hội thoại, và thử kéo lịch sử cho phần còn lại. Người nào thật sự
+ * có tin thì handleIncomingMessage tự tạo hội thoại + liên hệ; ai không có tin
+ * thì không tạo gì cả, nên không sinh rác.
+ */
+export async function backfillFriendThreads(
+  api: any,
+  accountId: string,
+  orgId: string,
+  maxMessages = 200,
+  maxFriends = 0, // 0 = tất cả
+): Promise<{ scanned: number; withHistory: number; totalInserted: number; errors: any[] }> {
+  registerCustomApis(api);
+
+  const friends = await prisma.channelContact.findMany({
+    where: { channelAccountId: accountId },
+    select: { friendUid: true, displayName: true },
+    orderBy: { syncedAt: 'desc' },
+  });
+
+  // Bỏ những người đã có hội thoại — phần đó do backfill thường lo.
+  const existing = await prisma.conversation.findMany({
+    where: { channelAccountId: accountId },
+    select: { externalThreadId: true },
+  });
+  const known = new Set(existing.map((c) => c.externalThreadId).filter(Boolean) as string[]);
+
+  let targets = friends.filter((f) => f.friendUid && !known.has(f.friendUid));
+  if (maxFriends > 0) targets = targets.slice(0, maxFriends);
+
+  const result = { scanned: 0, withHistory: 0, totalInserted: 0, errors: [] as any[] };
+  logger.info(`[backfill-friends:${accountId}] ${friends.length} bạn bè, ${targets.length} người chưa có hội thoại`);
+
+  for (let i = 0; i < targets.length; i++) {
+    const f = targets[i];
+    try {
+      emitBackfillProgress(orgId, {
+        accountId,
+        mode: 'friends',
+        current: i + 1,
+        total: targets.length,
+        threadName: f.displayName || f.friendUid,
+        status: 'processing',
+      });
+
+      const stats = await backfillConversation(api, accountId, f.friendUid, 'user', maxMessages);
+      result.scanned++;
+      if (stats.inserted > 0) {
+        result.withHistory++;
+        result.totalInserted += stats.inserted;
+        logger.info(`[backfill-friends:${accountId}] [${i + 1}/${targets.length}] ${f.displayName || f.friendUid}: +${stats.inserted} tin`);
+      }
+    } catch (err: any) {
+      result.errors.push({ friendUid: f.friendUid, error: err.message });
+    }
+
+    if (i < targets.length - 1) await sleep(DELAY_BETWEEN_CONVS_MS);
+  }
+
+  emitBackfillProgress(orgId, {
+    accountId,
+    mode: 'friends',
+    current: targets.length,
+    total: targets.length,
+    status: 'completed',
+    result: { withHistory: result.withHistory, totalInserted: result.totalInserted, errors: result.errors.length },
+  });
+
+  logger.info(`[backfill-friends:${accountId}] Xong: ${result.withHistory}/${result.scanned} người có lịch sử, +${result.totalInserted} tin`);
   return result;
 }
 

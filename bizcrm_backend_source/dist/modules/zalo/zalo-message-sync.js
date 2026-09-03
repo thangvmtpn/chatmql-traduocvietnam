@@ -7,8 +7,22 @@
  */
 import { prisma } from '../../shared/prisma-client.js';
 import { handleIncomingMessage } from '../chat/message-handler.js';
-import { emitBackfillProgress } from '../realtime/socket-gateway.js';
 import { logger } from '../../shared/logger.js';
+// Dynamic import for emitBackfillProgress — may not exist in all image versions
+let _emitBackfillProgress = null;
+try {
+    const sgModule = await import('../realtime/socket-gateway.js');
+    if (typeof sgModule.emitBackfillProgress === 'function') {
+        _emitBackfillProgress = sgModule.emitBackfillProgress;
+    }
+}
+catch { }
+function emitBackfillProgress(orgId, data) {
+    if (_emitBackfillProgress)
+        _emitBackfillProgress(orgId, data);
+    else
+        logger.info(`[backfill] Progress: ${JSON.stringify(data)}`);
+}
 function mapZcaContentType(zcaType) {
     const typeMap = {
         '1': 'text', '2': 'image', '3': 'sticker', '4': 'video',
@@ -34,23 +48,35 @@ export function registerCustomApis(api) {
         if (typeof api.custom === 'function' && typeof api.getUserChatHistory !== 'function') {
             api.custom('getUserChatHistory', async ({ ctx, utils, props }) => {
                 const { userId, count = MESSAGES_PER_PAGE, lastMsgId = 0 } = props || {};
+                // Debug: log available service maps and API internals
+                logger.info(`[getUserChatHistory] zpwServiceMap keys=${api.zpwServiceMap ? Object.keys(api.zpwServiceMap).join(',') : 'undefined'}`);
+                logger.info(`[getUserChatHistory] zpwServiceMap.conversation=${JSON.stringify(api.zpwServiceMap?.conversation)}`);
                 const serviceMap = api.zpwServiceMap?.conversation || ['https://chat3-wpa.chat.zalo.me'];
-                const serviceURL = utils.makeURL(`${serviceMap[0]}/api/message/list`);
+                const baseUrl = `${serviceMap[0]}/api/message/list`;
+                logger.info(`[getUserChatHistory] baseUrl=${baseUrl}`);
+                const serviceURL = utils.makeURL(baseUrl);
+                logger.info(`[getUserChatHistory] serviceURL after makeURL=${serviceURL}`);
                 const params = {
                     convId: String(userId),
                     count: count,
                     globalMsgId: lastMsgId,
                 };
+                logger.info(`[getUserChatHistory] params=${JSON.stringify(params)}`);
                 const encryptedParams = utils.encodeAES(JSON.stringify(params));
                 if (!encryptedParams)
                     throw new Error('Failed to encrypt params for getUserChatHistory');
-                const response = await utils.request(utils.makeURL(serviceURL, { params: encryptedParams }), {
+                const finalURL = utils.makeURL(serviceURL, { params: encryptedParams });
+                logger.info(`[getUserChatHistory] finalURL=${String(finalURL).substring(0, 200)}`);
+                const response = await utils.request(finalURL, {
                     method: 'GET',
                 });
+                logger.info(`[getUserChatHistory] response type=${typeof response}, keys=${response ? Object.keys(response).join(',') : 'null'}`);
                 return utils.resolve(response, (result) => {
+                    logger.info(`[getUserChatHistory] resolved result keys=${result ? Object.keys(result).join(',') : 'null'}`);
                     let data = result.data;
                     if (typeof data === 'string')
                         data = JSON.parse(data);
+                    logger.info(`[getUserChatHistory] data type=${typeof data}, keys=${data && typeof data === 'object' ? Object.keys(data).join(',') : 'n/a'}, sample=${JSON.stringify(data).substring(0, 500)}`);
                     return data;
                 });
             });
@@ -243,17 +269,35 @@ export async function backfillConversation(api, accountId, threadId, threadType 
                 if (typeof api.getUserChatHistory !== 'function') {
                     throw new Error('getUserChatHistory API is not available');
                 }
+                logger.info(`[backfill:${accountId}] Calling getUserChatHistory for thread ${threadId}, lastMsgId=${lastMsgId}, count=${MESSAGES_PER_PAGE}`);
                 const history = await api.getUserChatHistory({
                     userId: threadId,
                     count: MESSAGES_PER_PAGE,
                     lastMsgId: lastMsgId,
                 });
-                rawMessages = history?.msgs || history?.msgList || history?.data?.msgs || [];
+                // Debug: log raw response structure
+                logger.info(`[backfill:${accountId}] Raw history type=${typeof history}, keys=${history ? Object.keys(history).join(',') : 'null'}`);
+                if (history?.data) {
+                    logger.info(`[backfill:${accountId}] history.data keys=${Object.keys(history.data).join(',')}`);
+                }
+                if (history?.msgs) {
+                    logger.info(`[backfill:${accountId}] history.msgs length=${Array.isArray(history.msgs) ? history.msgs.length : typeof history.msgs}`);
+                }
+                if (history?.msgList) {
+                    logger.info(`[backfill:${accountId}] history.msgList length=${Array.isArray(history.msgList) ? history.msgList.length : typeof history.msgList}`);
+                }
+                rawMessages = history?.msgs || history?.msgList || history?.data?.msgs || history?.data?.msgList || [];
+                // If still empty, log the full history (truncated) for debugging
+                if (rawMessages.length === 0 && history) {
+                    logger.warn(`[backfill:${accountId}] Empty rawMessages! Full history sample: ${JSON.stringify(history).substring(0, 1000)}`);
+                }
             }
             if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+                logger.info(`[backfill:${accountId}] No messages returned for thread ${threadId}, stopping pagination.`);
                 hasMore = false;
                 break;
             }
+            logger.info(`[backfill:${accountId}] Got ${rawMessages.length} messages for thread ${threadId}`);
             for (const item of rawMessages) {
                 total++;
                 if (total > maxMessages)
@@ -312,7 +356,7 @@ export async function backfillConversation(api, accountId, threadId, threadType 
             }
         }
         catch (err) {
-            logger.error(`[backfill:${accountId}] Error backfilling thread ${threadId}:`, err.message);
+            logger.error({ stack: err.stack, error: String(err) }, `[backfill:${accountId}] Error backfilling thread ${threadId}: ${err.message || err}`);
             hasMore = false;
         }
     }
@@ -373,6 +417,70 @@ export async function backfillAllAccountConversations(api, accountId, orgId, max
         },
     });
     logger.info(`[backfill:${accountId}] Completed backfill: +${result.totalInserted} new, ~${result.totalSkipped} skipped, ${result.errors.length} errors`);
+    return result;
+}
+/**
+ * Quét theo DANH SÁCH BẠN BÈ — kéo lịch sử cả những người CHƯA có hội thoại.
+ *
+ * backfillAllAccountConversations chỉ đi qua hội thoại đã có trong CSDL, nên
+ * khách từng chat trước khi kết nối ChatMQL rồi im lặng sẽ không bao giờ được
+ * kéo về. Hàm này duyệt bạn bè đã đồng bộ lúc kết nối (ChannelContact), bỏ qua
+ * ai đã có hội thoại, và thử kéo lịch sử cho phần còn lại. Người nào thật sự
+ * có tin thì handleIncomingMessage tự tạo hội thoại + liên hệ; ai không có tin
+ * thì không tạo gì cả, nên không sinh rác.
+ */
+export async function backfillFriendThreads(api, accountId, orgId, maxMessages = 200, maxFriends = 0) {
+    registerCustomApis(api);
+    const friends = await prisma.channelContact.findMany({
+        where: { channelAccountId: accountId },
+        select: { friendUid: true, displayName: true },
+        orderBy: { syncedAt: 'desc' },
+    });
+    // Bỏ những người đã có hội thoại — phần đó do backfill thường lo.
+    const existing = await prisma.conversation.findMany({
+        where: { channelAccountId: accountId },
+        select: { externalThreadId: true },
+    });
+    const known = new Set(existing.map((c) => c.externalThreadId).filter(Boolean));
+    let targets = friends.filter((f) => f.friendUid && !known.has(f.friendUid));
+    if (maxFriends > 0)
+        targets = targets.slice(0, maxFriends);
+    const result = { scanned: 0, withHistory: 0, totalInserted: 0, errors: [] };
+    logger.info(`[backfill-friends:${accountId}] ${friends.length} bạn bè, ${targets.length} người chưa có hội thoại`);
+    for (let i = 0; i < targets.length; i++) {
+        const f = targets[i];
+        try {
+            emitBackfillProgress(orgId, {
+                accountId,
+                mode: 'friends',
+                current: i + 1,
+                total: targets.length,
+                threadName: f.displayName || f.friendUid,
+                status: 'processing',
+            });
+            const stats = await backfillConversation(api, accountId, f.friendUid, 'user', maxMessages);
+            result.scanned++;
+            if (stats.inserted > 0) {
+                result.withHistory++;
+                result.totalInserted += stats.inserted;
+                logger.info(`[backfill-friends:${accountId}] [${i + 1}/${targets.length}] ${f.displayName || f.friendUid}: +${stats.inserted} tin`);
+            }
+        }
+        catch (err) {
+            result.errors.push({ friendUid: f.friendUid, error: err.message });
+        }
+        if (i < targets.length - 1)
+            await sleep(DELAY_BETWEEN_CONVS_MS);
+    }
+    emitBackfillProgress(orgId, {
+        accountId,
+        mode: 'friends',
+        current: targets.length,
+        total: targets.length,
+        status: 'completed',
+        result: { withHistory: result.withHistory, totalInserted: result.totalInserted, errors: result.errors.length },
+    });
+    logger.info(`[backfill-friends:${accountId}] Xong: ${result.withHistory}/${result.scanned} người có lịch sử, +${result.totalInserted} tin`);
     return result;
 }
 /** Start periodic group & user sync for an account. */

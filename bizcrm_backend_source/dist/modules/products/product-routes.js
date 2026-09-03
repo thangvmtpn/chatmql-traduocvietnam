@@ -185,7 +185,8 @@ export async function productRoutes(app) {
         const u = request.user;
         if (!canManage(u.role))
             return err(reply, 403, 'Không có quyền', 'FORBIDDEN');
-        const result = await backfillProductEmbeddings(u.orgId);
+        const force = request.body?.force === true;
+        const result = await backfillProductEmbeddings(u.orgId, { force });
         return { success: true, data: result };
     });
     // ── Import / Sync (Google Sheet or raw CSV) ─────────────────────────

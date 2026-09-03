@@ -71,6 +71,7 @@ export async function zaloWebhookRoutes(app) {
                     lastMessageAt: new Date(),
                     unreadCount: 1,
                     isReplied: false,
+                    aiMode: 'auto',
                 },
             });
         }

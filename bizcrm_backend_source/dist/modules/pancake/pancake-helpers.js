@@ -66,4 +66,33 @@ export function extractAttachments(raw) {
         url: a.url || a.payload?.url || null,
     })).filter(a => a.url);
 }
+// ─── Note Serializer ─────────────────────────────────────────────────────────
+export function serializePancakeNotes(raw) {
+    if (!raw)
+        return null;
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        return trimmed.length > 0 ? trimmed.slice(0, 5000) : null;
+    }
+    if (Array.isArray(raw)) {
+        const lines = [];
+        for (const item of raw) {
+            if (typeof item === 'string') {
+                const t = item.trim();
+                if (t)
+                    lines.push(t);
+            }
+            else if (item && typeof item === 'object') {
+                const msg = item.message;
+                if (typeof msg === 'string' && msg.trim()) {
+                    lines.push(msg.trim());
+                }
+            }
+        }
+        if (lines.length === 0)
+            return null;
+        return lines.join('\n').slice(0, 5000);
+    }
+    return null;
+}
 //# sourceMappingURL=pancake-helpers.js.map

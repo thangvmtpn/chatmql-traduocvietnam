@@ -27,6 +27,22 @@ export declare function backfillAllAccountConversations(api: any, accountId: str
     totalSkipped: number;
     errors: any[];
 }>;
+/**
+ * Quét theo DANH SÁCH BẠN BÈ — kéo lịch sử cả những người CHƯA có hội thoại.
+ *
+ * backfillAllAccountConversations chỉ đi qua hội thoại đã có trong CSDL, nên
+ * khách từng chat trước khi kết nối ChatMQL rồi im lặng sẽ không bao giờ được
+ * kéo về. Hàm này duyệt bạn bè đã đồng bộ lúc kết nối (ChannelContact), bỏ qua
+ * ai đã có hội thoại, và thử kéo lịch sử cho phần còn lại. Người nào thật sự
+ * có tin thì handleIncomingMessage tự tạo hội thoại + liên hệ; ai không có tin
+ * thì không tạo gì cả, nên không sinh rác.
+ */
+export declare function backfillFriendThreads(api: any, accountId: string, orgId: string, maxMessages?: number, maxFriends?: number): Promise<{
+    scanned: number;
+    withHistory: number;
+    totalInserted: number;
+    errors: any[];
+}>;
 /** Start periodic group & user sync for an account. */
 export declare function startMessageSync(api: any, accountId: string): void;
 /** Stop periodic sync for an account. */

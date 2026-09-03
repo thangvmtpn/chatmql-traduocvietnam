@@ -26,3 +26,4 @@ export declare function extractAttachments(raw?: Array<{
     };
     [k: string]: unknown;
 }>): any[];
+export declare function serializePancakeNotes(raw: unknown): string | null;

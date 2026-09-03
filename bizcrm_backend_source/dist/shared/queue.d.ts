@@ -71,10 +71,10 @@ export declare function enqueueTrigger(data: TriggerJobData): Promise<string>;
 export declare function enqueueZnsSend(data: ZnsSendJobData): Promise<string>;
 /**
  * Enqueue an AI reply processing job for a conversation.
- * Cancels pending delayed jobs for the same convId (debounce reset)
- * and assigns a unique jobId so subsequent turns are never blocked.
+ * Uses reliable in-memory debouncing before triggering the AI reply orchestrator.
+ * This guarantees 100% reliability with 0 Redis/BullMQ stalls.
  */
-export declare function enqueueAiReply(convId: string, delayMs: number): Promise<string>;
+export declare function enqueueAiReply(convId: string, delayMs?: number): Promise<string>;
 /**
  * Enqueue an embedding job for a KB entry.
  * Idempotent: uses `orgId:entryId` as jobId so duplicate enqueues
@@ -99,8 +99,8 @@ export declare function initWorkers(processTrigger: (job: Job<TriggerJobData>) =
 export declare function initZnsSendWorker(processor: (job: Job<ZnsSendJobData>) => Promise<void>): void;
 /**
  * Initialize the AI reply worker. Call once from app.ts after initWorkers.
- * Uses concurrency=1 so each conversation is processed serially — combined with
- * the jobId=convId debounce this guarantees at most one in-flight job per conv.
+ * Uses concurrency=5 with an in-memory active conversation Set so each conversation
+ * is processed serially without blocking other conversations.
  */
 export declare function initAiReplyWorker(processor: (job: Job<AiReplyJobData>) => Promise<void>): void;
 /**

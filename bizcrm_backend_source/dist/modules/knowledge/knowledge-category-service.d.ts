@@ -6,11 +6,11 @@ export declare function listKnowledgeCategories(orgId: string): Promise<{
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
-    sortOrder: number;
-    parentId: string | null;
     slug: string;
-    importConfig: import("@prisma/client/runtime/library").JsonValue;
+    sortOrder: number;
     kind: string;
+    parentId: string | null;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
 }[]>;
 export type KnowledgeCategoryInput = {
     name: string;
@@ -26,11 +26,11 @@ export declare function createKnowledgeCategory(orgId: string, data: KnowledgeCa
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
-    sortOrder: number;
-    parentId: string | null;
     slug: string;
-    importConfig: import("@prisma/client/runtime/library").JsonValue;
+    sortOrder: number;
     kind: string;
+    parentId: string | null;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
 }>;
 export declare function updateKnowledgeCategory(orgId: string, id: string, data: Partial<KnowledgeCategoryInput>): Promise<{
     id: string;
@@ -38,11 +38,11 @@ export declare function updateKnowledgeCategory(orgId: string, id: string, data:
     createdAt: Date;
     updatedAt: Date;
     description: string | null;
-    sortOrder: number;
-    parentId: string | null;
     slug: string;
-    importConfig: import("@prisma/client/runtime/library").JsonValue;
+    sortOrder: number;
     kind: string;
+    parentId: string | null;
+    importConfig: import("@prisma/client/runtime/library").JsonValue;
 } | null>;
 export declare function deleteKnowledgeCategory(orgId: string, id: string): Promise<boolean>;
 /** Idempotent seed of default sales/consulting taxonomy (only if org has none). */

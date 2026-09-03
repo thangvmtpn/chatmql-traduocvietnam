@@ -29,7 +29,7 @@ import { buildRouterPrompt, parseRouterDecision } from '../prompts/ai-router.js'
 import { buildGeneratorPrompt, buildAgentSystemPrompt } from '../prompts/auto-reply.js';
 import { buildCriticPrompt, parseCriticVerdict } from '../prompts/critic.js';
 import { getToolsConfig, buildToolScopeNote } from '../tools-config-service.js';
-import { buildOpenaiTools, executeTool, resolveProductImage, HANDOFF_TOOL, APPOINTMENT_TOOL, LOG_GAP_TOOL, SEND_IMAGE_TOOL } from './tools-runtime.js';
+import { buildOpenaiTools, executeTool, resolveProductImage, HANDOFF_TOOL, APPOINTMENT_TOOL, ORDER_TOOL, LOG_GAP_TOOL, SEND_IMAGE_TOOL } from './tools-runtime.js';
 import { recordPendingAction } from '../pending-action-service.js';
 import { recordKnowledgeGap } from '../knowledge-gap-service.js';
 import { isConfidentHit, shouldAutoLogGap } from './gap-detection.js';
@@ -139,7 +139,20 @@ async function runAgentLoop(args) {
             }
             let result;
             let hits = [];
-            if (tc.name === APPOINTMENT_TOOL) {
+            if (tc.name === ORDER_TOOL) {
+                // Action: record a draft order (staff confirms and fulfills).
+                try {
+                    const rec = await recordPendingAction({
+                        orgId: args.orgId, conversationId: args.convId,
+                        type: 'create_order', payload: (parsedArgs ?? {}),
+                    });
+                    result = `ĐÃ LÊN ĐƠN HÀNG NHÁP THÀNH CÔNG trên hệ thống (${rec.summary}). Trạng thái: CHỜ DUYỆT & ĐÓNG GÓI. Hãy xuất bảng HÓA ĐƠN NHÁP chi tiết cho khách kiểm tra lại thông tin (Tên, SĐT, Địa chỉ, Sản phẩm, Tổng tiền), báo khách xác nhận OK và yên tâm nhân viên/shop sẽ liên hệ đóng gói gửi hàng sớm.`;
+                }
+                catch (err) {
+                    result = `Không lưu được đơn hàng: ${err.message}`;
+                }
+            }
+            else if (tc.name === APPOINTMENT_TOOL) {
                 // Action: record a pending appointment (staff confirms before it books).
                 try {
                     const rec = await recordPendingAction({
@@ -455,7 +468,15 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
         const criticStarted = Date.now();
         try {
             const criticSystem = 'You are a strict QA reviewer. Respond ONLY with JSON.';
-            const criticPrompt = buildCriticPrompt({ customerMessage: ctx.turnText, reply: replyText, criteria: ctx.logic.criteria, grounding });
+            const criticPrompt = buildCriticPrompt({
+                customerMessage: ctx.turnText,
+                reply: replyText,
+                criteria: ctx.logic.criteria,
+                persona: ctx.logic.persona,
+                playbook: ctx.logic.playbook,
+                scenarios: ctx.scenarios,
+                grounding,
+            });
             const criticRaw = await callProvider(genCfg.provider, genKey, genCfg.model, criticSystem, criticPrompt, { jsonMode: true, maxTokens: 300 });
             const verdict = parseCriticVerdict(criticRaw.text);
             recordStep({

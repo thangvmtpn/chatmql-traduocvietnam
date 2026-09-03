@@ -16,8 +16,10 @@ export declare function embedAndStoreProductsBatch(orgId: string, productIds: st
     embedded: number;
     failed: number;
 }>;
-/** Idempotent: embed all active products missing a vector (batched API calls). */
-export declare function backfillProductEmbeddings(orgId: string): Promise<{
+/** Idempotent: embed all active products missing a vector (or all if force=true). */
+export declare function backfillProductEmbeddings(orgId: string, opts?: {
+    force?: boolean;
+}): Promise<{
     embedded: number;
     failed: number;
 }>;
@@ -35,10 +37,11 @@ export type ProductSemanticRow = {
     score?: number | null;
 };
 /**
- * Hybrid product retrieval: cosine semantic search (pgvector <=>) with a
- * relevance threshold, plus keyword backfill (name/code/keywords) for recall.
- * Below `minScore` a semantic hit is off-topic noise and is dropped so it can
- * never become grounding. org_id is ALWAYS filtered (anti cross-company).
+ * Hybrid product retrieval (Anti-Shadowing):
+ * Runs pgvector semantic search in parallel with keyword search, merging them
+ * with strict priority for exact / strong product name matches over partial vector hits.
+ * This ensures that even if semantic search returns topK items or vector is stale,
+ * exact-name hits are never shadowed.
  */
 export declare function retrieveProductSemantic(orgId: string, query: string, topK: number, opts?: {
     categoryId?: string;

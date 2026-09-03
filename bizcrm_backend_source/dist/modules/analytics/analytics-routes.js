@@ -431,5 +431,14 @@ export async function analyticsRoutes(app) {
             }
         }
     });
+    // ── GET /api/v1/analytics/quotes ──────────────────────────────────────
+    app.get('/api/v1/analytics/quotes', async (request) => {
+        const user = request.user;
+        const { from, to } = request.query;
+        const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86400_000);
+        const toDate = to ? new Date(to) : new Date();
+        const { getQuoteAnalytics } = await import('./quote-analytics-service.js');
+        return getQuoteAnalytics(user.orgId, fromDate, toDate);
+    });
 }
 //# sourceMappingURL=analytics-routes.js.map

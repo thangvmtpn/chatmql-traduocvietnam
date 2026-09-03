@@ -71,6 +71,9 @@ model Organization {
   products              Product[]
   productCategories     ProductCategory[]
   knowledgeCategories   KnowledgeCategory[]
+  quotes                Quote[]
+  quoteTemplates        QuoteTemplate[]
+  quoteEvents           QuoteEvent[]
 
   @@map("organizations")
 }
@@ -118,6 +121,7 @@ model User {
   notifications    Notification[]
   createdNotes     Note[]                 @relation("CreatedNotes")
   ownedCompanies   Company[]              @relation("OwnedCompanies")
+  assignedQuotes   Quote[]                @relation("AssignedQuotes")
   znsLogs          ZnsLog[]               @relation("ZnsSent")
   znsCampaigns     ZnsCampaign[]          @relation("ZnsCampaignCreator")
   // Manager hierarchy: multi-manager support via junction table
@@ -244,6 +248,7 @@ model Contact {
   propertyValues    ContactPropertyValue[]
   cdpEvents         CdpEvent[]
   lifecycleLogs     LifecycleLog[]
+  quotes            Quote[]
 
   @@index([orgId, phone])
   @@index([orgId, zaloUid])
@@ -281,6 +286,7 @@ model Company {
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   owner    User?        @relation("OwnedCompanies", fields: [ownerId], references: [id])
   contacts Contact[]
+  quotes   Quote[]
 
   @@index([orgId, name])
   @@index([orgId, taxCode])
@@ -774,7 +780,7 @@ model AiScenario {
   enabled      Boolean                      @default(true)
   triggerHints String?                      @map("trigger_hints") // optional keywords, embedded alongside the description
   priority     Int                          @default(0) // ordering for always-loaded scenarios
-  // embedding    Unsupported("vector(1536)")? // description (+hints) embedding; HNSW index via raw SQL
+  embedding    Unsupported("vector(1536)")? // description (+hints) embedding; HNSW index via raw SQL
   version      Int                          @default(1)
   updatedBy    String?                      @map("updated_by") // userId or 'ai_master'
   createdAt    DateTime                     @default(now()) @map("created_at")
@@ -846,16 +852,13 @@ model KnowledgeEntry {
   content    String
   keywords   String? // cách hỏi / tên gọi khác — tăng recall RAG
   status     String // active | pending | rejected | archived
-  /// Ảnh/video đính kèm. Chỉ mục có status='active' mới được gửi ra ngoài
-  /// cho khách — xem thư viện tài liệu ở library-routes.ts.
-  mediaUrls  String[] @default([]) @map("media_urls")
-  /// 'image' | 'video' | null (mục chỉ có chữ)
-  mediaType  String?  @db.VarChar(16) @map("media_type")
+  mediaUrls  String[]                     @default([]) @map("media_urls")
+  mediaType  String?                      @db.VarChar(16) @map("media_type")
   risk       String // low | sensitive
   source     String // ai_extracted | staff_manual | feedback | gap_resolved
   confidence Float?                       @default(0)
   version    Int                          @default(1)
-  // embedding  Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
+  embedding  Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
   createdAt  DateTime                     @default(now()) @map("created_at")
   updatedAt  DateTime                     @updatedAt @map("updated_at")
 
@@ -921,7 +924,7 @@ model AiExample {
   aiDraft        String                       @map("ai_draft")
   finalText      String?                      @map("final_text") // staff-edited version that was sent
   editDiff       String?                      @map("edit_diff") // diff for learning signal
-  // embedding      Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
+  embedding      Unsupported("vector(1536)")? // OpenAI text-embedding-3-small; HNSW index via raw SQL
   createdAt      DateTime                     @default(now()) @map("created_at")
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -1359,8 +1362,6 @@ model Note {
   conversationId  String?  @map("conversation_id")
   createdByUserId String   @map("created_by_user_id")
   content         String
-  /// Kết quả tương tác của lần liên hệ này. Null = ghi chú thường, không gắn
-  /// với cuộc gọi/trao đổi nào. Giá trị hợp lệ xem NOTE_STATUSES ở note-routes.ts.
   status          String?  @db.VarChar(32)
   isPinned        Boolean  @default(false) @map("is_pinned")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -1747,7 +1748,7 @@ model Product {
   status           String                       @default("active") // draft | active | archived
   sortOrder        Int                          @default(0) @map("sort_order")
   source           String                       @default("manual") // manual | import | sync | ai_master
-  // embedding        Unsupported("vector(1536)")? // name + short + keywords
+  embedding        Unsupported("vector(1536)")? // name + short + keywords
   createdById      String?                      @map("created_by_id")
   createdAt        DateTime                     @default(now()) @map("created_at")
   updatedAt        DateTime                     @updatedAt @map("updated_at")
@@ -1755,6 +1756,7 @@ model Product {
   org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   category ProductCategory? @relation(fields: [categoryId], references: [id])
   knowledge KnowledgeEntry[]
+  quoteLines QuoteLine[]
 
   @@unique([orgId, code])
   @@unique([orgId, slug])
@@ -1786,4 +1788,163 @@ model KnowledgeCategory {
   @@unique([orgId, slug])
   @@index([orgId, parentId])
   @@map("knowledge_categories")
+}
+
+// ── Quote / Contract (Báo giá & Hợp đồng) ───────────────────────────
+// Chứng từ bán hàng gắn với 1 Contact (Company optional, thường đọc từ contact).
+// Vòng đời: draft → sent → viewed → accepted | rejected | expired | canceled
+// parentId: báo giá v1 → v2 (revise khi deal giá) hoặc báo giá → hợp đồng.
+// Đã gửi (sent+) thì BẤT BIẾN — muốn sửa phải revise ra bản mới.
+model Quote {
+  id               String    @id @default(uuid())
+  orgId            String    @map("org_id")
+  contactId        String    @map("contact_id")
+  companyId        String?   @map("company_id")
+  parentId         String?   @map("parent_id") // bản gốc khi revise / convert
+
+  number           String // BG-2026-0001 — unique THEO ORG
+  type             String    @default("quote") // quote (báo giá) | contract (hợp đồng)
+  status           String    @default("draft") // draft | sent | viewed | accepted | rejected | expired | canceled
+  publicToken      String    @unique @map("public_token") // link khách xem, không đoán được
+  title            String?
+  currency         String    @default("VND")
+
+  subtotal         Decimal   @default(0) @db.Decimal(14, 2) // tổng dòng SAU chiết khấu dòng
+  discountType     String    @default("none") @map("discount_type") // none | percent | amount
+  discountValue    Decimal   @default(0) @db.Decimal(14, 2) @map("discount_value")
+  discountAmount   Decimal   @default(0) @db.Decimal(14, 2) @map("discount_amount")
+  taxRate          Decimal   @default(0) @db.Decimal(5, 2) @map("tax_rate") // VAT VN: 0 | 5 | 8 | 10
+  taxAmount        Decimal   @default(0) @db.Decimal(14, 2) @map("tax_amount")
+  total            Decimal   @default(0) @db.Decimal(14, 2)
+
+  notes            String? // điều khoản / ghi chú HIỂN THỊ cho khách
+  internalNotes    String?   @map("internal_notes") // chỉ nội bộ, không lộ ra route public
+  templateId       String?   @map("template_id")
+  templateSnapshot Json      @default("{}") @map("template_snapshot") // đóng băng thông tin bên bán lúc gửi
+
+  assignedUserId   String?   @map("assigned_user_id")
+  createdById      String?   @map("created_by_id")
+  source           String    @default("manual") // manual | ai | automation | import
+  validUntil       DateTime? @map("valid_until")
+  sentAt           DateTime? @map("sent_at")
+  sentVia          String?   @map("sent_via") // zalo | zalo_oa | facebook | email | link
+  firstViewedAt    DateTime? @map("first_viewed_at")
+  lastViewedAt     DateTime? @map("last_viewed_at")
+  viewCount        Int       @default(0) @map("view_count")
+  respondedAt      DateTime? @map("responded_at")
+  rejectReason     String?   @map("reject_reason")
+
+  deletedAt        DateTime? @map("deleted_at") // soft delete — chứng từ tài chính
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  org          Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contact      Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company      Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  parent       Quote?         @relation("QuoteLineage", fields: [parentId], references: [id])
+  revisions    Quote[]        @relation("QuoteLineage")
+  template     QuoteTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  assignedUser User?          @relation("AssignedQuotes", fields: [assignedUserId], references: [id])
+  lines        QuoteLine[]
+  events       QuoteEvent[]
+
+  @@unique([orgId, number])
+  @@index([orgId, status])
+  @@index([orgId, contactId])
+  @@index([orgId, companyId])
+  @@index([orgId, assignedUserId])
+  @@index([orgId, deletedAt])
+  @@map("quotes")
+}
+
+// Dòng hàng. name/unitPrice là SNAPSHOT lúc tạo — sản phẩm đổi tên/xoá sau này
+// KHÔNG được làm đổi báo giá đã gửi khách.
+model QuoteLine {
+  id              String   @id @default(uuid())
+  quoteId         String   @map("quote_id")
+  productId       String?  @map("product_id") // chỉ để truy vết
+
+  name            String // snapshot tên sản phẩm/dịch vụ
+  description     String?
+  quantity        Decimal  @default(1) @db.Decimal(12, 3) // 3 số lẻ: 0.5 ngày công, 2.75 m²
+  unit            String   @default("cái")
+  unitPrice       Decimal  @db.Decimal(14, 2) @map("unit_price")
+  discountPercent Decimal  @default(0) @db.Decimal(5, 2) @map("discount_percent")
+  amount          Decimal  @db.Decimal(14, 2)
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  quote   Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([quoteId, sortOrder])
+  @@map("quote_lines")
+}
+
+// Mẫu báo giá: thông tin bên bán + điều khoản mặc định + quy tắc đánh số.
+// Field CÓ CẤU TRÚC (không phải HTML tự do) → an toàn XSS, AI đọc được.
+model QuoteTemplate {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  name             String
+  isDefault        Boolean  @default(false) @map("is_default")
+
+  sellerName       String?  @map("seller_name")
+  sellerTaxCode    String?  @map("seller_tax_code") // MST
+  sellerAddress    String?  @map("seller_address")
+  sellerPhone      String?  @map("seller_phone")
+  sellerEmail      String?  @map("seller_email")
+  logoUrl          String?  @map("logo_url")
+  bankInfo         String?  @map("bank_info") // STK / ngân hàng / chủ TK
+  signerName       String?  @map("signer_name")
+  signerTitle      String?  @map("signer_title")
+
+  termsText        String?  @map("terms_text")
+  footerNote       String?  @map("footer_note")
+  numberPrefix     String   @default("BG") @map("number_prefix")
+  defaultTaxRate   Decimal  @default(0) @db.Decimal(5, 2) @map("default_tax_rate")
+  defaultValidDays Int      @default(30) @map("default_valid_days")
+  accentColor      String?  @map("accent_color")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  quotes Quote[]
+
+  @@unique([orgId, name])
+  @@index([orgId, isDefault])
+  @@map("quote_templates")
+}
+
+// Audit trail + tracking hành vi khách. actorType theo pattern actorKind của ZNS.
+model QuoteEvent {
+  id        String   @id @default(uuid())
+  quoteId   String   @map("quote_id")
+  orgId     String   @map("org_id")
+  type      String // created | updated | sent | viewed | accepted | rejected | expired | canceled | reminded | revised
+  actorType String   @default("user") @map("actor_type") // user | contact | system | ai
+  actorId   String?  @map("actor_id")
+  meta      Json     @default("{}") // { from, to, channel, ip, userAgent, … }
+  createdAt DateTime @default(now()) @map("created_at")
+
+  quote Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId, createdAt])
+  @@index([orgId, type, createdAt])
+  @@map("quote_events")
+}
+
+// Bộ đếm số chứng từ theo org + kỳ. Tăng ATOMIC trong cùng transaction với
+// việc tạo quote → không bao giờ trùng số dù nhiều user bấm cùng lúc.
+model QuoteCounter {
+  orgId     String   @map("org_id")
+  period    String // "2026" hoặc "2026-07"
+  seq       Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([orgId, period])
+  @@map("quote_counters")
 }
