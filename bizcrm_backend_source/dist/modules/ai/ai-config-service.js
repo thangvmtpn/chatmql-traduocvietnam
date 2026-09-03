@@ -2,6 +2,8 @@
  * AI configuration & usage queries — split from ai-service.ts to keep files small.
  */
 import { prisma } from '../../shared/prisma-client.js';
+import { logger } from '../../shared/logger.js';
+import { encryptToken, decryptToken } from '../../shared/crypto.js';
 import { config } from '../../config/index.js';
 import { getAvailableProviders, getProviderConfig } from './provider-registry.js';
 const VERIFY_TIMEOUT_MS = 15_000;
@@ -10,11 +12,45 @@ const VERIFY_TIMEOUT_MS = 15_000;
 // because AI provider config is owned by the UI, not deployment.
 const BOOTSTRAP_PROVIDER = 'openai';
 const BOOTSTRAP_MODEL = 'gpt-4.1-mini';
+/** Có khoá mã hoá (TOKEN_ENC_KEY) thì mới mã hoá được; không có thì cảnh báo và giữ chữ thường. */
+function canEncryptSecrets() {
+    return !!process.env.TOKEN_ENC_KEY;
+}
+let warnedPlainKey = false;
 export async function getProviderApiKey(orgId, provider) {
-    const setting = await prisma.appSetting.findFirst({
-        where: { orgId, settingKey: `ai_${provider}_api_key` },
-    });
-    return setting?.valuePlain || '';
+    const settingKey = `ai_${provider}_api_key`;
+    const setting = await prisma.appSetting.findFirst({ where: { orgId, settingKey } });
+    if (!setting)
+        return '';
+    if (setting.valueEncrypted) {
+        try {
+            const encStr = Buffer.from(setting.valueEncrypted).toString('utf8');
+            return decryptToken(encStr);
+        }
+        catch (err) {
+            logger.error({ err, provider }, '[ai-config] không giải mã được API key — kiểm tra TOKEN_ENC_KEY');
+            return setting.valuePlain || '';
+        }
+    }
+    const plain = setting.valuePlain || '';
+    // Bản chữ thường còn sót: mã hoá ngay lần đọc đầu tiên rồi xoá bản thường.
+    if (plain && canEncryptSecrets()) {
+        try {
+            await prisma.appSetting.update({
+                where: { id: setting.id },
+                data: { valueEncrypted: Buffer.from(encryptToken(plain), 'utf8'), valuePlain: null },
+            });
+            logger.info({ provider }, '[ai-config] đã mã hoá API key đang lưu chữ thường');
+        }
+        catch (err) {
+            logger.warn({ err, provider }, '[ai-config] không mã hoá được API key cũ');
+        }
+    }
+    else if (plain && !warnedPlainKey) {
+        warnedPlainKey = true;
+        logger.warn('[ai-config] API key AI đang lưu CHỮ THƯỜNG trong CSDL — đặt TOKEN_ENC_KEY để mã hoá');
+    }
+    return plain;
 }
 export async function saveProviderApiKey(orgId, provider, apiKey) {
     const trimmed = apiKey.trim();
@@ -24,10 +60,13 @@ export async function saveProviderApiKey(orgId, provider, apiKey) {
         throw new Error('API key seems too short');
     if (!getProviderConfig(provider))
         throw new Error(`Unknown provider: ${provider}`);
+    const data = canEncryptSecrets()
+        ? { valueEncrypted: Buffer.from(encryptToken(trimmed), 'utf8'), valuePlain: null }
+        : { valuePlain: trimmed, valueEncrypted: null };
     return prisma.appSetting.upsert({
         where: { orgId_settingKey: { orgId, settingKey: `ai_${provider}_api_key` } },
-        update: { valuePlain: trimmed },
-        create: { orgId, settingKey: `ai_${provider}_api_key`, valuePlain: trimmed },
+        update: data,
+        create: { orgId, settingKey: `ai_${provider}_api_key`, ...data },
     });
 }
 /**
@@ -155,6 +194,7 @@ export function isValidTaskType(t) {
     return VALID_TASK_TYPES.includes(t);
 }
 export async function updateAiConfig(orgId, input) {
+    invalidateAiReplyConfigCache(orgId);
     // Sanitize taskOverrides — strip unknown task types, drop empty entries
     const cleanOverrides = input.taskOverrides
         ? Object.fromEntries(Object.entries(input.taskOverrides)
@@ -290,6 +330,7 @@ export async function getAiScheduleConfig(orgId) {
     }
 }
 export async function saveAiScheduleConfig(orgId, cfg) {
+    invalidateAiReplyConfigCache(orgId);
     const current = await getAiScheduleConfig(orgId);
     const updated = { ...current, ...cfg };
     return prisma.appSetting.upsert({
@@ -302,7 +343,25 @@ export async function saveAiScheduleConfig(orgId, cfg) {
  * Get the auto-reply configuration for an org.
  * Creates a default AiConfig row if none exists.
  */
+// Mỗi tin đến — kể cả hội thoại thủ công — đều đọc cấu hình + lịch (2 truy vấn).
+// Cache ngắn; mọi chỗ ghi cấu hình gọi invalidateAiReplyConfigCache.
+const AI_REPLY_CFG_TTL_MS = 30_000;
+const aiReplyConfigCache = new Map();
+export function invalidateAiReplyConfigCache(orgId) {
+    if (orgId)
+        aiReplyConfigCache.delete(orgId);
+    else
+        aiReplyConfigCache.clear();
+}
 export async function getAiReplyConfig(orgId) {
+    const hit = aiReplyConfigCache.get(orgId);
+    if (hit && Date.now() - hit.at < AI_REPLY_CFG_TTL_MS)
+        return hit.value;
+    const value = await loadAiReplyConfig(orgId);
+    aiReplyConfigCache.set(orgId, { at: Date.now(), value });
+    return value;
+}
+async function loadAiReplyConfig(orgId) {
     let cfg = await prisma.aiConfig.findUnique({ where: { orgId } });
     if (!cfg) {
         cfg = await prisma.aiConfig.create({
@@ -345,14 +404,17 @@ export function resolveConversationMode(input) {
         return 'manual';
     if (input.convAiMode === 'off')
         return 'manual';
+    // "Thủ công" CÓ CHỦ ĐÍCH (nhân viên bấm, hoặc AI vừa chuyển người) là quyết
+    // định cuối — lịch giờ không được ghi đè.
+    const explicitManual = input.convAiMode === 'manual' && !!input.convAiModeReason;
+    if (explicitManual)
+        return 'manual';
     if (input.schedule?.enabled) {
+        // Hội thoại đã chọn rõ suggest/auto thì giữ; còn lại đi theo lịch.
+        if (input.convAiMode && input.convAiMode !== 'manual')
+            return input.convAiMode;
         const afterHours = isAfterHours(input.currentTime, input.schedule.timezone || 'Asia/Ho_Chi_Minh', input.schedule.startHour ?? 18, input.schedule.endHour ?? 8);
-        if (afterHours) {
-            return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.nighttimeMode ?? 'auto');
-        }
-        else {
-            return (input.convAiMode && input.convAiMode !== 'manual') ? input.convAiMode : (input.schedule.daytimeMode ?? 'auto');
-        }
+        return afterHours ? (input.schedule.nighttimeMode ?? 'auto') : (input.schedule.daytimeMode ?? 'auto');
     }
     return input.convAiMode ?? input.defaultAiMode;
 }
@@ -452,15 +514,31 @@ export async function getAiUsage(orgId, days = 1) {
         days: safeDays,
     };
 }
+/** Đầu ngày theo múi giờ cho trước, trả về mốc UTC tương ứng. */
+export function startOfDayInTimezone(timezone = 'Asia/Ho_Chi_Minh', now = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(now);
+    const get = (t) => parseInt(parts.find(p => p.type === t)?.value ?? '0', 10);
+    // giờ hiện tại theo múi giờ → lùi về 00:00 của ngày đó
+    const elapsedMs = ((get('hour') % 24) * 3600 + get('minute') * 60 + get('second')) * 1000;
+    return new Date(now.getTime() - elapsedMs - now.getMilliseconds());
+}
 export async function ensureQuota(orgId, maxDaily) {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    // type != 'embedding': quota covers LLM calls only (embeds are logged for cost).
-    const used = await prisma.aiUsage.count({
-        where: { orgId, createdAt: { gte: startOfDay }, type: { not: 'embedding' } },
-    });
+    // Ngày tính theo giờ Việt Nam (máy chủ có thể chạy UTC — reset giữa buổi sáng).
+    const startOfDay = startOfDayInTimezone('Asia/Ho_Chi_Minh');
+    // Đếm LƯỢT, không đếm dòng: một lượt trả lời ghi ~2–3 dòng ai_usage (router +
+    // generator + critic) nên đếm dòng làm quota cạn nhanh gấp 2–3 lần cài đặt.
+    // Dòng không thuộc lượt nào (tóm tắt, chấm điểm…) vẫn tính mỗi dòng một đơn vị.
+    const rows = await prisma.$queryRaw `
+    SELECT count(DISTINCT coalesce(ai_reply_run_id, id)) AS used
+    FROM ai_usage
+    WHERE org_id = ${orgId} AND created_at >= ${startOfDay} AND type <> 'embedding'
+  `;
+    const used = Number(rows[0]?.used ?? 0);
     if (used >= maxDaily)
-        throw new Error('AI daily quota exceeded');
+        throw new Error(`AI daily quota exceeded (${used}/${maxDaily} lượt hôm nay)`);
 }
 export { getAvailableProviders };
 //# sourceMappingURL=ai-config-service.js.map

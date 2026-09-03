@@ -6,4 +6,5 @@ export type GeminiResult = {
 export declare function generateWithGemini(baseUrl: string, apiKey: string, model: string, system: string, userPrompt: string, options?: {
     jsonMode?: boolean;
     maxTokens?: number;
+    signal?: AbortSignal;
 }): Promise<GeminiResult>;

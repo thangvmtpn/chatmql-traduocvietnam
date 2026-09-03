@@ -36,12 +36,15 @@ export async function generateWithOpenai(
   model: string,
   system: string,
   userPrompt: string,
-  options: { jsonMode?: boolean; maxTokens?: number } = {},
+  options: { jsonMode?: boolean; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<OpenaiResult> {
   const maxTokens = options.maxTokens ?? 1024
   const url = `${baseUrl}/v1/chat/completions`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs)
+  // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+  // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal
 
   try {
     const response = await fetch(url, {
@@ -59,7 +62,7 @@ export async function generateWithOpenai(
         ],
         ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
       }),
-      signal: controller.signal,
+      signal,
     })
 
     if (!response.ok) {
@@ -116,12 +119,15 @@ export async function generateWithOpenaiMessages(
   model: string,
   messages: OpenaiMessage[],
   tools: OpenaiToolDef[] | undefined,
-  options: { maxTokens?: number; toolChoice?: 'auto' | 'required' } = {},
+  options: { maxTokens?: number; toolChoice?: 'auto' | 'required'; signal?: AbortSignal } = {},
 ): Promise<OpenaiToolStep> {
   const maxTokens = options.maxTokens ?? 1024
   const url = `${baseUrl}/v1/chat/completions`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs)
+  // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+  // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal
 
   try {
     const response = await fetch(url, {
@@ -133,7 +139,7 @@ export async function generateWithOpenaiMessages(
         messages,
         ...(tools && tools.length > 0 ? { tools, tool_choice: options.toolChoice ?? 'auto' } : {}),
       }),
-      signal: controller.signal,
+      signal,
     })
 
     if (!response.ok) {

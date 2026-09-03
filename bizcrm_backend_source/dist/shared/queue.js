@@ -54,7 +54,6 @@ export const QUEUE_NAMES = {
     AUTOMATION_TRIGGER: 'automation-trigger',
     AUTOMATION_DELAY: 'automation-delay',
     ZNS_SEND: 'zns-send',
-    AI_REPLY: 'ai-reply',
     EMBEDDING: 'kb-embedding',
 };
 // ─── Queues ───────────────────────────────────────────────────────────────────
@@ -76,16 +75,6 @@ export const delayQueue = new Queue(QUEUE_NAMES.AUTOMATION_DELAY, {
         backoff: { type: 'fixed', delay: 5000 },
         removeOnComplete: { age: 86400, count: 500 },
         removeOnFail: { age: 604800 },
-    },
-});
-export const aiReplyQueue = new Queue(QUEUE_NAMES.AI_REPLY, {
-    connection,
-    prefix: REDIS_PREFIX,
-    defaultJobOptions: {
-        attempts: 2,
-        backoff: { type: 'fixed', delay: 3000 },
-        removeOnComplete: { age: 3600, count: 500 },
-        removeOnFail: { age: 86400 },
     },
 });
 export const embeddingQueue = new Queue(QUEUE_NAMES.EMBEDDING, {
@@ -126,18 +115,21 @@ export async function enqueueZnsSend(data) {
 // ── In-memory debounce map for AI auto-reply (convId -> Timeout) ─────────────
 const aiDebounceTimers = new Map();
 /**
- * Enqueue an AI reply processing job for a conversation.
- * Uses reliable in-memory debouncing before triggering the AI reply orchestrator.
- * This guarantees 100% reliability with 0 Redis/BullMQ stalls.
+ * Xếp lịch một lượt AI trả lời cho hội thoại, debounce trong tiến trình.
+ *
+ * Giới hạn đã biết: timer nằm trong RAM — restart là mất (bù bằng
+ * recoverPendingAiReplies lúc khởi động) và chỉ đúng khi chạy MỘT tiến trình.
+ * `delayMs = 0` là chạy ngay (trước đây `0 || 2500` khiến nhánh này chết).
  */
-export async function enqueueAiReply(convId, delayMs = 2500) {
+const MAX_DEBOUNCE_MS = 60_000; // khớp giới hạn debounceSeconds 0–60 của cấu hình
+export async function enqueueAiReply(convId, delayMs) {
     // Clear any existing timer for this conversation (debounce reset)
     const existingTimer = aiDebounceTimers.get(convId);
     if (existingTimer) {
         clearTimeout(existingTimer);
         aiDebounceTimers.delete(convId);
     }
-    const effectiveDelay = Math.max(0, Math.min(delayMs || 2500, 3000));
+    const effectiveDelay = Math.max(0, Math.min(delayMs ?? 2500, MAX_DEBOUNCE_MS));
     if (effectiveDelay === 0) {
         logger.info({ convId }, '[queue] Triggering AI reply immediately');
         import('../modules/ai/harness/auto-reply-orchestrator.js').then(({ processAiReply }) => {
@@ -198,7 +190,6 @@ function getPriority(trigger) {
 let triggerWorker = null;
 let delayWorker = null;
 let znsSendWorker = null;
-let aiReplyWorker = null;
 let embeddingWorker = null;
 /**
  * Initialize BullMQ workers. Call once from app.ts on startup.
@@ -245,35 +236,6 @@ export function initZnsSendWorker(processor) {
     });
     logger.info({ rateMax, concurrency, prefix: REDIS_PREFIX }, '[queue] ZNS send worker initialized');
 }
-const activeAiConversations = new Set();
-/**
- * Initialize the AI reply worker. Call once from app.ts after initWorkers.
- * Uses concurrency=5 with an in-memory active conversation Set so each conversation
- * is processed serially without blocking other conversations.
- */
-export function initAiReplyWorker(processor) {
-    aiReplyWorker = new Worker(QUEUE_NAMES.AI_REPLY, async (job) => {
-        const { convId } = job.data;
-        if (activeAiConversations.has(convId)) {
-            logger.info({ convId }, '[queue] Conversation already processing — skipping duplicate execution');
-            return;
-        }
-        activeAiConversations.add(convId);
-        try {
-            await processor(job);
-        }
-        finally {
-            activeAiConversations.delete(convId);
-        }
-    }, { connection, prefix: REDIS_PREFIX, concurrency: 5 });
-    aiReplyWorker.on('completed', (job) => {
-        logger.info({ jobId: job.id, convId: job.data.convId }, '[queue] AI reply job completed');
-    });
-    aiReplyWorker.on('failed', (job, err) => {
-        logger.error({ jobId: job?.id, convId: job?.data?.convId, err: err.message }, '[queue] AI reply job failed');
-    });
-    logger.info({ prefix: REDIS_PREFIX, concurrency: 5 }, '[queue] AI reply worker initialized');
-}
 /**
  * Initialize the KB embedding worker.
  * Concurrency=3: embedding is I/O-bound (HTTP to OpenAI) — parallelism is fine.
@@ -294,7 +256,6 @@ export async function shutdownQueue() {
     await triggerWorker?.close();
     await delayWorker?.close();
     await znsSendWorker?.close();
-    await aiReplyWorker?.close();
     await embeddingWorker?.close();
     await redisConnection.quit();
     logger.info('[queue] Queue shutdown complete');

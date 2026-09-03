@@ -50,6 +50,14 @@ export function buildGeneratorPrompt(ctx, decision, toolScopeNote) {
             lines.push(`Sentiment: ${c.aiSentimentLabel}`);
         parts.push(`\n## Customer Info\n${lines.join('\n')}`);
     }
+    // Staff notes from CRM
+    if (ctx.staffNotes && ctx.staffNotes.length > 0) {
+        const noteLines = ctx.staffNotes.map((n) => {
+            const tag = n.status ? `[${n.status}]: ` : '';
+            return `• ${tag}${n.content}`;
+        });
+        parts.push(`\n## Ghi chú nội bộ của nhân viên (lưu ý đặc biệt về khách)\n${noteLines.join('\n')}\nLƯU Ý: Đây là ghi chú nội bộ từ nhân viên chăm sóc trước đó. Hãy tôn trọng và làm theo các lưu ý này, KHÔNG được tiết lộ với khách rằng bạn đang đọc ghi chú nội bộ.`);
+    }
     // Router intents for focused reply
     if (decision.intents && decision.intents.length > 0) {
         parts.push(`\n## Detected Intents\n${decision.intents.join(', ')}`);

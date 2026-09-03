@@ -145,10 +145,7 @@ export type AiReplyConfig = {
     autoLearnEnabled: boolean;
     autoLearnIntervalDays: number;
 };
-/**
- * Get the auto-reply configuration for an org.
- * Creates a default AiConfig row if none exists.
- */
+export declare function invalidateAiReplyConfigCache(orgId?: string): void;
 export declare function getAiReplyConfig(orgId: string): Promise<AiReplyConfig>;
 /**
  * Resolve effective AI mode for a conversation.
@@ -164,6 +161,13 @@ export declare function resolveConversationMode(input: {
     autoReplyEnabled: boolean;
     defaultAiMode: string;
     convAiMode?: string | null;
+    /**
+     * Lý do đặt chế độ của hội thoại. CÓ lý do = nhân viên/handoff chọn rõ ràng;
+     * KHÔNG có = giá trị mặc định điền lúc tạo hội thoại. Cần phân biệt vì
+     * `aiMode` dùng chung một cột cho cả hai — trước đây "Thủ công" do nhân viên
+     * chọn bị lịch giờ ghi đè y như chưa chọn, AI tự bật lại lúc 18:00.
+     */
+    convAiModeReason?: string | null;
     schedule?: ScheduleConfig;
     currentTime?: Date;
 }): string;
@@ -206,5 +210,7 @@ export declare function getAiUsage(orgId: string, days?: number): Promise<{
     series: AiUsageSeriesPoint[];
     days: number;
 }>;
+/** Đầu ngày theo múi giờ cho trước, trả về mốc UTC tương ứng. */
+export declare function startOfDayInTimezone(timezone?: string, now?: Date): Date;
 export declare function ensureQuota(orgId: string, maxDaily: number): Promise<void>;
 export { getAvailableProviders };

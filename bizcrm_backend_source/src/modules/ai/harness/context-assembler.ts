@@ -19,7 +19,7 @@ import { retrieveKbSemantic } from '../../knowledge/embedding-service.js'
 import { retrieveProductSemantic } from '../../products/product-embedding.js'
 import { getThreadMemory } from '../../knowledge/memory-service.js'
 import { getToolsConfig, type ToolsConfig, type ToolConfig } from '../tools-config-service.js'
-import type { HarnessContext, ContactProfile, KbSnippet, ProductSnippet, MemoryFact, ScenarioSnippet } from './harness-types.js'
+import type { HarnessContext, ContactProfile, KbSnippet, ProductSnippet, MemoryFact, ScenarioSnippet, StaffNoteSnippet } from './harness-types.js'
 import { recordStep } from '../observability/trace-recorder.js'
 
 // ── Token / char budgets per layer ────────────────────────────────────────────
@@ -27,6 +27,7 @@ const BUDGET_L0_CHARS = 2_000   // logic docs total
 const BUDGET_L1_CHARS = 2_000   // KB RAG snippets total
 const BUDGET_L2_CHARS = 800     // contact profile
 const BUDGET_L3_CHARS = 800     // thread memory facts total
+const BUDGET_L3B_CHARS = 800    // staff notes total
 const BUDGET_L5_CHARS = 4_000   // recent messages
 const BUDGET_L6_CHARS = 1_000   // current turn
 
@@ -100,6 +101,42 @@ async function loadThreadMemory(orgId: string, contactId: string): Promise<Memor
     kept.push({ id: f.id, kind: f.kind, content: f.content })
   }
   return kept
+}
+
+// ── L3b: Staff notes (CRM internal notes) ────────────────────────────────────
+
+async function loadStaffNotes(orgId: string, convId: string, contactId?: string | null): Promise<StaffNoteSnippet[]> {
+  try {
+    const notes = await prisma.note.findMany({
+      where: {
+        orgId,
+        OR: [
+          { conversationId: convId },
+          ...(contactId ? [{ contactId }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { content: true, status: true, createdAt: true },
+    })
+
+    let total = 0
+    const kept: StaffNoteSnippet[] = []
+    for (const n of notes) {
+      const text = n.content.trim()
+      if (!text) continue
+      total += text.length
+      if (total > BUDGET_L3B_CHARS) break
+      kept.push({
+        content: text,
+        status: n.status,
+        createdAt: n.createdAt ? n.createdAt.toISOString() : null,
+      })
+    }
+    return kept
+  } catch {
+    return []
+  }
 }
 
 // ── L1: KB RAG (semantic with keyword fallback) ───────────────────────────────
@@ -188,9 +225,16 @@ async function loadProductSnippets(orgId: string, query: string, topK: number, t
 
 async function loadRecentMessages(
   convId: string,
+  before?: Date,
 ): Promise<Array<{ role: 'customer' | 'agent'; text: string }>> {
+  // `before` = mốc của tin đầu tiên trong lượt đang xử lý. Không lọc thì tin
+  // khách vừa gửi nằm cả trong "Conversation History" lẫn khối CUSTOMER —
+  // model thấy hai lần, dễ trả lời lại câu cũ.
   const rows = await prisma.message.findMany({
-    where: { conversationId: convId, isDeleted: false, contentType: 'text' },
+    where: {
+      conversationId: convId, isDeleted: false, contentType: 'text',
+      ...(before ? { sentAt: { lt: before } } : {}),
+    },
     orderBy: { sentAt: 'desc' },
     take: 12,
     select: { senderType: true, content: true },
@@ -220,7 +264,7 @@ export async function assembleContext(
   convId: string,
   turnText: string,
   aiReplyRunId?: string,
-  opts: { skipRag?: boolean; minScore?: number } = {},
+  opts: { skipRag?: boolean; minScore?: number; historyBefore?: Date } = {},
 ): Promise<HarnessContext> {
   // Resolve conversation meta + the per-function tool config (enable + guardrail).
   const [{ contactId, ragTopK }, tools] = await Promise.all([
@@ -231,14 +275,15 @@ export async function assembleContext(
   // In agent mode (skipRag) the generator fetches KB/products via tool calls,
   // so we don't pre-fetch them here (avoids double retrieval).
   // Parallelize all layer loads (each KB/product tool gated by its own config)
-  const [logic, scenarios, contact, threadMemory, kbSnippets, products, recentMessages] = await Promise.all([
+  const [logic, scenarios, contact, threadMemory, staffNotes, kbSnippets, products, recentMessages] = await Promise.all([
     getActiveLogicContext(orgId),                                                          // L0
     loadScenarios(orgId, turnText, ragTopK, opts.minScore),                                // L0b
     contactId ? loadContactProfile(contactId) : Promise.resolve(null),                    // L2
     contactId ? loadThreadMemory(orgId, contactId) : Promise.resolve([]),                 // L3
+    loadStaffNotes(orgId, convId, contactId),                                              // L3b
     opts.skipRag ? Promise.resolve([] as KbSnippet[]) : loadKbSnippets(orgId, turnText, ragTopK, tools, opts.minScore),          // L1
     opts.skipRag ? Promise.resolve([] as ProductSnippet[]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, opts.minScore), // L1b
-    loadRecentMessages(convId),                                                            // L5
+    loadRecentMessages(convId, opts.historyBefore),                                        // L5
   ])
 
   // Char-cap L0 docs individually so no single doc dominates
@@ -265,6 +310,7 @@ export async function assembleContext(
     products,
     contact,
     threadMemory,
+    staffNotes,
     recentMessages,
     turnText: truncate(turnText, BUDGET_L6_CHARS),
   }
@@ -290,6 +336,7 @@ export async function assembleContext(
         search_knowledge: { bat: tools.search_knowledge.enabled, gioi_han_danh_muc: tools.search_knowledge.guardrail.categoryIds },
       },
       ghi_nho_khach: threadMemory.map((f) => f.content),
+      ghi_chu_nhan_vien: staffNotes?.map((n) => n.content) ?? [],
       logic_ap_dung: {
         persona: cappedLogic.persona ?? null,
         playbook: cappedLogic.playbook ?? null,

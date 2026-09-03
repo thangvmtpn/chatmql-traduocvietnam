@@ -242,6 +242,7 @@ export async function handleIncomingMessage(
           autoReplyEnabled: aiReplyCfg.autoReplyEnabled,
           defaultAiMode: aiReplyCfg.defaultAiMode,
           convAiMode: conversation.aiMode ?? null,
+          convAiModeReason: conversation.aiModeReason ?? null,
           schedule: aiReplyCfg.schedule,
         })
 
@@ -609,7 +610,7 @@ async function findOrCreateConversation(
 
   const existing = await prisma.conversation.findFirst({
     where: { channelAccountId: msg.accountId, externalThreadId },
-    select: { id: true, displayName: true, aiMode: true, aiPausedUntil: true },
+    select: { id: true, displayName: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
   })
 
   if (existing) {
@@ -646,7 +647,7 @@ async function findOrCreateConversation(
       isReplied: msg.isSelf,
       aiMode: defaultAiMode,
     },
-    select: { id: true, aiMode: true, aiPausedUntil: true },
+    select: { id: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
   })
 }
 

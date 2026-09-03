@@ -15,6 +15,7 @@
  *   notification:new    — new in-app notification
  */
 import type { Server as HttpServer } from 'http'
+import { prisma } from '../../shared/prisma-client.js'
 import { Server, Socket } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import { logger } from '../../shared/logger.js'
@@ -83,6 +84,10 @@ export function initSocketGateway(httpServer: HttpServer): Server {
     // Join a conversation room
     socket.on('join:conv', (convId: string) => {
       socket.join(`conv:${convId}`)
+      // Gợi ý AI chỉ được bắn lúc sinh ra; ai mở hội thoại sau đó không thấy dù
+      // đã lưu. Khi vào phòng, gửi lại bản nháp mới nhất chưa dùng và chưa bị
+      // một câu trả lời của người/AI vượt qua.
+      replayPendingDraft(socket, convId).catch(() => {})
     })
 
     // Leave a conversation room
@@ -120,6 +125,22 @@ export function initSocketGateway(httpServer: HttpServer): Server {
 /* ── Event emitters (called from route handlers) ─────────── */
 
 /** Emit new message to all members of a conversation */
+/** Gửi lại cho MỘT socket bản nháp AI mới nhất còn hiệu lực của hội thoại. */
+async function replayPendingDraft(socket: { emit: (ev: string, payload: unknown) => void; data?: unknown }, convId: string): Promise<void> {
+  const draft = await prisma.aiSuggestion.findFirst({
+    where: { conversationId: convId, accepted: false },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, content: true, confidence: true, createdAt: true },
+  })
+  if (!draft) return
+  const lastReply = await prisma.message.findFirst({
+    where: { conversationId: convId, senderType: 'self', sentAt: { gt: draft.createdAt } },
+    select: { id: true },
+  })
+  if (lastReply) return // đã có người trả lời sau khi nháp sinh ra → nháp hết ý nghĩa
+  socket.emit('chat:ai-draft', { convId, suggestionId: draft.id, content: draft.content, confidence: draft.confidence })
+}
+
 export function emitNewMessage(orgId: string, convId: string, message: unknown) {
   getIO().to(`conv:${convId}`).emit('chat:message', message)
   // Also emit conversation list update to org room

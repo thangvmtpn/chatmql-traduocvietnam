@@ -179,6 +179,7 @@ export async function handleIncomingMessage(msg) {
                     autoReplyEnabled: aiReplyCfg.autoReplyEnabled,
                     defaultAiMode: aiReplyCfg.defaultAiMode,
                     convAiMode: conversation.aiMode ?? null,
+                    convAiModeReason: conversation.aiModeReason ?? null,
                     schedule: aiReplyCfg.schedule,
                 });
                 const isPaused = !!(conversation.aiPausedUntil)
@@ -498,7 +499,7 @@ async function findOrCreateConversation(msg, orgId, contactId, displayName) {
     const externalThreadId = msg.threadId;
     const existing = await prisma.conversation.findFirst({
         where: { channelAccountId: msg.accountId, externalThreadId },
-        select: { id: true, displayName: true, aiMode: true, aiPausedUntil: true },
+        select: { id: true, displayName: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
     });
     if (existing) {
         // Self-heal: update displayName if currently null/Unknown and we have a valid name
@@ -533,7 +534,7 @@ async function findOrCreateConversation(msg, orgId, contactId, displayName) {
             isReplied: msg.isSelf,
             aiMode: defaultAiMode,
         },
-        select: { id: true, aiMode: true, aiPausedUntil: true },
+        select: { id: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
     });
 }
 // ── Update conversation metadata after new message ────────────────────

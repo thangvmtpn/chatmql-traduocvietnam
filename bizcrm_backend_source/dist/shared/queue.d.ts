@@ -26,12 +26,10 @@ export declare const QUEUE_NAMES: {
     readonly AUTOMATION_TRIGGER: "automation-trigger";
     readonly AUTOMATION_DELAY: "automation-delay";
     readonly ZNS_SEND: "zns-send";
-    readonly AI_REPLY: "ai-reply";
     readonly EMBEDDING: "kb-embedding";
 };
 export declare const triggerQueue: Queue<any, any, string, any, any, string>;
 export declare const delayQueue: Queue<any, any, string, any, any, string>;
-export declare const aiReplyQueue: Queue<any, any, string, any, any, string>;
 export declare const embeddingQueue: Queue<any, any, string, any, any, string>;
 export declare const znsSendQueue: Queue<any, any, string, any, any, string>;
 export interface TriggerJobData {
@@ -56,9 +54,6 @@ export interface ZnsSendJobData {
     campaignId: string;
     recipientId: string;
 }
-export interface AiReplyJobData {
-    convId: string;
-}
 export interface EmbedJobData {
     orgId: string;
     entryId?: string;
@@ -69,11 +64,6 @@ export interface EmbedJobData {
 export declare function enqueueTrigger(data: TriggerJobData): Promise<string>;
 /** Enqueue a single ZNS recipient send. Used by campaign starter. */
 export declare function enqueueZnsSend(data: ZnsSendJobData): Promise<string>;
-/**
- * Enqueue an AI reply processing job for a conversation.
- * Uses reliable in-memory debouncing before triggering the AI reply orchestrator.
- * This guarantees 100% reliability with 0 Redis/BullMQ stalls.
- */
 export declare function enqueueAiReply(convId: string, delayMs?: number): Promise<string>;
 /**
  * Enqueue an embedding job for a KB entry.
@@ -97,12 +87,6 @@ export declare function initWorkers(processTrigger: (job: Job<TriggerJobData>) =
  * with ZNS_SEND_RATE — max jobs per second).
  */
 export declare function initZnsSendWorker(processor: (job: Job<ZnsSendJobData>) => Promise<void>): void;
-/**
- * Initialize the AI reply worker. Call once from app.ts after initWorkers.
- * Uses concurrency=5 with an in-memory active conversation Set so each conversation
- * is processed serially without blocking other conversations.
- */
-export declare function initAiReplyWorker(processor: (job: Job<AiReplyJobData>) => Promise<void>): void;
 /**
  * Initialize the KB embedding worker.
  * Concurrency=3: embedding is I/O-bound (HTTP to OpenAI) — parallelism is fine.
