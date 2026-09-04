@@ -166,6 +166,8 @@ export interface ConversationResources {
 export interface ConversationCounts {
   unread: number
   unreplied: number
+  /** Hội thoại đang để AI tự tư vấn (aiMode = auto). */
+  ai?: number
   total: number
 }
 
@@ -184,6 +186,8 @@ export interface ConversationsQueryParams {
   search?: string
   unread?: boolean
   unreplied?: boolean
+  /** Lọc theo chế độ AI của hội thoại — 'auto' = AI đang tự tư vấn. */
+  aiMode?: string
   pinned?: boolean
   accountId?: string
   tag?: string
@@ -200,6 +204,7 @@ export function useConversations(params: ConversationsQueryParams) {
   if (params.search) query.search = params.search
   if (params.unread) query.unread = 'true'
   if (params.unreplied) query.unreplied = 'true'
+  if (params.aiMode) query.aiMode = params.aiMode
   // Backend TDVN không có ghim / không đọc `?tag=` → không gửi tham số thừa.
   if (params.pinned && FEATURES.CHAT_PIN) query.pinned = 'true'
   if (params.accountId) query.accountId = params.accountId

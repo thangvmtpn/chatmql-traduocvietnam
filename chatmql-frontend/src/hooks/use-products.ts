@@ -94,6 +94,8 @@ export interface Product {
   currency: string
   specs: Record<string, unknown>
   images: string[]
+  /** Link video (YouTube / mp4) cho tài liệu bán hàng — backend `video_urls`. */
+  videoUrls: string[]
   status: string
   sortOrder: number
   source: string
@@ -128,6 +130,7 @@ export interface ProductInput {
   priceMax?: number | null
   currency?: string
   images?: string[]
+  videoUrls?: string[]
   status?: string
 }
 
@@ -167,6 +170,15 @@ export function useProducts(params: ProductQueryParams) {
   })
 }
 
+/** Một sản phẩm — dùng cho trang chi tiết Tài liệu bán hàng. Backend: GET /products/:id. */
+export function useProduct(id: string | undefined) {
+  return useQuery<Product>({
+    queryKey: ['product', id],
+    enabled: !!id,
+    queryFn: async () => (await api.get<Envelope<Product>>(`/products/${id}`)).data.data,
+  })
+}
+
 export function useCreateProduct() {
   const qc = useQueryClient()
   return useMutation({
@@ -185,7 +197,10 @@ export function useUpdateProduct() {
       const { data } = await api.patch<Envelope<Product>>(`/products/${vars.id}`, vars.data)
       return data.data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: (_r, vars) => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['product', vars.id] }) // trang chi tiết Tài liệu bán hàng
+    },
   })
 }
 

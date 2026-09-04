@@ -12,6 +12,7 @@ import {
   Settings,
   Database,
   BadgePercent,
+  FolderOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { Role } from '@/types/api'
@@ -47,6 +48,8 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'CDP', to: '/cdp', icon: Database, roles: ['owner', 'admin', 'manager'], permission: 'cdp.view' },
   { label: 'Phân tích', to: '/analytics', icon: BarChart3, roles: ['owner', 'admin', 'manager'], permission: 'analytics.view' },
   { label: 'Sản phẩm & Tri thức', to: '/knowledge-base', icon: Package, permission: 'products.view' },
+  // Thư mục tài liệu bán hàng (biểu giá → danh mục → sản phẩm → chi tiết ảnh/mô tả/video); admin quản trị.
+  { label: 'Tài liệu bán hàng', to: '/sales-docs', icon: FolderOpen, permission: 'products.view' },
   { label: 'Báo giá', to: '/quotes', icon: FileText, permission: 'quotes.view' },
   { label: 'Ưu đãi', to: '/promotions', icon: BadgePercent, roles: ['owner', 'admin', 'manager'], permission: 'promotions.view' },
   { label: 'AI', to: '/ai', icon: Sparkles, permission: 'ai.view' },

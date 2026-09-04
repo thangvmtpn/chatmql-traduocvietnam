@@ -164,13 +164,15 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const [unread, unreplied, total] = await Promise.all([
+    const [unread, unreplied, ai, total] = await Promise.all([
       prisma.conversation.count({ where: { ...baseWhere, unreadCount: { gt: 0 } } }),
       prisma.conversation.count({ where: { ...baseWhere, isReplied: false } }),
+      // "AI tư vấn": hội thoại đang để AI tự trả lời (aiMode = auto) — badge cho bộ lọc bên trái.
+      prisma.conversation.count({ where: { ...baseWhere, aiMode: 'auto' } }),
       prisma.conversation.count({ where: baseWhere }),
     ])
 
-    return { unread, unreplied, total }
+    return { unread, unreplied, ai, total }
   })
 
   // ── List conversations (paginated, filterable) ──────────────────────

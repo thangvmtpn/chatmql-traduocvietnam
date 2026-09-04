@@ -23,6 +23,7 @@ import { searchRoutes } from './modules/search/search-routes.js'
 import { initSocketGateway } from './modules/realtime/socket-gateway.js'
 import { profileRoutes } from './modules/auth/profile-routes.js'
 import { aiRoutes } from './modules/ai/ai-routes.js'
+import { assistantRoutes } from './modules/ai/assistant-routes.js'
 import { aiBotRoutes } from './modules/ai/ai-bot-routes.js'
 import { aiEvalRoutes } from './modules/ai/ai-eval-routes.js'
 import { masterRoutes } from './modules/ai/master-routes.js'
@@ -260,6 +261,7 @@ await app.register(notificationRoutes)
 await app.register(searchRoutes)
 await app.register(profileRoutes)
 await app.register(aiRoutes)
+await app.register(assistantRoutes)
 await app.register(aiBotRoutes)
 await app.register(aiEvalRoutes) // bộ câu hỏi vàng — kiểm định hồi quy cho AI
 await app.register(masterRoutes)

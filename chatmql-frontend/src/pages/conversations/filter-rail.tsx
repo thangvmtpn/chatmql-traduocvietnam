@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Inbox, Mail, MessageCircleWarning, Pin, Users, type LucideIcon } from 'lucide-react'
+import { Bot, Inbox, Mail, MessageCircleWarning, Pin, Users, type LucideIcon } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -21,7 +21,7 @@ import { cn, initials } from '@/lib/utils'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Bộ lọc nhanh của danh sách hội thoại. */
-export type ConvFilter = 'all' | 'unread' | 'unreplied' | 'pinned'
+export type ConvFilter = 'all' | 'unread' | 'unreplied' | 'ai' | 'pinned'
 
 export interface FilterRailProps {
   /** Bộ lọc đang được chọn. */
@@ -33,7 +33,7 @@ export interface FilterRailProps {
   /** Đổi tài khoản kênh; `undefined` nghĩa là "Tất cả tài khoản". */
   onAccountChange: (id?: string) => void
   /** Số đếm hiển thị trên badge. */
-  counts?: { unread: number; unreplied: number; total: number }
+  counts?: { unread: number; unreplied: number; ai?: number; total: number }
 }
 
 interface FilterItem {
@@ -46,6 +46,8 @@ const FILTER_ITEMS: FilterItem[] = [
   { value: 'all', label: 'Tất cả', icon: Inbox },
   { value: 'unread', label: 'Chưa đọc', icon: Mail },
   { value: 'unreplied', label: 'Chưa trả lời', icon: MessageCircleWarning },
+  // Hội thoại đang để AI tự tư vấn (aiMode = auto) — backend lọc qua `?aiMode=`.
+  { value: 'ai', label: 'AI tư vấn', icon: Bot },
   // Backend TDVN không có ghim → không có bộ lọc "Đã ghim".
   ...(FEATURES.CHAT_PIN ? [{ value: 'pinned' as const, label: 'Đã ghim', icon: Pin }] : []),
 ]
@@ -95,6 +97,7 @@ export function FilterRail({
     if (!counts) return 0
     if (value === 'unread') return counts.unread
     if (value === 'unreplied') return counts.unreplied
+    if (value === 'ai') return counts.ai ?? 0
     return 0
   }
 

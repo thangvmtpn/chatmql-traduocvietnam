@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Settings2, User } from 'lucide-react'
+import { Bot, ExternalLink, Settings2, User } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Loading } from '@/components/shared/feedback'
 import { cn } from '@/lib/utils'
+import { AiAssistantPanel } from './ai-assistant-panel'
 
 /** Một mini-app nhúng ở cột phải màn Hội thoại (webview/form). */
 export interface MiniApp {
@@ -32,6 +33,8 @@ interface Props {
 
 /** Id ảo của tab mặc định (hồ sơ khách hàng) — không trùng id app thật. */
 const CONTACT_TAB = '__contact__'
+/** Id ảo của tab "AI Trợ lý" nội bộ — cũng không trùng id app thật. */
+const ASSISTANT_TAB = '__assistant__'
 
 /** Ảnh icon của app, tự fallback sang chữ cái đầu khi ảnh lỗi/không có. */
 function AppIcon({ app }: { app: MiniApp }) {
@@ -67,7 +70,7 @@ export function AppRail({ apps, onOpenConnections, onOpenAppSettings, children }
 
   // App bị gỡ/tắt khi đang mở → quay lại tab hồ sơ khách hàng.
   useEffect(() => {
-    if (activeId !== CONTACT_TAB && !apps.some((a) => a.id === activeId)) {
+    if (activeId !== CONTACT_TAB && activeId !== ASSISTANT_TAB && !apps.some((a) => a.id === activeId)) {
       setActiveId(CONTACT_TAB)
     }
   }, [apps, activeId])
@@ -107,8 +110,12 @@ export function AppRail({ apps, onOpenConnections, onOpenAppSettings, children }
             )}
           </>
         ) : (
-          <div className="h-full">{children}</div>
+          <div className={cn('h-full', activeId === ASSISTANT_TAB && 'hidden')}>{children}</div>
         )}
+        {/* Luôn mount để giữ lịch sử hỏi đáp khi đổi tab qua lại; chỉ ẩn/hiện. */}
+        <div className={cn('h-full', activeId !== ASSISTANT_TAB && 'hidden')}>
+          <AiAssistantPanel active={activeId === ASSISTANT_TAB} />
+        </div>
       </div>
       {/* Hàng icon (đáy cột) — cuộn ngang khi nhiều app */}
       <div className="flex shrink-0 items-center gap-2 border-t bg-background px-3 py-2.5">
@@ -129,6 +136,23 @@ export function AppRail({ apps, onOpenConnections, onOpenAppSettings, children }
             )}
           >
             <User className="h-[18px] w-[18px]" />
+          </button>
+
+          {/* Tab "AI Trợ lý" — phẳng như tab hồ sơ khách, đặt ngay cạnh nó. */}
+          <button
+            type="button"
+            title="AI Trợ lý — hỏi đáp, tra cứu thông tin nội bộ"
+            aria-label="AI Trợ lý"
+            onClick={() => selectApp(ASSISTANT_TAB)}
+            className={cn(
+              railBtn,
+              'bg-muted/60 text-muted-foreground',
+              activeId === ASSISTANT_TAB
+                ? 'bg-primary/15 text-primary ring-1 ring-primary'
+                : 'opacity-70 hover:opacity-100',
+            )}
+          >
+            <Bot className="h-[18px] w-[18px]" />
           </button>
 
           {apps.map((app) => (

@@ -114,11 +114,11 @@ api.interceptors.response.use(
 
 /** Trích thông điệp lỗi thân thiện từ response backend. */
 export function apiError(err: unknown): string {
-  const e = err as AxiosError<{ error?: string; message?: string }>
-  return (
-    e?.response?.data?.error ||
-    e?.response?.data?.message ||
-    e?.message ||
-    'Đã có lỗi xảy ra'
-  )
+  // Backend có 2 kiểu lỗi: `{ error: 'chuỗi' }` (đa số) và envelope
+  // `{ success:false, error: { code, message } }` (nhóm products/knowledge).
+  // Trả về object sẽ làm React sập ("Objects are not valid as a React child").
+  const e = err as AxiosError<{ error?: string | { code?: string; message?: string }; message?: string }>
+  const raw = e?.response?.data?.error
+  const fromError = typeof raw === 'string' ? raw : raw?.message
+  return fromError || e?.response?.data?.message || e?.message || 'Đã có lỗi xảy ra'
 }

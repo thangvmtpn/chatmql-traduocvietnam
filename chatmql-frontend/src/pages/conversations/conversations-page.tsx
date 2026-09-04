@@ -101,6 +101,8 @@ export function ConversationsPage() {
     tag,
     unread: filter === 'unread',
     unreplied: filter === 'unreplied',
+    // "AI tư vấn" = hội thoại đang để AI tự trả lời.
+    aiMode: filter === 'ai' ? 'auto' : undefined,
     pinned: filter === 'pinned',
   })
   const { data: counts } = useConversationCounts()

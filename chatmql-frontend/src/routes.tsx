@@ -33,6 +33,8 @@ import { AutomationPage } from '@/pages/automation/automation-page'
 import { AutomationFlowPage } from '@/pages/automation/automation-flow-page'
 // Sản phẩm & Tri thức
 import { ProductsPage } from '@/pages/knowledge/products-page'
+// Tài liệu bán hàng (thư mục: biểu giá → danh mục → sản phẩm → chi tiết)
+import { SalesDocsPage } from '@/pages/sales-docs/sales-docs-page'
 // ZNS
 import { ZnsCampaignsPage } from '@/pages/zns/zns-campaigns-page'
 import { ZnsCampaignDetailPage } from '@/pages/zns/zns-campaign-detail-page'
@@ -98,6 +100,10 @@ export const router = createBrowserRouter([
       { path: 'analytics/saved-reports', element: <ProtectedRoute permission={'analytics.view'} roles={['owner', 'admin', 'manager']}><SavedReportsPage /></ProtectedRoute> },
 
       { path: 'knowledge-base', element: <ProtectedRoute permission={'products.view'}><ProductsPage /></ProtectedRoute> },
+
+      { path: 'sales-docs', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
+      { path: 'sales-docs/c/:catId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
+      { path: 'sales-docs/p/:productId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
 
       { path: 'quotes', element: <ProtectedRoute permission={'quotes.view'}><QuotesPage /></ProtectedRoute> },
       { path: 'promotions', element: <ProtectedRoute permission={'promotions.view'} roles={['owner', 'admin', 'manager']}><PromotionsAdminPage /></ProtectedRoute> },

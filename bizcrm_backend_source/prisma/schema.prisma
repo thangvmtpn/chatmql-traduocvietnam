@@ -1882,6 +1882,7 @@ model Product {
   currency         String                       @default("VND")
   specs            Json                         @default("{}") // thuộc tính linh hoạt, chuẩn theo category.specSchema
   images           String[]                     @default([])
+  videoUrls        String[]                     @default([]) @map("video_urls") // link video (YouTube/mp4) cho tài liệu bán hàng
   status           String                       @default("active") // draft | active | archived
   sortOrder        Int                          @default(0) @map("sort_order")
   source           String                       @default("manual") // manual | import | sync | ai_master
