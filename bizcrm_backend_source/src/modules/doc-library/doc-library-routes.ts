@@ -4,8 +4,7 @@
  */
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import path from 'node:path'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
+import { writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import multipart from '@fastify/multipart'
 import { authMiddleware } from '../auth/auth-middleware.js'
@@ -14,15 +13,15 @@ import { logger } from '../../shared/logger.js'
 import { sendImageCore } from '../chat/send-image-core.js'
 import { emitNewMessage } from '../realtime/socket-gateway.js'
 import { transformMessageForFrontend } from '../chat/chat-routes.js'
+import { searchCrmProducts } from '../crm-products/crm-products-client.js'
+import { DOC_ASSETS_DIR } from './doc-assets-store.js'
 import {
   ASSET_KINDS, VISIBILITIES,
   listFolders, createFolder, updateFolder, deleteFolder,
   listAssets, createAsset, updateAsset, deleteAsset,
 } from './doc-library-service.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-export const DOC_ASSETS_DIR = path.resolve(__dirname, '../../../uploads/doc-assets')
-mkdir(DOC_ASSETS_DIR, { recursive: true }).catch(() => {})
+export { DOC_ASSETS_DIR } from './doc-assets-store.js'
 
 /** 25MB: đủ cho ảnh chất lượng cao và pdf tài liệu; video nên dán link thay vì tải lên. */
 const MAX_FILE_SIZE = 25 * 1024 * 1024
@@ -51,6 +50,51 @@ function guard(request: { user: unknown }, reply: FastifyReply): AuthUser | null
     return null
   }
   return u
+}
+
+
+/** Tối đa 5 ảnh mỗi sản phẩm — gửi nhiều hơn là dội chuông khách. */
+const MAX_IMAGES_PER_PRODUCT = 5
+
+/**
+ * Soạn tin giới thiệu sản phẩm để gửi khách.
+ *
+ * Zalo cá nhân KHÔNG hiểu markdown nên không dùng ** hay #; dùng emoji và
+ * xuống dòng cho dễ đọc trên điện thoại. Giá lấy trực tiếp từ hệ thống nguồn
+ * tại thời điểm gửi — không lưu bản sao nên không bao giờ báo giá cũ. Hệ thống
+ * nguồn lỗi thì bỏ phần giá, phần còn lại vẫn gửi được.
+ */
+async function buildProductMessage(a: {
+  title: string
+  description: string | null
+  textContent: string | null
+  productCodes: string[]
+  videoUrls: string[]
+}): Promise<string> {
+  const lines: string[] = [`🍵 ${a.title}`]
+
+  for (const code of a.productCodes.slice(0, 3)) {
+    try {
+      const { products } = await searchCrmProducts(code, 10)
+      const p = products.find((x) => x.code?.toUpperCase() === code.toUpperCase())
+      if (!p) continue
+      const price = p.price != null
+        ? `${new Intl.NumberFormat('vi-VN').format(p.price)}đ${p.unit ? `/${p.unit}` : ''}`
+        : 'liên hệ'
+      lines.push(`💰 Giá: ${price}`)
+      if (p.inventory != null && p.inventory <= 0) lines.push('⚠️ Hiện tạm hết hàng')
+    } catch {
+      // Hệ thống nguồn không phản hồi — bỏ giá, vẫn gửi phần giới thiệu.
+    }
+  }
+
+  const body = [a.description, a.textContent].filter(Boolean).join('\n\n')
+  if (body) lines.push('', body)
+  if (a.videoUrls.length) {
+    lines.push('', '🎬 Video sản phẩm:')
+    for (const v of a.videoUrls.slice(0, 3)) lines.push(v)
+  }
+  return lines.join('\n')
 }
 
 export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
@@ -212,8 +256,44 @@ export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
             continue
           }
 
-          // Ảnh: ảnh đại diện của bộ ảnh, hoặc tệp ảnh đơn.
-          const image = a.images[0] ?? (a.kind === 'image' ? a.fileUrl : null)
+          // ── Loại `product`: gửi TRỌN BỘ như một bài giới thiệu ──
+          // Thứ tự: một tin chữ tóm tắt (tên · giá · mô tả · link video) rồi tới
+          // ảnh. Khách đọc biết là gì trước, xem ảnh sau. Cắt tối đa 5 ảnh để
+          // không dội chuông khách hàng chục lần.
+          if (a.kind === 'product') {
+            const text = await buildProductMessage(a)
+            const msg = await prisma.message.create({
+              data: {
+                conversationId: conv.id,
+                senderType: 'user',
+                repliedByUserId: user.id,
+                contentType: 'text',
+                content: text,
+                sentAt: new Date(),
+              },
+            })
+            emitNewMessage(user.orgId, conv.id, transformMessageForFrontend(msg))
+
+            let imgOk = 0
+            for (const img of a.images.slice(0, MAX_IMAGES_PER_PRODUCT)) {
+              const r = await sendImageCore({
+                orgId: user.orgId,
+                conversationId: conv.id,
+                imageUrl: img,
+                sender: 'staff',
+                repliedByUserId: user.id,
+              })
+              if (r.sent) imgOk++
+            }
+            if (a.images.length && imgOk === 0) {
+              skipped.push({ id, reason: 'Đã gửi phần chữ nhưng không gửi được ảnh' })
+            }
+            sentIds.push(id)
+            continue
+          }
+
+          // Ảnh đơn: gửi ảnh kèm chú thích là tiêu đề.
+          const image = a.kind === 'image' ? (a.fileUrl ?? a.images[0]) : null
           if (image) {
             const r = await sendImageCore({
               orgId: user.orgId,
@@ -231,7 +311,7 @@ export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
           // Còn lại gửi dạng chữ: tiêu đề + mô tả/nội dung + link (nếu có).
           const link = a.sourceUrl || a.videoUrls[0] || a.fileUrl
           const body = [a.description, a.textContent].filter(Boolean).join('\n\n')
-          const text = [`**${a.title}**`, body, link].filter(Boolean).join('\n\n')
+          const text = [a.title, body, link].filter(Boolean).join('\n\n')
 
           const msg = await prisma.message.create({
             data: {

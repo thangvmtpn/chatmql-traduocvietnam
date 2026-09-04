@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   ExternalLink, FileText, Film, Folder, Image as ImageIcon, Link2, Lock, Package,
-  Search, Send, Settings2, Type,
+  Maximize2, Search, Send, Settings2, Type,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -24,6 +24,7 @@ import { Checkbox, ScrollArea } from '@/components/ui/misc'
 import { ErrorState, Loading } from '@/components/shared/feedback'
 import { apiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { DocAssetDetailDialog } from '@/pages/sales-docs/doc-asset-detail-dialog'
 import {
   KIND_LABELS, assetUrl, useDocAssets, useDocFolders, useSendDocAssets,
   type AssetKind, type DocAsset, type DocFolder,
@@ -110,13 +111,13 @@ export function SalesDocsDialog({ convId, open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[74vh] max-h-[74vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        <DialogHeader className="border-b px-5 py-3">
+        <DialogHeader className="border-b px-5 py-3 pr-14">
           <div className="flex items-start justify-between gap-3">
             <div>
               <DialogTitle className="text-base">Tài liệu bán hàng</DialogTitle>
               <DialogDescription className="flex items-center gap-1.5">
                 <Lock className="h-3 w-3 shrink-0" />
-                Chỉ xem và gửi — muốn sửa thì bấm Quản lý.
+                Chọn để gửi trọn bộ · mở chi tiết để lấy từng phần · sửa thì bấm Quản lý.
               </DialogDescription>
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5">
@@ -215,49 +216,76 @@ export function SalesDocsDialog({ convId, open, onOpenChange }: Props) {
   )
 }
 
-/** Một tài nguyên chọn được. Bấm cả thẻ để tick, không cần nhắm đúng ô vuông. */
+/**
+ * Một tài nguyên chọn được.
+ *
+ * Bấm cả thẻ để tick — tick rồi bấm "Gửi vào chat" là gửi TRỌN BỘ (với sản phẩm
+ * là tin giới thiệu kèm ảnh). Muốn lấy lẻ từng ảnh/mô tả/link thì bấm nút mở
+ * chi tiết ở góc.
+ */
 function AssetPick({
   a, checked, onToggle,
 }: { a: DocAsset; checked: boolean; onToggle: (on: boolean) => void }) {
+  const [detailOpen, setDetailOpen] = useState(false)
   const Icon = KIND_ICON[a.kind] ?? FileText
   const src = a.kind === 'product'
     ? assetUrl(a.images?.[0])
     : a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
+  // Chi tiết chỉ có ích khi tài nguyên gồm nhiều phần để lấy lẻ.
+  const hasParts = a.kind === 'product'
+    || (a.images?.length ?? 0) > 1 || (a.videoUrls?.length ?? 0) > 0 || !!a.textContent
 
   return (
-    <label
-      title={a.description || a.title}
-      className={cn(
-        'relative flex cursor-pointer flex-col overflow-hidden rounded-lg border-2 bg-card transition-shadow',
-        checked ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-border',
-      )}
-    >
-      <div className="relative aspect-square bg-muted">
-        {src ? (
-          <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
-            <Icon className="h-6 w-6" />
-            <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
-          </div>
+    <>
+      <label
+        title={a.description || a.title}
+        className={cn(
+          'group relative flex cursor-pointer flex-col overflow-hidden rounded-lg border-2 bg-card transition-shadow',
+          checked ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-border',
         )}
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(v) => onToggle(v === true)}
-          className="absolute left-1.5 top-1.5 z-10 bg-background"
-        />
-      </div>
-      <div className="min-w-0 space-y-0.5 p-2">
-        <p className="line-clamp-2 text-[11px] font-medium leading-snug">{a.title}</p>
-        <div className="flex flex-wrap items-center gap-1">
-          {a.productCodes.slice(0, 2).map((c) => (
-            <span key={c} className="rounded bg-primary/10 px-1 font-mono text-[9px] text-primary">{c}</span>
-          ))}
-          {(a.images?.length ?? 0) > 1 && (
-            <span className="text-[9px] text-muted-foreground">{a.images.length} ảnh</span>
+      >
+        <div className="relative aspect-square bg-muted">
+          {src ? (
+            <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <Icon className="h-6 w-6" />
+              <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
+            </div>
+          )}
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(v) => onToggle(v === true)}
+            className="absolute left-1.5 top-1.5 z-10 bg-background"
+          />
+          {hasParts && (
+            <button
+              type="button"
+              title="Mở chi tiết để lấy từng phần"
+              aria-label={`Chi tiết ${a.title}`}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDetailOpen(true) }}
+              className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 opacity-0 shadow transition-opacity hover:text-primary group-hover:opacity-100"
+            >
+              <Maximize2 className="h-3 w-3" />
+            </button>
           )}
         </div>
-      </div>
-    </label>
+        <div className="min-w-0 space-y-0.5 p-2">
+          <p className="line-clamp-2 text-[11px] font-medium leading-snug">{a.title}</p>
+          <div className="flex flex-wrap items-center gap-1">
+            {a.productCodes.slice(0, 2).map((c) => (
+              <span key={c} className="rounded bg-primary/10 px-1 font-mono text-[9px] text-primary">{c}</span>
+            ))}
+            {(a.images?.length ?? 0) > 1 && (
+              <span className="text-[9px] text-muted-foreground">{a.images.length} ảnh</span>
+            )}
+            {(a.videoUrls?.length ?? 0) > 0 && (
+              <span className="text-[9px] text-muted-foreground">{a.videoUrls.length} video</span>
+            )}
+          </div>
+        </div>
+      </label>
+      <DocAssetDetailDialog asset={a} open={detailOpen} onOpenChange={setDetailOpen} />
+    </>
   )
 }
