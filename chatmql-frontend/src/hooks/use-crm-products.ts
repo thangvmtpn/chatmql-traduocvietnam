@@ -5,18 +5,45 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 
+/**
+ * Cấu trúc dữ liệu sản phẩm CHUẨN (khớp `CrmProduct` ở backend).
+ * `code` là khoá nghiệp vụ — tài liệu bán hàng gắn vào sản phẩm theo mã này.
+ */
 export interface CrmProduct {
   id: string | number | null
   code: string | null
   name: string
   price: number | null
-  inventory: number | null
+  priceMax: number | null
+  currency: string
   unit: string | null
+  vatNote: string | null
+  inventory: number | null
   weight: number | null
   warehouseId: number | null
   warehouseName: string | null
+  categoryId: string | number | null
+  categoryName: string | null
+  brand: string | null
+  status: string | null
   /** Bản ghi gốc CRM — dùng khi cần cột chưa được chuẩn hoá. */
   raw: Record<string, unknown>
+}
+
+export interface CrmProductListParams {
+  q?: string
+  warehouseId?: number
+  category?: string
+  inStock?: boolean
+  page?: number
+  pageSize?: number
+}
+
+export interface CrmProductListResult {
+  source: CrmProductSource
+  products: CrmProduct[]
+  categories: string[]
+  meta: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
 export type CrmProductSource = 'bridge' | 'dashboard'
@@ -31,6 +58,26 @@ export function useCrmProductSource() {
     queryKey: ['crm-products', 'source'],
     queryFn: async () => (await api.get('/crm-products/source')).data,
     staleTime: 5 * 60_000,
+  })
+}
+
+/** Danh sách sản phẩm để duyệt — không cần gõ từ khoá. */
+export function useCrmProductList(params: CrmProductListParams) {
+  const query: Record<string, unknown> = {
+    page: params.page ?? 1,
+    pageSize: params.pageSize ?? 50,
+  }
+  if (params.q?.trim()) query.q = params.q.trim()
+  if (params.warehouseId != null) query.warehouseId = params.warehouseId
+  if (params.category) query.category = params.category
+  if (params.inStock) query.inStock = 'true'
+
+  return useQuery<CrmProductListResult>({
+    queryKey: ['crm-products', 'list', query],
+    // Giá và tồn kho đổi liên tục bên hệ thống nguồn — cache ngắn.
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    queryFn: async () => (await api.get('/crm-products', { params: query })).data,
   })
 }
 

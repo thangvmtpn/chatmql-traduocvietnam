@@ -28,18 +28,44 @@ export function resolveSource(): CrmProductSource {
   return 'bridge'
 }
 
-/** Hình dạng chung trả về cho frontend — độc lập với nguồn. */
+/**
+ * CẤU TRÚC DỮ LIỆU SẢN PHẨM CHUẨN của ChatMQL.
+ *
+ * Đây là hợp đồng dữ liệu duy nhất mà toàn bộ giao diện và AI dựa vào. Nguồn
+ * gốc (CRM hôm nay, hệ thống TDVN sau này) chỉ cần map về đúng hình dạng này
+ * trong `normalizeProduct` là mọi nơi chạy được, không phải sửa gì thêm.
+ *
+ * `code` là KHOÁ NGHIỆP VỤ: tài liệu bán hàng (ảnh/mô tả/video do ChatMQL sở
+ * hữu) gắn vào sản phẩm theo mã này, nên đổi nguồn dữ liệu vẫn giữ nguyên tri
+ * thức đã soạn.
+ */
 export interface CrmProduct {
+  // ── Định danh ──
+  /** Id bên hệ thống nguồn. Chỉ để đối chiếu, không dùng làm khoá liên kết. */
   id: string | number | null
+  /** Mã sản phẩm (SKU). KHOÁ chính để gắn tài liệu bán hàng và lên đơn. */
   code: string | null
   name: string
+  // ── Bán hàng ──
   price: number | null
-  inventory: number | null
+  /** Cận trên khi sản phẩm bán theo khoảng giá. */
+  priceMax: number | null
+  currency: string
   unit: string | null
+  /** Ghi chú thuế của hệ thống nguồn, ví dụ "Đã có VAT 8%". */
+  vatNote: string | null
+  // ── Kho ──
+  inventory: number | null
   weight: number | null
   warehouseId: number | null
   warehouseName: string | null
-  /** Bản ghi gốc của CRM — giữ lại để hiện thêm cột mà không phải sửa backend. */
+  // ── Phân loại ──
+  categoryId: string | number | null
+  categoryName: string | null
+  brand: string | null
+  /** active | inactive | ngừng bán… theo hệ thống nguồn. */
+  status: string | null
+  /** Bản ghi gốc — giữ lại để hiện thêm cột mà không phải sửa backend. */
   raw: Record<string, unknown>
 }
 
@@ -74,11 +100,18 @@ export function normalizeProduct(row: Record<string, unknown>): CrmProduct {
     code: str(pick(row, ['code', 'code_product', 'sku', 'ma_sp', 'product_code'])),
     name: str(pick(row, ['name', 'product_name', 'ten_sp', 'title'])) ?? '(không tên)',
     price: num(pick(row, ['price', 'gia_ban', 'sale_price', 'unit_price', 'price_sale'])),
-    inventory: num(pick(row, ['inventory', 'ton_kho', 'stock', 'quantity', 'so_luong'])),
+    priceMax: num(pick(row, ['price_max', 'gia_max', 'max_price'])),
+    currency: str(pick(row, ['currency', 'don_vi_tien'])) ?? 'VND',
     unit: str(pick(row, ['unit', 'don_vi', 'unit_name', 'dvt'])),
+    vatNote: str(pick(row, ['vat_note', 'ghi_chu_vat', 'vat'])),
+    inventory: num(pick(row, ['inventory', 'ton_kho', 'stock', 'quantity', 'so_luong'])),
     weight: num(pick(row, ['weight', 'khoi_luong', 'trong_luong'])),
     warehouseId: num(pick(row, ['warehouse_id', 'id_kho', 'kho_id'])),
     warehouseName: str(pick(row, ['warehouse_name', 'ten_kho', 'kho'])),
+    categoryId: (pick(row, ['category_id', 'id_danh_muc', 'nhom_id', 'group_id']) as string | number) ?? null,
+    categoryName: str(pick(row, ['category_name', 'category', 'danh_muc', 'nhom_sp', 'ten_nhom'])),
+    brand: str(pick(row, ['brand', 'thuong_hieu', 'brand_name'])),
+    status: str(pick(row, ['status', 'trang_thai', 'active'])),
     raw: row,
   }
 }
@@ -135,9 +168,9 @@ async function searchViaDashboard(q: string, limit: number): Promise<CrmProduct[
   }
 }
 
-async function searchViaBridge(q: string, limit: number): Promise<CrmProduct[]> {
+async function searchViaBridge(q: string, limit: number, warehouseId?: number): Promise<CrmProduct[]> {
   // Bridge trả cả danh mục theo kho; lọc theo từ khoá ngay tại backend.
-  const { products } = await fetchProductCatalog({ q: q || undefined })
+  const { products } = await fetchProductCatalog({ q: q || undefined, warehouseId })
   const needle = q.trim().toLowerCase()
   const rows = (products as unknown as Record<string, unknown>[])
     .filter((p) => {
@@ -160,4 +193,59 @@ export async function searchCrmProducts(
     ? await searchViaDashboard(q, safeLimit)
     : await searchViaBridge(q, safeLimit)
   return { source, products }
+}
+
+export interface ListParams {
+  q?: string
+  warehouseId?: number
+  category?: string
+  /** Chỉ lấy hàng còn tồn — nhân viên thường chỉ quan tâm hàng bán được. */
+  inStockOnly?: boolean
+  page?: number
+  pageSize?: number
+}
+
+export interface ListResult {
+  source: CrmProductSource
+  products: CrmProduct[]
+  /** Danh mục có trong tập kết quả — để dựng bộ lọc mà không cần API riêng. */
+  categories: string[]
+  meta: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+/**
+ * Danh sách sản phẩm để DUYỆT (không bắt buộc gõ từ khoá).
+ *
+ * Hệ thống nguồn hiện chưa có API phân trang, nên lấy trọn danh mục rồi lọc và
+ * cắt trang tại backend. Khi TDVN cấp API chính thức có `page`/`total`, chỉ cần
+ * thay phần thân hàm này, hình dạng trả về giữ nguyên.
+ */
+export async function listCrmProducts(params: ListParams = {}): Promise<ListResult> {
+  const source = resolveSource()
+  const page = Math.max(1, params.page ?? 1)
+  const pageSize = Math.min(200, Math.max(1, params.pageSize ?? 50))
+
+  const all = source === 'dashboard'
+    ? await searchViaDashboard(params.q ?? '', 200)
+    : await searchViaBridge('', 1000, params.warehouseId)
+
+  const needle = (params.q ?? '').trim().toLowerCase()
+  let rows = all.filter((p) => {
+    if (needle && !`${p.name} ${p.code ?? ''}`.toLowerCase().includes(needle)) return false
+    if (params.warehouseId != null && p.warehouseId != null && p.warehouseId !== params.warehouseId) return false
+    if (params.category && (p.categoryName ?? '') !== params.category) return false
+    if (params.inStockOnly && !(p.inventory != null && p.inventory > 0)) return false
+    return true
+  })
+
+  const categories = [...new Set(all.map((p) => p.categoryName).filter((c): c is string => !!c))].sort()
+  const total = rows.length
+  rows = rows.slice((page - 1) * pageSize, page * pageSize)
+
+  return {
+    source,
+    products: rows,
+    categories,
+    meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+  }
 }
