@@ -21,22 +21,11 @@ import { getThreadMemory } from '../../knowledge/memory-service.js'
 import { getToolsConfig, type ToolsConfig, type ToolConfig } from '../tools-config-service.js'
 import type { HarnessContext, ContactProfile, KbSnippet, ProductSnippet, MemoryFact, ScenarioSnippet } from './harness-types.js'
 import { recordStep } from '../observability/trace-recorder.js'
-
-// ── Token / char budgets per layer ────────────────────────────────────────────
-const BUDGET_L0_CHARS = 2_000   // logic docs total
-const BUDGET_L1_CHARS = 2_000   // KB RAG snippets total
-const BUDGET_L2_CHARS = 800     // contact profile
-const BUDGET_L3_CHARS = 800     // thread memory facts total
-const BUDGET_L5_CHARS = 4_000   // recent messages
-const BUDGET_L6_CHARS = 1_000   // current turn
+// Ngân sách ký tự theo model (base/large) — xem budgets.ts vì sao có 2 bậc.
+import { getContextBudgets, truncate, type ContextBudgets } from './budgets.js'
 
 // Default KB retrieval topK (overridden by AiConfig.ragTopK when available)
 const DEFAULT_RAG_TOP_K = 5
-
-function truncate(s: string, maxChars: number): string {
-  if (s.length <= maxChars) return s
-  return s.slice(0, maxChars) + '…'
-}
 
 // ── Resolve conversation meta (contactId, ragTopK) ────────────────────────────
 
@@ -88,7 +77,7 @@ async function loadContactProfile(contactId: string): Promise<ContactProfile | n
 
 // ── L3: Thread memory ─────────────────────────────────────────────────────────
 
-async function loadThreadMemory(orgId: string, contactId: string): Promise<MemoryFact[]> {
+async function loadThreadMemory(orgId: string, contactId: string, maxChars: number): Promise<MemoryFact[]> {
   const facts = await getThreadMemory(orgId, contactId)
 
   // Cap total chars across all facts
@@ -96,7 +85,7 @@ async function loadThreadMemory(orgId: string, contactId: string): Promise<Memor
   const kept: MemoryFact[] = []
   for (const f of facts) {
     total += f.content.length
-    if (total > BUDGET_L3_CHARS) break
+    if (total > maxChars) break
     kept.push({ id: f.id, kind: f.kind, content: f.content })
   }
   return kept
@@ -109,6 +98,7 @@ async function loadKbSnippets(
   query: string,
   topK: number,
   tools: ToolsConfig,
+  maxChars: number,
   minScore?: number,
 ): Promise<KbSnippet[]> {
   // One knowledge tool (search_knowledge) searches ALL KB formats (FAQ + articles).
@@ -130,7 +120,7 @@ async function loadKbSnippets(
   const kept: KbSnippet[] = []
   for (const s of merged) {
     total += s.title.length + s.content.length + 5
-    if (total > BUDGET_L1_CHARS) break
+    if (total > maxChars) break
     kept.push(s)
   }
   return kept
@@ -138,14 +128,12 @@ async function loadKbSnippets(
 
 // ── L0b: Scenarios (modular logic skills) ─────────────────────────────────────
 
-const BUDGET_L0B_CHARS = 2_500
-
 /**
  * Always-on scenarios + the auto scenarios semantically relevant to this turn,
  * merged (dedupe by id) and char-capped. Loaded in BOTH pipeline and agent mode
  * — scenarios are logic, not data RAG, so they apply regardless of skipRag.
  */
-async function loadScenarios(orgId: string, turnText: string, topK: number, minScore?: number): Promise<ScenarioSnippet[]> {
+async function loadScenarios(orgId: string, turnText: string, topK: number, maxChars: number, minScore?: number): Promise<ScenarioSnippet[]> {
   const [always, relevant] = await Promise.all([
     getAlwaysScenarios(orgId),
     retrieveRelevantScenarios(orgId, turnText, topK, minScore),
@@ -157,7 +145,7 @@ async function loadScenarios(orgId: string, turnText: string, topK: number, minS
     if (seen.has(s.id)) continue
     seen.add(s.id)
     total += s.name.length + s.content.length + 5
-    if (total > BUDGET_L0B_CHARS) break
+    if (total > maxChars) break
     kept.push(s)
   }
   return kept
@@ -165,9 +153,7 @@ async function loadScenarios(orgId: string, turnText: string, topK: number, minS
 
 // ── L1b: Product RAG (semantic) ───────────────────────────────────────────────
 
-const BUDGET_PRODUCTS_CHARS = 1_500
-
-async function loadProductSnippets(orgId: string, query: string, topK: number, tool: ToolConfig, minScore?: number): Promise<ProductSnippet[]> {
+async function loadProductSnippets(orgId: string, query: string, topK: number, tool: ToolConfig, maxChars: number, minScore?: number): Promise<ProductSnippet[]> {
   if (!tool.enabled) return []
   const rows = await retrieveProductSemantic(orgId, query, topK, { categoryIds: tool.guardrail.categoryIds, minScore })
   let total = 0
@@ -175,7 +161,7 @@ async function loadProductSnippets(orgId: string, query: string, topK: number, t
   for (const r of rows) {
     const size = r.name.length + (r.description?.length ?? 0) + 20
     total += size
-    if (total > BUDGET_PRODUCTS_CHARS) break
+    if (total > maxChars) break
     kept.push({
       id: r.id, name: r.name, price: r.price, priceMax: r.priceMax, priceType: r.priceType,
       currency: r.currency, description: r.description, score: r.score ?? null,
@@ -188,6 +174,7 @@ async function loadProductSnippets(orgId: string, query: string, topK: number, t
 
 async function loadRecentMessages(
   convId: string,
+  maxChars: number,
 ): Promise<Array<{ role: 'customer' | 'agent'; text: string }>> {
   const rows = await prisma.message.findMany({
     where: { conversationId: convId, isDeleted: false, contentType: 'text' },
@@ -207,7 +194,7 @@ async function loadRecentMessages(
   const kept: Array<{ role: 'customer' | 'agent'; text: string }> = []
   for (let i = msgs.length - 1; i >= 0; i--) {
     total += msgs[i].text.length
-    if (total > BUDGET_L5_CHARS) break
+    if (total > maxChars) break
     kept.unshift(msgs[i])
   }
   return kept
@@ -220,8 +207,12 @@ export async function assembleContext(
   convId: string,
   turnText: string,
   aiReplyRunId?: string,
-  opts: { skipRag?: boolean; minScore?: number } = {},
+  opts: { skipRag?: boolean; minScore?: number; budgets?: ContextBudgets } = {},
 ): Promise<HarnessContext> {
+  // Ngân sách ký tự theo model sinh trả lời — caller (reply-generator) truyền
+  // budgets khớp model thực dùng; không truyền → bậc `base` an toàn chi phí.
+  const budgets = opts.budgets ?? getContextBudgets(null)
+
   // Resolve conversation meta + the per-function tool config (enable + guardrail).
   const [{ contactId, ragTopK }, tools] = await Promise.all([
     loadConvMeta(orgId, convId),
@@ -233,27 +224,29 @@ export async function assembleContext(
   // Parallelize all layer loads (each KB/product tool gated by its own config)
   const [logic, scenarios, contact, threadMemory, kbSnippets, products, recentMessages] = await Promise.all([
     getActiveLogicContext(orgId),                                                          // L0
-    loadScenarios(orgId, turnText, ragTopK, opts.minScore),                                // L0b
+    loadScenarios(orgId, turnText, ragTopK, budgets.l0bScenarios, opts.minScore),          // L0b
     contactId ? loadContactProfile(contactId) : Promise.resolve(null),                    // L2
-    contactId ? loadThreadMemory(orgId, contactId) : Promise.resolve([]),                 // L3
-    opts.skipRag ? Promise.resolve([] as KbSnippet[]) : loadKbSnippets(orgId, turnText, ragTopK, tools, opts.minScore),          // L1
-    opts.skipRag ? Promise.resolve([] as ProductSnippet[]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, opts.minScore), // L1b
-    loadRecentMessages(convId),                                                            // L5
+    contactId ? loadThreadMemory(orgId, contactId, budgets.l3Memory) : Promise.resolve([]), // L3
+    opts.skipRag ? Promise.resolve([] as KbSnippet[]) : loadKbSnippets(orgId, turnText, ragTopK, tools, budgets.l1Kb, opts.minScore),          // L1
+    opts.skipRag ? Promise.resolve([] as ProductSnippet[]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, budgets.products, opts.minScore), // L1b
+    loadRecentMessages(convId, budgets.l5Messages),                                        // L5
   ])
 
-  // Char-cap L0 docs individually so no single doc dominates
+  // Char-cap L0 docs individually so no single doc dominates.
+  // Tỷ lệ giữ như trước: persona/index/handoff/mechanism = l0Total/4 → budgets.index|persona,
+  // playbook/criteria = l0Total/2 → budgets.playbook (criteria dùng chung mức playbook).
   const cappedLogic = {
-    index: logic.index ? truncate(logic.index, BUDGET_L0_CHARS / 4) : null,
-    persona: logic.persona ? truncate(logic.persona, BUDGET_L0_CHARS / 4) : null,
-    playbook: logic.playbook ? truncate(logic.playbook, BUDGET_L0_CHARS / 2) : null,
-    handoff_rules: logic.handoff_rules ? truncate(logic.handoff_rules, BUDGET_L0_CHARS / 4) : null,
-    mechanism: logic.mechanism ? truncate(logic.mechanism, BUDGET_L0_CHARS / 4) : null,
-    criteria: logic.criteria ? truncate(logic.criteria, BUDGET_L0_CHARS / 2) : null,
+    index: logic.index ? truncate(logic.index, budgets.index) : null,
+    persona: logic.persona ? truncate(logic.persona, budgets.persona) : null,
+    playbook: logic.playbook ? truncate(logic.playbook, budgets.playbook) : null,
+    handoff_rules: logic.handoff_rules ? truncate(logic.handoff_rules, budgets.index) : null,
+    mechanism: logic.mechanism ? truncate(logic.mechanism, budgets.index) : null,
+    criteria: logic.criteria ? truncate(logic.criteria, budgets.playbook) : null,
   }
 
   // Cap contact profile summary
   if (contact?.aiSummary) {
-    contact.aiSummary = truncate(contact.aiSummary, BUDGET_L2_CHARS)
+    contact.aiSummary = truncate(contact.aiSummary, budgets.l2Contact)
   }
 
   const assembled: HarnessContext = {
@@ -266,7 +259,7 @@ export async function assembleContext(
     contact,
     threadMemory,
     recentMessages,
-    turnText: truncate(turnText, BUDGET_L6_CHARS),
+    turnText: truncate(turnText, budgets.l6Turn),
   }
 
   // Fire-and-forget trace — MUST NOT block caller
