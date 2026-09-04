@@ -5,16 +5,17 @@
  *   1. CHỌN MODULE — lưới thẻ, mỗi thẻ một mảng việc, kèm dấu đã học xong.
  *   2. TỪNG BƯỚC   — danh sách bước bên trái, nội dung bên phải, đi tới đi lui.
  *
- * Không dùng kiểu tô sáng đè lên màn hình thật: nhân viên thường mở hướng dẫn
- * lúc rảnh chứ không phải lúc đang có khách chờ, nên đọc trước rồi làm sau là
- * hợp hơn. Bước nào gắn màn hình thật thì có nút mở thẳng tới đó.
+ * Module nào có màn hình để chỉ thì kèm một TOUR TƯƠNG TÁC: tour tô sáng đúng
+ * nút trên giao diện thật và dẫn đi từng chỗ. Hai thứ bổ cho nhau — tour dạy
+ * "bấm ở đâu", phần đọc nói "vì sao và tránh gì" — nên bản đọc vẫn giữ.
  *
  * Tiến độ lưu ở máy người dùng — đây là trí nhớ tiện tay, mất cũng không sao.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, ArrowRight, BookOpen, Check, CircleCheck, ExternalLink, Lightbulb, TriangleAlert,
+  ArrowLeft, ArrowRight, BookOpen, Check, CircleCheck, ExternalLink, Lightbulb,
+  MousePointerClick, TriangleAlert,
 } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -24,6 +25,8 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/misc'
 import { cn } from '@/lib/utils'
 import { GUIDE_MODULES, type GuideModule } from '@/lib/user-guide-content'
+import { tourFor } from '@/lib/product-tours'
+import { ProductTour } from './product-tour'
 
 const DONE_KEY = 'chatmql_guide_done'
 
@@ -49,6 +52,8 @@ export function UserGuideDialog({
   const [moduleId, setModuleId] = useState<string | null>(null)
   const [stepIdx, setStepIdx] = useState(0)
   const [done, setDone] = useState<Set<string>>(loadDone)
+  /** Tour đang chạy — đóng hộp thoại để không che giao diện đang được chỉ. */
+  const [tourId, setTourId] = useState<string | null>(null)
 
   // Mở lại thì bắt đầu từ danh sách module, khỏi rơi vào giữa bài cũ.
   useEffect(() => {
@@ -66,6 +71,16 @@ export function UserGuideDialog({
     })
   }
 
+  const runTour = (id: string) => {
+    setTourId(id)
+    onOpenChange(false)
+  }
+
+  const activeTour = tourId ? tourFor(tourId) : null
+  if (activeTour) {
+    return <ProductTour tour={activeTour} onClose={() => setTourId(null)} />
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[80vh] max-h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
@@ -77,10 +92,12 @@ export function UserGuideDialog({
             onBack={() => { setModuleId(null); setStepIdx(0) }}
             onFinish={() => { markDone(mod.id); setModuleId(null); setStepIdx(0) }}
             onClose={() => onOpenChange(false)}
+            onTour={() => runTour(mod.id)}
           />
         ) : (
           <ModulePicker
             done={done}
+            onTour={runTour}
             onPick={(id) => { setModuleId(id); setStepIdx(0) }}
             onReset={() => { setDone(new Set()); saveDone(new Set()) }}
           />
@@ -93,8 +110,13 @@ export function UserGuideDialog({
 // ── Màn 1: chọn module ──────────────────────────────────────────────
 
 function ModulePicker({
-  done, onPick, onReset,
-}: { done: Set<string>; onPick: (id: string) => void; onReset: () => void }) {
+  done, onPick, onTour, onReset,
+}: {
+  done: Set<string>
+  onPick: (id: string) => void
+  onTour: (id: string) => void
+  onReset: () => void
+}) {
   const total = GUIDE_MODULES.length
   const finished = GUIDE_MODULES.filter((m) => done.has(m.id)).length
 
@@ -129,13 +151,16 @@ function ModulePicker({
           {GUIDE_MODULES.map((m) => {
             const Icon = m.icon
             const isDone = done.has(m.id)
+            const hasTour = !!tourFor(m.id)
             return (
-              <button
+              <div
                 key={m.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => onPick(m.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onPick(m.id) }}
                 className={cn(
-                  'group flex gap-3 rounded-xl border p-3.5 text-left transition-all hover:border-primary/60 hover:shadow-sm',
+                  'group flex cursor-pointer gap-3 rounded-xl border p-3.5 text-left transition-all hover:border-primary/60 hover:shadow-sm',
                   isDone && 'bg-primary/[0.03]',
                 )}
               >
@@ -157,9 +182,18 @@ function ModulePicker({
                   <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
                     {m.summary}
                   </span>
+                  {hasTour && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onTour(m.id) }}
+                      className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
+                    >
+                      <MousePointerClick className="h-3 w-3" /> Tour tương tác
+                    </button>
+                  )}
                 </span>
                 <ArrowRight className="mt-2.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-              </button>
+              </div>
             )
           })}
         </div>
@@ -171,7 +205,7 @@ function ModulePicker({
 // ── Màn 2: từng bước ────────────────────────────────────────────────
 
 function ModuleSteps({
-  mod, stepIdx, onStep, onBack, onFinish, onClose,
+  mod, stepIdx, onStep, onBack, onFinish, onClose, onTour,
 }: {
   mod: GuideModule
   stepIdx: number
@@ -179,6 +213,7 @@ function ModuleSteps({
   onBack: () => void
   onFinish: () => void
   onClose: () => void
+  onTour: () => void
 }) {
   const navigate = useNavigate()
   const step = mod.steps[stepIdx]
@@ -271,7 +306,13 @@ function ModuleSteps({
       </div>
 
       <div className="flex items-center gap-2 border-t px-5 py-3">
-        <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {tourFor(mod.id) ? (
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={onTour}>
+            <MousePointerClick className="h-3.5 w-3.5" /> Tour tương tác
+          </Button>
+        ) : (
+          <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
         <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">
           Đọc xong phần này rồi mở màn hình thật làm thử một lần.
         </span>

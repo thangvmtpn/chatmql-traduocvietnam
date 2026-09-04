@@ -100,6 +100,7 @@ export function TopNav() {
             <NavLink
               key={item.to}
               to={item.to}
+              data-tour={`nav-${item.to.replace('/', '')}`}
               className={({ isActive }) => cn(ITEM_CLS, isActive ? ACTIVE : INACTIVE)}
             >
               <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -117,6 +118,7 @@ export function TopNav() {
           variant="ghost"
           size="sm"
           onClick={() => setGuideOpen(true)}
+          data-tour="hdsd"
           className="h-8 gap-1.5 px-2 text-[12px] font-semibold text-sidebar-foreground hover:bg-sidebar-accent"
           title="Hướng dẫn sử dụng"
         >

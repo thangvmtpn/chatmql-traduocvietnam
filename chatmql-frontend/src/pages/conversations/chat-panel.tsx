@@ -938,6 +938,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             size="sm"
             className="h-8 gap-1.5 px-2.5 text-xs"
             onClick={() => setSalesDocsOpen(true)}
+            data-tour="chat-docs"
             aria-label="Tài liệu bán hàng"
             title="Tài liệu bán hàng: hình ảnh · content · video đã duyệt"
           >
@@ -1038,6 +1039,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             size="sm"
             className="h-8 gap-1.5 bg-success px-2.5 text-xs text-success-foreground hover:bg-success/90"
             onClick={() => useCrmPanelStore.getState().openOrder()}
+            data-tour="chat-order"
             aria-label="Lên đơn hàng cho khách"
             title="Lên đơn hàng cho khách này"
           >

@@ -111,7 +111,7 @@ export function CrmPanel({
             <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">{headerMeta}</div>
           </div>
         </div>
-        <div className="flex items-center gap-3 px-3.5">
+        <div data-tour="crm-tabs" className="flex items-center gap-3 px-3.5">
           {TABS.map((t) => (
             <div key={t.id} className="contents">
               <button

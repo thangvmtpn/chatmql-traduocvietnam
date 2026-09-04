@@ -205,7 +205,7 @@ export function FilterRail({
       <Separator className="my-2 w-8" />
 
       {/* ── Nhóm nút lọc (chỉ icon) ───────────────────────────── */}
-      <nav className="flex flex-col items-center gap-1" aria-label="Bộ lọc hội thoại">
+      <nav data-tour="conv-filters" className="flex flex-col items-center gap-1" aria-label="Bộ lọc hội thoại">
         {FILTER_ITEMS.map(({ value, label, icon: Icon }) => {
           const active = filter === value
           const count = countOf(value)
