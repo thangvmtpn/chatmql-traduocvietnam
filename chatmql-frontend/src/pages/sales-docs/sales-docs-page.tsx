@@ -30,8 +30,12 @@ import { cn } from '@/lib/utils'
 import { useMyPermissions } from '@/hooks/use-settings'
 import { resolveImageUrl } from '@/hooks/use-products'
 import { useCrmProductList, type CrmProduct } from '@/hooks/use-crm-products'
-import { useAllProductDocs, useProductDoc } from '@/hooks/use-product-docs'
+import { useProductDoc } from '@/hooks/use-product-docs'
+import {
+  KIND_LABELS, VISIBILITY_LABELS, assetUrl, useDocAssets, type DocAsset,
+} from '@/hooks/use-doc-library'
 import { useDocFolders, type DocFolder } from '@/hooks/use-doc-library'
+import { FileText } from 'lucide-react'
 import { SalesDocEditDialog } from './sales-doc-edit-dialog'
 
 const ROOT = '/sales-docs'
@@ -95,43 +99,19 @@ export function SalesDocsPage() {
 // ── Cấp 1: Tổng quan ────────────────────────────────────────────────
 
 /**
- * Trang đầu phải trả lời ngay 2 câu hỏi của người mở tài liệu bán hàng:
- * "giá bao nhiêu" và "công ty bán những gì". Nên bố cục là:
- *   1. Bảng giá tổng sản phẩm (thu gọn được)
- *   2. Cây danh mục nhiều cấp (Trà > Trà xanh > sản phẩm)
+ * Trang đầu = ĐÚNG NHỮNG GÌ NGƯỜI DÙNG TỰ DỰNG.
  *
- * Cây danh mục lấy từ `doc_folders` — do admin tự dựng, lồng bao nhiêu cấp cũng
- * được. Sản phẩm gắn vào một nhánh qua `product_docs.folderId`. Sản phẩm chưa
- * gắn thì gom vào nhánh ảo "Chưa phân loại" để không biến mất.
+ * Module này độc lập với hệ thống sản phẩm: thư mục, thứ tự và tài nguyên
+ * (bảng giá, ảnh, video, tài liệu) đều do người dùng tạo và sắp xếp. Sản phẩm
+ * chỉ xuất hiện khi một tài nguyên được GHÉP NỐI với mã sản phẩm — lúc đó mới
+ * nạp dữ liệu thật từ hệ thống nguồn.
  */
 function RootView() {
-  const q = useAllProducts()
   const foldersQ = useDocFolders()
-  const docsQ = useAllProductDocs()
-  const [showPrices, setShowPrices] = useState(false)
+  const assetsQ = useDocAssets({ pageSize: 200 })
 
-  const products = q.data?.products ?? []
   const folders = foldersQ.data ?? []
-  const docs = docsQ.data ?? []
-
-  /** Mã sản phẩm → thư mục đang gắn. */
-  const folderOfCode = useMemo(() => {
-    const m = new Map<string, string | null>()
-    for (const d of docs) m.set(d.productCode.toUpperCase(), d.folderId)
-    return m
-  }, [docs])
-
-  /** Sản phẩm thuộc TRỰC TIẾP một thư mục (không tính thư mục con). */
-  const productsByFolder = useMemo(() => {
-    const m = new Map<string | null, CrmProduct[]>()
-    for (const p of products) {
-      const fid = p.code ? folderOfCode.get(p.code.toUpperCase()) ?? null : null
-      const arr = m.get(fid) ?? []
-      arr.push(p)
-      m.set(fid, arr)
-    }
-    return m
-  }, [products, folderOfCode])
+  const assets = assetsQ.data?.items ?? []
 
   const childrenOf = useMemo(() => {
     const m = new Map<string | null, DocFolder[]>()
@@ -140,36 +120,47 @@ function RootView() {
       arr.push(f)
       m.set(f.parentId, arr)
     }
+    // Thứ tự do người dùng đặt (sortOrder), hoà thì theo tên.
     for (const [, arr] of m) arr.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
     return m
   }, [folders])
 
-  /** Tổng sản phẩm của một nhánh, tính cả cây con. */
+  const assetsByFolder = useMemo(() => {
+    const m = new Map<string | null, DocAsset[]>()
+    for (const a of assets) {
+      const arr = m.get(a.folderId) ?? []
+      arr.push(a)
+      m.set(a.folderId, arr)
+    }
+    return m
+  }, [assets])
+
+  /** Tổng tài nguyên của một nhánh, tính cả cây con. */
   const totalOf = useMemo(() => {
     const memo = new Map<string, number>()
     const walk = (id: string): number => {
       if (memo.has(id)) return memo.get(id)!
-      let n = (productsByFolder.get(id) ?? []).length
+      let n = (assetsByFolder.get(id) ?? []).length
       for (const c of childrenOf.get(id) ?? []) n += walk(c.id)
       memo.set(id, n)
       return n
     }
     for (const f of folders) walk(f.id)
     return memo
-  }, [folders, childrenOf, productsByFolder])
+  }, [folders, childrenOf, assetsByFolder])
 
-  const unfiled = productsByFolder.get(null) ?? []
   const roots = childrenOf.get(null) ?? []
-  const loading = q.isLoading || foldersQ.isLoading || docsQ.isLoading
+  const unfiled = assetsByFolder.get(null) ?? []
+  const loading = foldersQ.isLoading || assetsQ.isLoading
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Tài liệu bán hàng"
-        description="Bảng giá tổng và toàn bộ danh mục sản phẩm kèm mô tả, hình ảnh, video — nhân viên tra cứu, AI đọc khi tư vấn."
+        description="Tài nguyên bán hàng do đội ngũ tự dựng: bảng giá, ảnh, video, tài liệu. Sản phẩm chỉ hiện khi tài nguyên được ghép nối."
         actions={
           <Button variant="outline" className="gap-1.5" asChild>
-            <Link to={`${ROOT}/library`}><FolderOpen className="h-4 w-4" /> Thư viện tài liệu</Link>
+            <Link to={`${ROOT}/library`}><FolderOpen className="h-4 w-4" /> Quản lý thư viện</Link>
           </Button>
         }
       />
@@ -177,126 +168,56 @@ function RootView() {
 
       {loading ? (
         <Loading className="py-16" />
-      ) : q.error ? (
-        <ErrorState message={apiError(q.error)} />
+      ) : foldersQ.error || assetsQ.error ? (
+        <ErrorState message={apiError(foldersQ.error ?? assetsQ.error)} />
+      ) : roots.length === 0 && unfiled.length === 0 ? (
+        <div className="rounded-lg border border-dashed py-16 text-center">
+          <p className="text-sm font-medium">Chưa có tài liệu nào</p>
+          <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+            Vào <Link to={`${ROOT}/library`} className="text-primary hover:underline">Quản lý thư viện</Link> để tạo thư mục
+            (ví dụ: Bảng giá, Trà, Bánh) và nạp tài nguyên. Thứ tự hiển thị ở đây theo đúng thứ tự bạn sắp xếp.
+          </p>
+        </div>
       ) : (
-        <>
-          {/* 1. Bảng giá tổng — thu gọn mặc định để cây danh mục nằm ngay tầm mắt. */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <ReceiptText className="h-4 w-4 text-primary" /> Bảng giá tổng sản phẩm
-                  </CardTitle>
-                  <CardDescription>
-                    {products.length} sản phẩm · {docs.length} đã có tài liệu
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowPrices((v) => !v)}>
-                  {showPrices ? 'Thu gọn' : 'Xem bảng giá'}
-                </Button>
+        <div className="space-y-2">
+          {roots.map((f) => (
+            <FolderNode
+              key={f.id}
+              folder={f}
+              depth={0}
+              childrenOf={childrenOf}
+              assetsByFolder={assetsByFolder}
+              totalOf={totalOf}
+            />
+          ))}
+          {unfiled.length > 0 && (
+            <details className="rounded-lg border">
+              <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium">
+                Chưa xếp thư mục <span className="text-muted-foreground">({unfiled.length})</span>
+              </summary>
+              <div className="grid grid-cols-2 gap-3 border-t p-3 sm:grid-cols-3 lg:grid-cols-4">
+                {unfiled.map((a) => <AssetTile key={a.id} a={a} />)}
               </div>
-            </CardHeader>
-            {showPrices && (
-              <CardContent className="p-0">
-                <div className="max-h-[420px] overflow-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/95 text-xs uppercase text-muted-foreground backdrop-blur">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
-                        <th className="px-4 py-2 text-left font-medium">Mã</th>
-                        <th className="px-4 py-2 text-right font-medium">Giá</th>
-                        <th className="px-4 py-2 text-center font-medium">Tài liệu</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((p) => {
-                        const d = p.code ? docs.find((x) => x.productCode === p.code!.toUpperCase()) : undefined
-                        const has = !!(d && (d.description || d.images.length || d.videoUrls.length))
-                        return (
-                          <tr key={p.code ?? p.name} className="border-t hover:bg-accent/30">
-                            <td className="px-4 py-2">
-                              {p.code
-                                ? <Link to={`${ROOT}/p/${encodeURIComponent(p.code)}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
-                                : <span className="font-medium">{p.name}</span>}
-                            </td>
-                            <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{p.code || '—'}</td>
-                            <td className="whitespace-nowrap px-4 py-2 text-right font-medium">{priceText(p)}</td>
-                            <td className="px-4 py-2 text-center">
-                              {has ? <Badge variant="secondary">Đã có</Badge> : <span className="text-xs text-muted-foreground">Chưa soạn</span>}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-
-          {/* 2. Cây danh mục nhiều cấp */}
-          <section className="space-y-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <FolderOpen className="h-4 w-4" /> Danh mục sản phẩm
-            </h2>
-
-            {roots.length === 0 && unfiled.length === 0 ? (
-              <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                Chưa có danh mục nào. Tạo cây danh mục ở <Link to={`${ROOT}/library`} className="text-primary hover:underline">Thư viện tài liệu</Link>,
-                rồi gán sản phẩm vào danh mục khi soạn tài liệu.
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {roots.map((f) => (
-                  <CategoryNode
-                    key={f.id}
-                    folder={f}
-                    depth={0}
-                    childrenOf={childrenOf}
-                    productsByFolder={productsByFolder}
-                    totalOf={totalOf}
-                    docs={docs}
-                  />
-                ))}
-                {unfiled.length > 0 && (
-                  <details className="rounded-lg border">
-                    <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium">
-                      Chưa phân loại <span className="text-muted-foreground">({unfiled.length})</span>
-                    </summary>
-                    <div className="grid grid-cols-2 gap-3 border-t p-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                      {unfiled.map((p) => (
-                        <ProductCard key={p.code ?? p.name} p={p} doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined} />
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
-            )}
-          </section>
-        </>
+            </details>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-/**
- * Một nhánh của cây danh mục. Mở sẵn hai cấp đầu để người xem thấy ngay cấu
- * trúc; sâu hơn thì phải bấm, tránh trang dài lê thê.
- */
-function CategoryNode({
-  folder, depth, childrenOf, productsByFolder, totalOf, docs,
+/** Một nhánh thư mục: mở sẵn 2 cấp đầu, sâu hơn thì bấm để mở. */
+function FolderNode({
+  folder, depth, childrenOf, assetsByFolder, totalOf,
 }: {
   folder: DocFolder
   depth: number
   childrenOf: Map<string | null, DocFolder[]>
-  productsByFolder: Map<string | null, CrmProduct[]>
+  assetsByFolder: Map<string | null, DocAsset[]>
   totalOf: Map<string, number>
-  docs: ProductDocLite[]
 }) {
   const kids = childrenOf.get(folder.id) ?? []
-  const own = productsByFolder.get(folder.id) ?? []
+  const own = assetsByFolder.get(folder.id) ?? []
   const total = totalOf.get(folder.id) ?? 0
 
   return (
@@ -304,56 +225,107 @@ function CategoryNode({
       <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm">
         <Folder className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
         <span className="font-medium">{folder.icon ? `${folder.icon} ` : ''}{folder.name}</span>
-        <span className="text-xs text-muted-foreground">({total} sản phẩm)</span>
+        <span className="text-xs text-muted-foreground">({total})</span>
+        {folder.visibility === 'internal' && <Badge variant="outline" className="text-[9px]">Nội bộ</Badge>}
         {folder.description && (
-          <span className="ml-2 hidden truncate text-xs text-muted-foreground sm:inline">{folder.description}</span>
+          <span className="ml-1 hidden truncate text-xs text-muted-foreground sm:inline">{folder.description}</span>
         )}
       </summary>
 
       <div className="space-y-3 border-t p-3">
         {kids.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {kids.map((k) => (
-              <CategoryNode
+              <FolderNode
                 key={k.id}
                 folder={k}
                 depth={depth + 1}
                 childrenOf={childrenOf}
-                productsByFolder={productsByFolder}
+                assetsByFolder={assetsByFolder}
                 totalOf={totalOf}
-                docs={docs}
               />
             ))}
           </div>
         )}
 
         {own.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {own.map((p) => (
-              <ProductCard key={p.code ?? p.name} p={p} doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined} />
-            ))}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {own.map((a) => <AssetTile key={a.id} a={a} />)}
           </div>
         ) : kids.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Chưa có sản phẩm nào trong danh mục này.</p>
+          <p className="text-xs text-muted-foreground">Thư mục này chưa có tài nguyên.</p>
         ) : null}
       </div>
     </details>
   )
 }
 
-// ── Cấp 2: Một danh mục (folderId) ──────────────────────────────────
+/**
+ * Một tài nguyên. Nếu đã ghép nối sản phẩm thì hiện mã kèm lối tắt sang trang
+ * chi tiết sản phẩm — nơi dữ liệu thật (giá, tồn) được nạp từ hệ thống nguồn.
+ */
+function AssetTile({ a }: { a: DocAsset }) {
+  const src = a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
+  const href = assetUrl(a.fileUrl) ?? a.sourceUrl ?? undefined
 
-/** Xem riêng một nhánh — gồm cả sản phẩm của các thư mục con. */
+  return (
+    <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="relative aspect-[4/3] bg-muted">
+        {src ? (
+          <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+            <FileText className="h-6 w-6" />
+            <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
+          </div>
+        )}
+        {a.visibility !== 'sales' && (
+          <span className="absolute left-1.5 top-1.5 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium">
+            {VISIBILITY_LABELS[a.visibility]}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 space-y-1 p-2.5">
+        {href ? (
+          <a href={href} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-medium leading-snug hover:text-primary hover:underline">
+            {a.title}
+          </a>
+        ) : (
+          <p className="line-clamp-2 text-sm font-medium leading-snug">{a.title}</p>
+        )}
+        {a.description && <p className="line-clamp-2 text-[11px] text-muted-foreground">{a.description}</p>}
+        {a.productCodes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 pt-0.5">
+            {a.productCodes.slice(0, 3).map((c) => (
+              <Link
+                key={c}
+                to={`${ROOT}/p/${encodeURIComponent(c)}`}
+                className="rounded bg-primary/10 px-1 font-mono text-[9.5px] text-primary hover:underline"
+                title="Xem chi tiết sản phẩm đã ghép nối"
+              >
+                {c}
+              </Link>
+            ))}
+            {a.productCodes.length > 3 && (
+              <span className="text-[9.5px] text-muted-foreground">+{a.productCodes.length - 3}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Cấp 2: Một nhánh thư mục ────────────────────────────────────────
+
+/** Xem riêng một nhánh — gồm cả tài nguyên của các thư mục con. */
 function CategoryView({ folderId }: { folderId: string }) {
-  const q = useAllProducts()
   const foldersQ = useDocFolders()
-  const docsQ = useAllProductDocs()
+  const assetsQ = useDocAssets({ pageSize: 200 })
 
   const folders = foldersQ.data ?? []
-  const docs = docsQ.data ?? []
   const folder = folders.find((f) => f.id === folderId)
 
-  // Nhánh này gồm chính nó + toàn bộ thư mục con.
   const branchIds = useMemo(() => {
     const childrenOf = new Map<string | null, string[]>()
     for (const f of folders) {
@@ -370,74 +342,27 @@ function CategoryView({ folderId }: { folderId: string }) {
     return out
   }, [folders, folderId])
 
-  const products = useMemo(() => {
-    const codeToFolder = new Map(docs.map((d) => [d.productCode.toUpperCase(), d.folderId]))
-    return (q.data?.products ?? []).filter((p) => {
-      const fid = p.code ? codeToFolder.get(p.code.toUpperCase()) : null
-      return fid ? branchIds.has(fid) : false
-    })
-  }, [q.data, docs, branchIds])
-
-  const loading = q.isLoading || foldersQ.isLoading || docsQ.isLoading
+  const assets = (assetsQ.data?.items ?? []).filter((a) => a.folderId && branchIds.has(a.folderId))
+  const loading = foldersQ.isLoading || assetsQ.isLoading
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={folder ? `${folder.icon ? `${folder.icon} ` : ''}${folder.name}` : 'Danh mục'}
-        description={folder?.description || `${products.length} sản phẩm trong nhánh này (tính cả danh mục con).`}
+        title={folder ? `${folder.icon ? `${folder.icon} ` : ''}${folder.name}` : 'Thư mục'}
+        description={folder?.description || `${assets.length} tài nguyên trong nhánh này (tính cả thư mục con).`}
       />
       <Crumbs items={[{ label: 'Tài liệu bán hàng', to: ROOT }, { label: folder?.name ?? '…' }]} />
 
       {loading ? (
         <Loading className="py-16" />
-      ) : q.error ? (
-        <ErrorState message={apiError(q.error)} />
-      ) : products.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Danh mục này chưa có sản phẩm nào được gán.</p>
+      ) : assets.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nhánh này chưa có tài nguyên nào.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {products.map((p) => (
-            <ProductCard
-              key={p.code ?? p.name}
-              p={p}
-              doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined}
-            />
-          ))}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {assets.map((a) => <AssetTile key={a.id} a={a} />)}
         </div>
       )}
     </div>
-  )
-}
-
-function ProductCard({ p, doc }: { p: CrmProduct; doc?: { images: string[]; videoUrls: string[] } }) {
-  const src = resolveImageUrl(doc?.images?.[0])
-  const inner = (
-    <>
-      <div className="relative aspect-square bg-muted">
-        {src
-          ? <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-          : <div className="flex h-full items-center justify-center text-muted-foreground"><ImageOff className="h-6 w-6" /></div>}
-        {(doc?.videoUrls?.length ?? 0) > 0 && (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1 text-primary shadow" title="Có video">
-            <PlayCircle className="h-4 w-4" />
-          </span>
-        )}
-      </div>
-      <div className="space-y-0.5 p-2.5">
-        <p className="line-clamp-2 text-sm font-medium leading-snug group-hover:text-primary">{p.name}</p>
-        {p.code && <p className="font-mono text-[11px] text-muted-foreground">{p.code}</p>}
-        <p className="text-sm font-semibold">{priceText(p)}</p>
-      </div>
-    </>
-  )
-  if (!p.code) return <div className="overflow-hidden rounded-lg border bg-card opacity-70">{inner}</div>
-  return (
-    <Link
-      to={`${ROOT}/p/${encodeURIComponent(p.code)}`}
-      className="group overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary/50"
-    >
-      {inner}
-    </Link>
   )
 }
 
@@ -545,6 +470,8 @@ function ProductDetailView({ code }: { code: string }) {
         </div>
       </div>
 
+      <LinkedAssets code={code} />
+
       <section className="space-y-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           <PlayCircle className="h-4 w-4" /> Video ({doc?.videoUrls?.length ?? 0})
@@ -595,5 +522,22 @@ function VideoBlock({ url }: { url: string }) {
     >
       <ExternalLink className="h-4 w-4 shrink-0" /><span className="truncate">{url}</span>
     </a>
+  )
+}
+
+/** Tài nguyên trong thư viện đã ghép nối với mã sản phẩm này. */
+function LinkedAssets({ code }: { code: string }) {
+  const q = useDocAssets({ productCode: code, pageSize: 100 })
+  const assets = q.data?.items ?? []
+  if (q.isLoading || assets.length === 0) return null
+  return (
+    <section className="space-y-3">
+      <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <FileText className="h-4 w-4" /> Tài liệu đã ghép nối ({assets.length})
+      </h3>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {assets.map((a) => <AssetTile key={a.id} a={a} />)}
+      </div>
+    </section>
   )
 }

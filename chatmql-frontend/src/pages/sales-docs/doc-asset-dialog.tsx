@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/misc'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { apiError } from '@/lib/api-client'
+import { ProductPicker } from './product-picker'
 import {
   KIND_LABELS, VISIBILITY_LABELS, assetUrl, useSaveDocAsset, useUploadDocFile,
   type AssetKind, type DocAsset, type DocFolder, type Visibility,
@@ -47,7 +48,7 @@ export function DocAssetDialog({ asset, folders, defaultFolderId, open, onOpenCh
   const [sourceUrl, setSourceUrl] = useState('')
   const [folderId, setFolderId] = useState<string>(NO_FOLDER)
   const [visibility, setVisibility] = useState<Visibility>('sales')
-  const [codes, setCodes] = useState('')
+  const [codes, setCodes] = useState<string[]>([])
 
   // Mở lại dialog thì nạp đúng trạng thái: sửa thì lấy từ bản ghi, thêm mới thì trắng.
   useEffect(() => {
@@ -62,7 +63,7 @@ export function DocAssetDialog({ asset, folders, defaultFolderId, open, onOpenCh
     setSourceUrl(asset?.sourceUrl ?? '')
     setFolderId(asset?.folderId ?? defaultFolderId ?? NO_FOLDER)
     setVisibility(asset?.visibility ?? 'sales')
-    setCodes((asset?.productCodes ?? []).join(', '))
+    setCodes(asset?.productCodes ?? [])
   }, [open, asset, defaultFolderId])
 
   const onPickFile = (f: File | undefined) => {
@@ -106,7 +107,7 @@ export function DocAssetDialog({ asset, folders, defaultFolderId, open, onOpenCh
           sourceUrl: sourceUrl.trim() || null,
           folderId: folderId === NO_FOLDER ? null : folderId,
           visibility,
-          productCodes: codes.split(',').map((c) => c.trim()).filter(Boolean),
+          productCodes: codes,
         },
       },
       {
@@ -214,12 +215,13 @@ export function DocAssetDialog({ asset, folders, defaultFolderId, open, onOpenCh
             />
           </div>
 
+          {/* Ghép nối sản phẩm — tài liệu soạn độc lập, chỉ nối khi người dùng chọn. */}
+          <div className="grid gap-1.5 rounded-lg border p-3">
+            <Label>Ghép nối sản phẩm</Label>
+            <ProductPicker value={codes} onChange={setCodes} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>Mã sản phẩm áp dụng</Label>
-              <Input value={codes} onChange={(e) => setCodes(e.target.value)} placeholder="VT-200G, CC03-100" />
-              <p className="text-[11px] text-muted-foreground">Cách nhau bởi dấu phẩy. Để trống = tài nguyên chung.</p>
-            </div>
             <div className="grid gap-1.5">
               <Label>Mức hiển thị</Label>
               <Select value={visibility} onValueChange={(v) => setVisibility(v as Visibility)}>
@@ -232,6 +234,7 @@ export function DocAssetDialog({ asset, folders, defaultFolderId, open, onOpenCh
               </Select>
               <p className="text-[11px] text-muted-foreground">"Chỉ nội bộ" sẽ không lọt vào lời AI tư vấn.</p>
             </div>
+            <div />
           </div>
         </div>
 
