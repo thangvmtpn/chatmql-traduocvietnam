@@ -1,16 +1,19 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { FEATURES } from '@/lib/features'
 import { useMyPermissions } from '@/hooks/use-settings'
-import { PanelLeftClose, PanelLeft, PanelTop } from 'lucide-react'
+import { BookOpen, PanelLeftClose, PanelLeft, PanelTop } from 'lucide-react'
 import { filterNavByPermissions, navForRole } from './nav-config'
 import { BrandLogo } from './brand-logo'
 import { useUiStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/misc'
+import { UserGuideDialog } from './user-guide-dialog'
 
 export function SideNav() {
   const { sidebarCollapsed, toggleSidebar, setNavMode } = useUiStore()
+  const [guideOpen, setGuideOpen] = useState(false)
   const role = useAuthStore((s) => s.user?.role)
   // RBAC động: menu lọc thêm theo /me/permissions (đang tải thì giữ nguyên
   // theo vai trò gốc để không nhấp nháy).
@@ -78,6 +81,13 @@ export function SideNav() {
       </nav>
 
       <div className="space-y-1 px-2 py-2">
+        {/* Cùng chỗ với nút đổi giao diện, giống hệt bên menu ngang. */}
+        <NavButton
+          collapsed={sidebarCollapsed}
+          onClick={() => setGuideOpen(true)}
+          icon={<BookOpen className="h-4 w-4 shrink-0" />}
+          label="HDSD"
+        />
         <NavButton
           collapsed={sidebarCollapsed}
           onClick={() => setNavMode('horizontal')}
@@ -91,6 +101,8 @@ export function SideNav() {
           label={sidebarCollapsed ? 'Mở rộng' : 'Thu gọn'}
         />
       </div>
+
+      <UserGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
     </aside>
   )
 }

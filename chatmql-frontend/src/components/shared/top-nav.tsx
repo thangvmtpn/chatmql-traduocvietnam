@@ -2,11 +2,12 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { FEATURES } from '@/lib/features'
 import { useMyPermissions } from '@/hooks/use-settings'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { PanelLeft, MoreHorizontal } from 'lucide-react'
+import { BookOpen, PanelLeft, MoreHorizontal } from 'lucide-react'
 import { filterNavByPermissions, navForRole, type NavItem } from './nav-config'
 import { BrandLogo } from './brand-logo'
 import { UserMenu } from './user-menu'
 import { NotificationsBell } from './notifications-bell'
+import { UserGuideDialog } from './user-guide-dialog'
 import { useUiStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ const MORE_W = 120 // chỗ dành cho nút "Xem thêm"
 
 export function TopNav() {
   const setNavMode = useUiStore((s) => s.setNavMode)
+  const [guideOpen, setGuideOpen] = useState(false)
   const role = useAuthStore((s) => s.user?.role)
   // RBAC động: menu lọc thêm theo /me/permissions (đang tải thì giữ nguyên
   // theo vai trò gốc để không nhấp nháy).
@@ -109,6 +111,17 @@ export function TopNav() {
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {/* Đặt cạnh nút đổi giao diện: người mới tìm hướng dẫn ở góc phải
+            thanh trên cùng, không phải trong trang Cài đặt. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setGuideOpen(true)}
+          className="h-8 gap-1.5 px-2 text-[12px] font-semibold text-sidebar-foreground hover:bg-sidebar-accent"
+          title="Hướng dẫn sử dụng"
+        >
+          <BookOpen className="h-4 w-4" /> HDSD
+        </Button>
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <Button
@@ -126,6 +139,8 @@ export function TopNav() {
         <NotificationsBell className="text-sidebar-foreground hover:bg-sidebar-accent" />
         <UserMenu />
       </div>
+
+      <UserGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
     </header>
   )
 }
