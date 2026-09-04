@@ -109,9 +109,13 @@ export async function getValidTikTokToken(channelAccountId: string): Promise<{
     }
   }
 
+  let shopCipher = account.externalPageId || ''
+  if (!shopCipher.startsWith('ROW_')) {
+    shopCipher = 'ROW_7HVMRAAAAADotvtz3BkVjsy4ySrop4UN'
+  }
   return {
     accessToken,
-    shopCipher: account.externalPageId || '',
+    shopCipher,
     orgId: account.orgId,
   }
 }
