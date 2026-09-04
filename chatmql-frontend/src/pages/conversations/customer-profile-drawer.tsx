@@ -369,7 +369,6 @@ function CrmInfoTab({ profile }: { profile: CustomerProfile }) {
         <InfoRow label="Ngày sinh" value={formatDateVi(crm.birthday)} />
         <InfoRow label="Nguồn khách hàng" value={crm.referral_source || cm?.source} />
         <InfoRow label="Cấp Vip" value={formatCombinedVip(crm)} />
-        <InfoRow label="Nhóm KH" value={crm.nhom_kh || crm.priority_level} />
         <InfoRow label="Người phụ trách" value={crm.staff_in_charge} />
         <InfoRow label="Tần suất mua" value={crm.purchase_frequency} />
         <InfoRow label="Lead score" value={cm?.leadScore != null ? `${cm.leadScore}/100` : null} />

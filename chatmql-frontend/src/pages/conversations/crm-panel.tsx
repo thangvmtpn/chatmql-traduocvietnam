@@ -237,7 +237,6 @@ function CrmInfo({
     { label: 'Tổng chi tiêu', value: crm.gmv_total != null ? formatVnd(crm.gmv_total) : null },
     { label: 'Nghề nghiệp', value: crm.occupation },
     { label: 'Cấp Vip', value: formatCombinedVip(crm) },
-    { label: 'Nhóm KH', value: crm.nhom_kh || crm.priority_level },
     { label: 'Giới tính', value: crm.gender },
     { label: 'Ngày sinh', value: formatDateVi(crm.birthday) },
     { label: 'Email', value: chat?.email },
