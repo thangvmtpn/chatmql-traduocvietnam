@@ -321,7 +321,7 @@ export function getAOVClass(aov: number | null | undefined): string {
  */
 export function formatCombinedVip(crm?: CrmCustomer | null): string {
   if (!crm) return '—'
-  if (crm.cap_vip && !/^(FT|KT|NC|PL|KD|KL)\d/i.test(crm.cap_vip)) return crm.cap_vip
+  if (crm.cap_vip && /^VIP/i.test(crm.cap_vip.trim())) return crm.cap_vip.trim()
   const gmv = Number(crm.gmv_total ?? crm.gmv) || 0
   const aov = Number(crm.aov) || (crm.order_count ? gmv / crm.order_count : gmv)
   return `${getVipLevelFromGMV(gmv)}${getAOVClass(aov)}`
