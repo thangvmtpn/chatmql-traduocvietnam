@@ -123,20 +123,15 @@ function win(from: Dayjs, to: Dayjs): Window {
 
 /**
  * Danh sách accountId "được phép xem" theo VAI TRÒ — trước khi áp bộ lọc UI.
- * `undefined` = owner/admin, không giới hạn.
+ * `undefined` = owner/admin, không giới hạn (xem tổng toàn bộ các tài khoản con).
+ * Đối với tài khoản con (member, manager, nhân viên...): chỉ trả về các tài khoản mình đang care.
  */
-async function resolveAllowedAccountIds(user: { id: string; role: string }): Promise<string[] | undefined> {
-  if (user.role === 'member') {
-    const rows = await prisma.channelAccountAccess.findMany({
-      where: { userId: user.id },
-      select: { channelAccountId: true },
-    })
-    return rows.map((r) => r.channelAccountId)
+export async function resolveAllowedAccountIds(user: { id: string; role: string }): Promise<string[] | undefined> {
+  if (user.role === 'owner' || user.role === 'admin') {
+    return undefined
   }
-  if (user.role === 'manager') {
-    return [...(await resolveManagerAccountIds(user.id))]
-  }
-  return undefined
+  const ids = await resolveManagerAccountIds(user.id)
+  return Array.from(ids)
 }
 
 /**

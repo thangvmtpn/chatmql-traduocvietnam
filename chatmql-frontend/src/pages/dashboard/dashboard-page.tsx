@@ -30,6 +30,7 @@ interface Kpi {
 
 export function DashboardPage() {
   const user = useAuthStore((s) => s.user)
+  const isBoss = user?.role === 'owner' || user?.role === 'admin'
   const qc = useQueryClient()
   const { data, isLoading } = useApiQuery<Kpi>(['dashboard-kpi'], '/dashboard/kpi')
 
@@ -45,7 +46,11 @@ export function DashboardPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader
           title={`Xin chào, ${user?.fullName || ''} 👋`}
-          description="Đây là tổng quan hoạt động hôm nay của bạn."
+          description={
+            isBoss
+              ? 'Tổng quan toàn bộ hệ thống hôm nay (tổng tất cả tài khoản con).'
+              : 'Tổng quan hôm nay cho các tài khoản bạn đang phụ trách.'
+          }
         />
         <Button variant="outline" size="sm" onClick={refresh}>
           <RefreshCw className="h-4 w-4" />

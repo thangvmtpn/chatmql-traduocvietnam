@@ -47,6 +47,7 @@ import {
   type ChatReportMetrics,
   type ChatReportMode,
 } from '@/hooks/use-chat-report'
+import { useAuthStore } from '@/stores/auth-store'
 import { cn, formatNumber } from '@/lib/utils'
 
 // ── Định dạng vi-VN ─────────────────────────────────────────────────
@@ -356,6 +357,8 @@ export function ChatOrderReport() {
   // Phạm vi: nhóm kênh tương tác + tài khoản cụ thể — để số liệu đúng nơi cần xem.
   const [channel, setChannel] = useState<string>(ALL_SCOPE)
   const [accountId, setAccountId] = useState<string>(ALL_SCOPE)
+  const user = useAuthStore((s) => s.user)
+  const isBoss = user?.role === 'owner' || user?.role === 'admin'
   const accountsQ = useZaloAccounts()
   const accounts = (accountsQ.data ?? []).filter(
     (a) => channel === ALL_SCOPE || groupOfPlatform(a.platform) === (channel as ChannelGroupId),
@@ -406,7 +409,13 @@ export function ChatOrderReport() {
           <Select value={accountId} onValueChange={setAccountId}>
             <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_SCOPE}>Tất cả tài khoản</SelectItem>
+              <SelectItem value={ALL_SCOPE}>
+                {isBoss
+                  ? 'Tất cả tài khoản'
+                  : accounts.length <= 1
+                    ? (accounts[0]?.displayName || 'Tài khoản của tôi')
+                    : `Tất cả tài khoản (${accounts.length})`}
+              </SelectItem>
               {accounts.map((a) => (
                 <SelectItem key={a.id} value={a.id}>{a.displayName || 'Không tên'}</SelectItem>
               ))}

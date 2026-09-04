@@ -1,5 +1,5 @@
 import { SenderType } from '../../shared/constants.js'
-import { resolveScopedAccountIds } from './report-routes.js'
+import { resolveAllowedAccountIds, resolveScopedAccountIds } from './report-routes.js'
 import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../auth/auth-middleware.js'
 import { prisma } from '../../shared/prisma-client.js'
@@ -10,19 +10,104 @@ import { fetchSalesStats, type SalesStats } from '../orders/crm-order-client.js'
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware)
 
-  // GET /api/v1/dashboard/kpi
+  // GET /api/v1/dashboard/kpi — 6 thẻ số liệu nhanh trên Dashboard
+  // Phân quyền:
+  // - Admin / Owner: hiển thị tổng của toàn bộ các tài khoản con (toàn tổ chức).
+  // - Tài khoản con (nhân viên/quản lý): chỉ hiển thị số liệu của tài khoản/khách hàng mà tài khoản đó đang care.
   app.get('/api/v1/dashboard/kpi', async (request) => {
-    const user = request.user as { orgId: string }
+    const user = request.user as { id: string; orgId: string; role: string }
     const today = dayjs().startOf('day').toDate()
+    const endOfToday = dayjs().endOf('day').toDate()
     const weekAgo = dayjs().subtract(7, 'day').toDate()
 
-    const [totalContacts, newContactsThisWeek, appointmentsToday, messagesUnreplied, messagesToday, unreadConversations] = await Promise.all([
-      prisma.contact.count({ where: { orgId: user.orgId, mergedInto: null, isGroup: false, deletedAt: null } }),
-      prisma.contact.count({ where: { orgId: user.orgId, createdAt: { gte: weekAgo }, mergedInto: null, isGroup: false, deletedAt: null } }),
-      prisma.appointment.count({ where: { orgId: user.orgId, appointmentDate: { gte: today, lte: dayjs().endOf('day').toDate() } } }),
-      prisma.conversation.count({ where: { orgId: user.orgId, isReplied: false, channelAccount: { isDisabled: false, deletedAt: null } } }),
-      prisma.message.count({ where: { conversation: { orgId: user.orgId, channelAccount: { isDisabled: false, deletedAt: null } }, sentAt: { gte: today } } }),
-      prisma.conversation.count({ where: { orgId: user.orgId, unreadCount: { gt: 0 }, channelAccount: { isDisabled: false, deletedAt: null } } }),
+    const liveAccount = { isDisabled: false, deletedAt: null }
+    const allowedAccountIds = await resolveAllowedAccountIds(user)
+
+    // Admin / Owner: Hiển thị tổng của toàn bộ các tài khoản con trong tổ chức
+    if (!allowedAccountIds) {
+      const [
+        totalContacts,
+        newContactsThisWeek,
+        appointmentsToday,
+        messagesUnreplied,
+        messagesToday,
+        unreadConversations,
+      ] = await Promise.all([
+        prisma.contact.count({ where: { orgId: user.orgId, mergedInto: null, isGroup: false, deletedAt: null } }),
+        prisma.contact.count({ where: { orgId: user.orgId, createdAt: { gte: weekAgo }, mergedInto: null, isGroup: false, deletedAt: null } }),
+        prisma.appointment.count({ where: { orgId: user.orgId, appointmentDate: { gte: today, lte: endOfToday } } }),
+        prisma.conversation.count({ where: { orgId: user.orgId, isReplied: false, channelAccount: liveAccount } }),
+        prisma.message.count({ where: { conversation: { orgId: user.orgId, channelAccount: liveAccount }, sentAt: { gte: today } } }),
+        prisma.conversation.count({ where: { orgId: user.orgId, unreadCount: { gt: 0 }, channelAccount: liveAccount } }),
+      ])
+
+      return {
+        messagesToday,
+        messagesUnreplied,
+        messagesUnread: unreadConversations,
+        appointmentsToday,
+        newContactsThisWeek,
+        totalContacts,
+      }
+    }
+
+    // Tài khoản con: Chỉ hiển thị số liệu của các tài khoản con mà mình đang care
+    if (allowedAccountIds.length === 0) {
+      const [totalContacts, newContactsThisWeek, appointmentsToday] = await Promise.all([
+        prisma.contact.count({ where: { orgId: user.orgId, assignedUserId: user.id, mergedInto: null, isGroup: false, deletedAt: null } }),
+        prisma.contact.count({ where: { orgId: user.orgId, assignedUserId: user.id, createdAt: { gte: weekAgo }, mergedInto: null, isGroup: false, deletedAt: null } }),
+        prisma.appointment.count({ where: { orgId: user.orgId, assignedUserId: user.id, appointmentDate: { gte: today, lte: endOfToday } } }),
+      ])
+      return {
+        messagesToday: 0,
+        messagesUnreplied: 0,
+        messagesUnread: 0,
+        appointmentsToday,
+        newContactsThisWeek,
+        totalContacts,
+      }
+    }
+
+    const convScope = {
+      orgId: user.orgId,
+      channelAccountId: { in: allowedAccountIds },
+      channelAccount: liveAccount,
+    }
+
+    const contactScope = {
+      orgId: user.orgId,
+      mergedInto: null,
+      isGroup: false,
+      deletedAt: null,
+      OR: [
+        { assignedUserId: user.id },
+        { conversations: { some: { channelAccountId: { in: allowedAccountIds } } } },
+      ],
+    }
+
+    const [
+      totalContacts,
+      newContactsThisWeek,
+      appointmentsToday,
+      messagesUnreplied,
+      messagesToday,
+      unreadConversations,
+    ] = await Promise.all([
+      prisma.contact.count({ where: contactScope }),
+      prisma.contact.count({ where: { ...contactScope, createdAt: { gte: weekAgo } } }),
+      prisma.appointment.count({
+        where: {
+          orgId: user.orgId,
+          appointmentDate: { gte: today, lte: endOfToday },
+          OR: [
+            { assignedUserId: user.id },
+            { contact: contactScope },
+          ],
+        },
+      }),
+      prisma.conversation.count({ where: { ...convScope, isReplied: false } }),
+      prisma.message.count({ where: { conversation: convScope, sentAt: { gte: today } } }),
+      prisma.conversation.count({ where: { ...convScope, unreadCount: { gt: 0 } } }),
     ])
 
     return {
@@ -36,15 +121,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // GET /api/v1/dashboard/overview — số liệu cho dashboard mới.
-  //
-  // Ba khác biệt so với /kpi cũ:
-  //  1. Có doanh thu. KPI cũ không có lấy một con số bán hàng nào, trong khi
-  //     đó là thứ cần nhìn đầu tiên mỗi sáng.
-  //  2. Gọi đúng tên: 888 và 408 là số HỘI THOẠI, không phải số tin nhắn —
-  //     màn hình cũ ghi "Tin nhắn chưa xem: 408" là sai. Số tin nhắn chưa đọc
-  //     thật là tổng unreadCount, trả thêm ở đây.
-  //  3. Trả về cả phần của riêng người đang đăng nhập, để nhân viên không nhìn
-  //     số toàn công ty rồi tưởng là của mình.
   app.get('/api/v1/dashboard/overview', async (request) => {
     const user = request.user as { orgId: string; id: string; role: string; email?: string }
     const today = dayjs().startOf('day').toDate()
@@ -52,22 +128,39 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     const weekAgo = dayjs().subtract(7, 'day').toDate()
 
     const liveAccount = { isDisabled: false, deletedAt: null }
+    const isBoss = ['owner', 'admin'].includes(user.role)
+    const allowedAccountIds = await resolveAllowedAccountIds(user)
 
-    // Nhân viên chỉ thấy hội thoại thuộc tài khoản Zalo mình được cấp quyền —
-    // đúng luật đang dùng ở danh sách hội thoại. Không có luật này thì màn hình
-    // báo 891 hội thoại chờ trả lời cho một người chỉ phụ trách vài chục.
     let convScope: any = { orgId: user.orgId, channelAccount: liveAccount }
-    if (user.role === 'member') {
-      const access = await prisma.channelAccountAccess.findMany({
-        where: { userId: user.id },
-        select: { channelAccountId: true },
-      })
-      const ids = access.map(a => a.channelAccountId)
-      convScope = ids.length
-        ? { orgId: user.orgId, channelAccountId: { in: ids }, channelAccount: liveAccount }
-        // Chưa được cấp tài khoản nào thì không có hội thoại nào — trả 0 chứ
-        // không phải trả số của cả công ty.
-        : { orgId: user.orgId, channelAccountId: '__none__' }
+    let contactScope: any = { orgId: user.orgId, mergedInto: null, isGroup: false, deletedAt: null }
+    let apptScope: any = { orgId: user.orgId, appointmentDate: { gte: today, lte: endOfToday } }
+
+    if (!isBoss) {
+      if (!allowedAccountIds || allowedAccountIds.length === 0) {
+        convScope = { orgId: user.orgId, channelAccountId: '__none__' }
+        contactScope = { orgId: user.orgId, assignedUserId: user.id, mergedInto: null, isGroup: false, deletedAt: null }
+        apptScope = { orgId: user.orgId, assignedUserId: user.id, appointmentDate: { gte: today, lte: endOfToday } }
+      } else {
+        convScope = { orgId: user.orgId, channelAccountId: { in: allowedAccountIds }, channelAccount: liveAccount }
+        contactScope = {
+          orgId: user.orgId,
+          mergedInto: null,
+          isGroup: false,
+          deletedAt: null,
+          OR: [
+            { assignedUserId: user.id },
+            { conversations: { some: { channelAccountId: { in: allowedAccountIds } } } },
+          ],
+        }
+        apptScope = {
+          orgId: user.orgId,
+          appointmentDate: { gte: today, lte: endOfToday },
+          OR: [
+            { assignedUserId: user.id },
+            { contact: contactScope },
+          ],
+        }
+      }
     }
 
     const [
@@ -75,9 +168,9 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       convUnreplied, convUnread, unreadAgg, messagesToday,
       myReplies, myConvUnreplied,
     ] = await Promise.all([
-      prisma.contact.count({ where: { orgId: user.orgId, mergedInto: null, isGroup: false, deletedAt: null } }),
-      prisma.contact.count({ where: { orgId: user.orgId, createdAt: { gte: weekAgo }, mergedInto: null, isGroup: false, deletedAt: null } }),
-      prisma.appointment.count({ where: { orgId: user.orgId, appointmentDate: { gte: today, lte: endOfToday } } }),
+      prisma.contact.count({ where: contactScope }),
+      prisma.contact.count({ where: { ...contactScope, createdAt: { gte: weekAgo } } }),
+      prisma.appointment.count({ where: apptScope }),
       prisma.conversation.count({ where: { ...convScope, isReplied: false } }),
       prisma.conversation.count({ where: { ...convScope, unreadCount: { gt: 0 } } }),
       prisma.conversation.aggregate({ _sum: { unreadCount: true }, where: convScope }),
@@ -89,8 +182,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       prisma.conversation.count({ where: { ...convScope, isReplied: false, assignedUserId: user.id } }),
     ])
 
-    // CRM hỏng thì vẫn trả phần hội thoại — thà thiếu ô doanh thu còn hơn
-    // trắng cả dashboard.
+    // CRM hỏng thì vẫn trả phần hội thoại
     let sales: SalesStats | null = null
     let salesError: string | null = null
     try {
@@ -116,7 +208,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       sales,
       salesError,
       // Nhân viên mặc định xem số của mình; chủ và quản trị xem toàn công ty.
-      defaultScope: ['owner', 'admin', 'manager'].includes(user.role) ? 'org' : 'mine',
+      defaultScope: isBoss ? 'org' : 'mine',
       role: user.role,
     }
   })
