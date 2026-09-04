@@ -34,6 +34,7 @@ import { ProductsPage } from '@/pages/knowledge/products-page'
 import { CrmProductsPage } from '@/pages/crm-products/crm-products-page'
 // Tài liệu bán hàng (thư mục: biểu giá → danh mục → sản phẩm → chi tiết)
 import { SalesDocsPage } from '@/pages/sales-docs/sales-docs-page'
+import { DocLibraryPage } from '@/pages/sales-docs/doc-library-page'
 // Tích hợp
 import { IntegrationsPage } from '@/pages/integrations/integrations-page'
 // Platform (super-admin) — auth & layout riêng
@@ -89,6 +90,7 @@ export const router = createBrowserRouter([
       { path: 'crm-products', element: <ProtectedRoute permission={'products.view'}><CrmProductsPage /></ProtectedRoute> },
 
       { path: 'sales-docs', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
+      { path: 'sales-docs/library', element: <ProtectedRoute permission={'products.view'}><DocLibraryPage /></ProtectedRoute> },
       { path: 'sales-docs/c/:catId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
       { path: 'sales-docs/p/:productId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
 

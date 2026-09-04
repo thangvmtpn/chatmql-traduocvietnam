@@ -88,6 +88,7 @@ import { platformBrandingRoutes } from './modules/platform/platform-branding-rou
 import { productRoutes, PRODUCT_UPLOADS_DIR } from './modules/products/product-routes.js'
 import { crmProductRoutes } from './modules/crm-products/crm-products-routes.js'
 import { productDocRoutes } from './modules/product-docs/product-docs-routes.js'
+import { docLibraryRoutes, DOC_ASSETS_DIR } from './modules/doc-library/doc-library-routes.js'
 import { crmSyncRoutes } from './modules/integrations/crm-sync/crm-sync-routes.js'
 import { orderRoutes } from './modules/orders/order-routes.js'
 import { promotionAdminRoutes } from './modules/orders/promotion-admin-routes.js'
@@ -195,6 +196,11 @@ await app.register(fastifyStatic, {
 await app.register(fastifyStatic, {
   root: PRODUCT_UPLOADS_DIR,
   prefix: '/uploads/products/',
+  decorateReply: false,
+})
+await app.register(fastifyStatic, {
+  root: DOC_ASSETS_DIR,
+  prefix: '/uploads/doc-assets/',
   decorateReply: false,
 })
 await app.register(fastifyStatic, {
@@ -316,6 +322,7 @@ await app.register(platformBrandingRoutes)
 await app.register(productRoutes)
 await app.register(crmProductRoutes)  // /crm-products — đọc sản phẩm thẳng từ CRM
 await app.register(productDocRoutes)  // /product-docs — tài liệu bán hàng theo mã SP
+await app.register(docLibraryRoutes)  // /doc-library — thư viện thư mục + tài nguyên
 
 // ── CRM & FM Integrations + Order Dispatch ───────────────────────────
 await app.register(crmSyncRoutes)

@@ -112,6 +112,11 @@ function RootView() {
       <PageHeader
         title="Tài liệu bán hàng"
         description="Biểu giá và tư liệu từng sản phẩm (ảnh · mô tả · video) để nhân viên tra cứu và AI đọc khi tư vấn."
+        actions={
+          <Button variant="outline" className="gap-1.5" asChild>
+            <Link to={`${ROOT}/library`}><FolderOpen className="h-4 w-4" /> Thư viện tài liệu</Link>
+          </Button>
+        }
       />
       <Crumbs items={[{ label: 'Tài liệu bán hàng' }]} />
 

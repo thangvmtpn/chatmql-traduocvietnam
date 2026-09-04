@@ -77,6 +77,8 @@ model Organization {
   quoteEvents           QuoteEvent[]
   websiteWidgets        WebsiteWidget[]
   productDocs           ProductDoc[]
+  docFolders            DocFolder[]
+  docAssets             DocAsset[]
   aiEvalCases           AiEvalCase[]
   aiEvalRuns            AiEvalRun[]
   roles                 Role[]
@@ -2179,4 +2181,70 @@ model ProductDoc {
   @@unique([orgId, productCode])
   @@index([orgId])
   @@map("product_docs")
+}
+
+/// Thư mục của THƯ VIỆN tài liệu bán hàng — admin tự tạo, lồng nhau tuỳ ý.
+/// Khác `product_docs` (tài liệu gắn cứng vào một mã sản phẩm): thư viện là kho
+/// tài nguyên chung, một tài nguyên có thể dùng cho nhiều mã hoặc không mã nào
+/// (biểu giá, ảnh xưởng, banner chiến dịch...).
+model DocFolder {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  parentId    String?  @map("parent_id")
+  name        String
+  description String?
+  /// Emoji hiển thị cho dễ nhận diện.
+  icon        String?
+  /// sales = được phép gửi khách · internal = chỉ nội bộ · ai_only = chỉ AI đọc.
+  /// Tài nguyên thừa kế mức này khi tạo, và luồng gửi khách CHẶN theo cờ này.
+  visibility  String   @default("sales")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent   DocFolder?   @relation("DocFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children DocFolder[]  @relation("DocFolderTree")
+  assets   DocAsset[]
+
+  @@index([orgId, parentId])
+  @@map("doc_folders")
+}
+
+/// Một tài nguyên trong thư viện: ảnh, video, pdf, tài liệu, văn bản thuần, hoặc
+/// chỉ là một đường dẫn. Nhân viên tra cứu để gửi khách; AI đọc phần chữ khi tư vấn.
+model DocAsset {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  folderId    String?  @map("folder_id")
+  /// image | video | pdf | doc | text | link
+  kind        String
+  title       String
+  description String?
+  /// Nội dung chữ (kind=text) hoặc chữ trích từ pdf/doc — đây là phần AI đọc.
+  textContent String?  @map("text_content")
+  /// Đường dẫn file đã tải lên máy chủ (tương đối, ví dụ /uploads/doc-assets/...).
+  fileUrl     String?  @map("file_url")
+  thumbUrl    String?  @map("thumb_url")
+  fileSize    Int?     @map("file_size")
+  mimeType    String?  @map("mime_type")
+  /// Link ngoài (Drive, YouTube...) khi không tải file về.
+  sourceUrl   String?  @map("source_url")
+  /// Id ở hệ thống nguồn (fileId Drive) — khoá chống nhập trùng khi chạy lại script.
+  sourceId    String?  @map("source_id")
+  /// Mã sản phẩm dùng tài nguyên này. Rỗng = tài nguyên chung, không theo sản phẩm.
+  productCodes String[] @default([]) @map("product_codes")
+  tags        String[] @default([])
+  visibility  String   @default("sales")
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  folder DocFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, sourceId])
+  @@index([orgId, folderId])
+  @@index([orgId, kind])
+  @@map("doc_assets")
 }

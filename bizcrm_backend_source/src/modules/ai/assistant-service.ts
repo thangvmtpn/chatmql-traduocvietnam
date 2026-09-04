@@ -12,6 +12,7 @@ import { retrieveKb } from '../knowledge/kb-service.js'
 import { retrieveKbSemantic } from '../knowledge/embedding-service.js'
 import { retrieveProductSemantic } from '../products/product-embedding.js'
 import { retrieveProductDocs } from '../product-docs/product-docs-service.js'
+import { retrieveDocAssets } from '../doc-library/doc-library-service.js'
 import { resolveBotById } from './ai-bot-service.js'
 import { getContextBudgets, truncate } from './harness/budgets.js'
 
@@ -69,13 +70,25 @@ async function loadProductContext(orgId: string, query: string): Promise<{ text:
 
 async function loadDocContext(orgId: string, query: string): Promise<{ text: string; count: number }> {
   // Tài liệu bán hàng do công ty soạn — nguồn tri thức sản phẩm chính.
-  const docs = await retrieveProductDocs(orgId, query, 5).catch(() => [])
+  const [docs, assets] = await Promise.all([
+    retrieveProductDocs(orgId, query, 5).catch(() => []),
+    retrieveDocAssets(orgId, query, 5).catch(() => []),
+  ])
   let total = 0
   const kept: string[] = []
   for (const d of docs) {
     const media = [d.imageCount ? `${d.imageCount} ảnh` : '', d.videoCount ? `${d.videoCount} video` : '']
       .filter(Boolean).join(' · ')
     const block = `- [${d.productCode}] ${d.name ?? ''}${media ? ` (có ${media})` : ''}: ${d.description ?? ''}`
+    total += block.length
+    if (total > MAX_DOC_CHARS) break
+    kept.push(block)
+  }
+  // Tài nguyên thư viện: chữ thì đưa vào, ảnh/video chỉ báo là CÓ để đề nghị gửi.
+  for (const a of assets) {
+    const body = a.textContent ?? a.description ?? ''
+    const tag = a.sendable ? ' (gửi được cho khách)' : ''
+    const block = `- [thư viện · ${a.kind}] ${a.title}${tag}: ${body}`
     total += block.length
     if (total > MAX_DOC_CHARS) break
     kept.push(block)
