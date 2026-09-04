@@ -37,6 +37,7 @@ import {
 import { useDocFolders, type DocFolder } from '@/hooks/use-doc-library'
 import { FileText } from 'lucide-react'
 import { SalesDocEditDialog } from './sales-doc-edit-dialog'
+import { DocAssetDetailDialog } from './doc-asset-detail-dialog'
 
 const ROOT = '/sales-docs'
 /** Phần tài liệu mà trang tổng quan cần — không cần cả bản ghi. */
@@ -265,56 +266,53 @@ function FolderNode({
  * chi tiết sản phẩm — nơi dữ liệu thật (giá, tồn) được nạp từ hệ thống nguồn.
  */
 function AssetTile({ a }: { a: DocAsset }) {
+  const [open, setOpen] = useState(false)
   const src = a.kind === 'product'
     ? assetUrl(a.images?.[0])
     : a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
-  const href = assetUrl(a.fileUrl) ?? a.sourceUrl ?? undefined
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
-      <div className="relative aspect-[4/3] bg-muted">
-        {src ? (
-          <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
-            <FileText className="h-6 w-6" />
-            <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
-          </div>
-        )}
-        {a.visibility !== 'sales' && (
-          <span className="absolute left-1.5 top-1.5 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium">
-            {VISIBILITY_LABELS[a.visibility]}
-          </span>
-        )}
-      </div>
-      <div className="min-w-0 space-y-1 p-2.5">
-        {href ? (
-          <a href={href} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-medium leading-snug hover:text-primary hover:underline">
-            {a.title}
-          </a>
-        ) : (
+    <>
+      {/* Bấm vào thẻ mở CHI TIẾT để lấy từng phần hoặc lấy toàn bộ, thay vì
+          mở thẳng tệp — tệp vẫn mở được từ trong chi tiết. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors hover:border-primary/50"
+      >
+        <div className="relative aspect-[4/3] w-full bg-muted">
+          {src ? (
+            <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+              <FileText className="h-6 w-6" />
+              <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
+            </div>
+          )}
+          {a.visibility !== 'sales' && (
+            <span className="absolute left-1.5 top-1.5 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium">
+              {VISIBILITY_LABELS[a.visibility]}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 space-y-1 p-2.5">
           <p className="line-clamp-2 text-sm font-medium leading-snug">{a.title}</p>
-        )}
-        {a.description && <p className="line-clamp-2 text-[11px] text-muted-foreground">{a.description}</p>}
-        {a.productCodes.length > 0 && (
+          {a.description && <p className="line-clamp-2 text-[11px] text-muted-foreground">{a.description}</p>}
           <div className="flex flex-wrap items-center gap-1 pt-0.5">
             {a.productCodes.slice(0, 3).map((c) => (
-              <Link
-                key={c}
-                to={`${ROOT}/p/${encodeURIComponent(c)}`}
-                className="rounded bg-primary/10 px-1 font-mono text-[9.5px] text-primary hover:underline"
-                title="Xem chi tiết sản phẩm đã ghép nối"
-              >
-                {c}
-              </Link>
+              <span key={c} className="rounded bg-primary/10 px-1 font-mono text-[9.5px] text-primary">{c}</span>
             ))}
-            {a.productCodes.length > 3 && (
-              <span className="text-[9.5px] text-muted-foreground">+{a.productCodes.length - 3}</span>
+            {(a.images?.length ?? 0) > 1 && (
+              <span className="text-[9.5px] text-muted-foreground">{a.images.length} ảnh</span>
+            )}
+            {(a.videoUrls?.length ?? 0) > 0 && (
+              <span className="text-[9.5px] text-muted-foreground">{a.videoUrls.length} video</span>
             )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      </button>
+      <DocAssetDetailDialog asset={a} open={open} onOpenChange={setOpen} />
+    </>
   )
 }
 

@@ -162,3 +162,18 @@ export function assetUrl(u?: string | null): string | undefined {
   if (/^https?:\/\//i.test(u) || u.startsWith('data:')) return u
   return `${API_ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
 }
+
+/**
+ * Gửi tài nguyên đã chọn vào hội thoại.
+ * Backend chặn lại lần nữa theo `visibility` — giao diện lọc chỉ là lớp trải nghiệm.
+ */
+export function useSendDocAssets() {
+  return useMutation({
+    mutationFn: async (input: { conversationId: string; assetIds: string[] }) =>
+      (await api.post<{
+        sent: number
+        sentIds: string[]
+        skipped: Array<{ id: string; reason: string }>
+      }>('/doc-library/send', input)).data,
+  })
+}

@@ -31,6 +31,7 @@ import {
 } from '@/hooks/use-doc-library'
 import { DocAssetDialog } from './doc-asset-dialog'
 import { DocFolderDialog } from './doc-folder-dialog'
+import { DocAssetDetailDialog } from './doc-asset-detail-dialog'
 
 const ALL = '__all__'
 const UNFILED = '__unfiled__'
@@ -327,6 +328,7 @@ function FolderRow({
 
 function AssetCard({ a, canEdit, onEdit }: { a: DocAsset; canEdit: boolean; onEdit: () => void }) {
   const del = useDeleteDocAsset()
+  const [detailOpen, setDetailOpen] = useState(false)
   const Icon = KIND_ICON[a.kind] ?? FileText
   const src = a.kind === 'product'
     ? assetUrl(a.images?.[0])
@@ -374,13 +376,13 @@ function AssetCard({ a, canEdit, onEdit }: { a: DocAsset; canEdit: boolean; onEd
         )}
       </div>
       <div className="min-w-0 space-y-1 p-2.5">
-        {href ? (
-          <a href={href} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-medium leading-snug hover:text-primary hover:underline">
-            {a.title}
-          </a>
-        ) : (
-          <p className="line-clamp-2 text-sm font-medium leading-snug">{a.title}</p>
-        )}
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          className="line-clamp-2 text-left text-sm font-medium leading-snug hover:text-primary hover:underline"
+        >
+          {a.title}
+        </button>
         {a.description && <p className="line-clamp-2 text-[11px] text-muted-foreground">{a.description}</p>}
         <div className="flex flex-wrap items-center gap-1 pt-0.5">
           {a.productCodes.slice(0, 3).map((c) => (

@@ -1,51 +1,57 @@
 /**
- * sales-docs-dialog.tsx — Popup "Tài liệu bán hàng".
+ * sales-docs-dialog.tsx — Popup "Tài liệu bán hàng" mở từ thanh soạn tin.
  *
- * Mở từ nút thư mục trên thanh soạn tin. Trước đây khối này nằm ở tab thứ tư của
- * cột phải, nhưng cột đó chỉ rộng 365px nên lưới ảnh bị bó thành 3 ô nhỏ; đưa ra
- * popup rộng thì nhân viên nhìn được nhiều tài liệu hơn trong một lần mở.
+ * Nguồn dữ liệu là THƯ VIỆN tài liệu bán hàng (module /sales-docs), duyệt đi từ
+ * tổng quan: cây thư mục bên trái, tài nguyên bên phải.
  *
- * Nguồn dữ liệu vẫn là `GET /library/items` — kho tài liệu ĐÃ DUYỆT (ảnh sản
- * phẩm + kho tri thức), gom theo danh mục. Gửi qua `POST /library/send`.
+ * Ở đây CHỈ xem · chọn · gửi — không sửa trực tiếp. Muốn thêm/sửa thì bấm
+ * "Quản lý" để mở module (mở tab mới, khỏi mất hội thoại đang dở).
  *
- * Ba tab theo `kind` của backend:
- *   • Hình ảnh — lưới ảnh, chọn nhiều rồi gửi thẳng vào hội thoại
- *   • Content  — bài viết/kịch bản, chỉ copy (không gửi được dạng tệp)
- *   • Video    — lưới video đã duyệt, gửi như ảnh
+ * Tài liệu `internal` không hiện ở đây và backend cũng chặn gửi.
  */
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Check, Copy, Lock, Search, Send } from 'lucide-react'
+import {
+  ExternalLink, FileText, Film, Folder, Image as ImageIcon, Link2, Lock, Package,
+  Search, Send, Settings2, Type,
+} from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox, ScrollArea } from '@/components/ui/misc'
 import { ErrorState, Loading } from '@/components/shared/feedback'
 import { apiError } from '@/lib/api-client'
-import { API_ORIGIN } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import {
-  LIBRARY_KIND_LABELS, useLibraryItems, useSendLibraryItems,
-  type LibraryItem, type LibraryKind,
-} from '@/hooks/use-library'
+  KIND_LABELS, assetUrl, useDocAssets, useDocFolders, useSendDocAssets,
+  type AssetKind, type DocAsset, type DocFolder,
+} from '@/hooks/use-doc-library'
 
-type DocsKind = Exclude<LibraryKind, 'all'>
+const ALL = '__all__'
 
-/** `sendable=false` cho Content: backend chỉ gửi được ảnh/video, văn bản thì copy. */
-const DOCS_TABS: Array<{ id: DocsKind; sendable: boolean }> = [
-  { id: 'image', sendable: true },
-  { id: 'content', sendable: false },
-  { id: 'video', sendable: true },
-]
+const KIND_ICON: Record<AssetKind, typeof ImageIcon> = {
+  product: Package, image: ImageIcon, video: Film, pdf: FileText, doc: FileText, text: Type, link: Link2,
+}
 
-/** Đường dẫn tương đối từ backend → URL tuyệt đối để trình duyệt tải được. */
-function mediaUrl(u?: string | null): string | undefined {
-  if (!u) return undefined
-  if (/^https?:\/\//i.test(u) || u.startsWith('data:')) return u
-  return `${API_ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+/** Cây thư mục phẳng hoá theo thứ tự người dùng đã sắp xếp. */
+function flatten(folders: DocFolder[]): Array<DocFolder & { depth: number }> {
+  const byParent = new Map<string | null, DocFolder[]>()
+  for (const f of folders) {
+    const arr = byParent.get(f.parentId) ?? []
+    arr.push(f)
+    byParent.set(f.parentId, arr)
+  }
+  const out: Array<DocFolder & { depth: number }> = []
+  const walk = (parentId: string | null, depth: number) => {
+    for (const f of (byParent.get(parentId) ?? []).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))) {
+      out.push({ ...f, depth })
+      walk(f.id, depth + 1)
+    }
+  }
+  walk(null, 0)
+  return out
 }
 
 interface Props {
@@ -55,67 +61,24 @@ interface Props {
 }
 
 export function SalesDocsDialog({ convId, open, onOpenChange }: Props) {
-  const [kind, setKind] = useState<DocsKind>('image')
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[70vh] max-h-[70vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b px-5 py-3">
-          <DialogTitle className="text-base">Tài liệu bán hàng</DialogTitle>
-          <DialogDescription className="flex items-center gap-1.5">
-            <Lock className="h-3 w-3 shrink-0" />
-            Chỉ hiển thị tài liệu <b className="font-semibold">đã duyệt</b> — được phép gửi ra ngoài cho khách.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs
-          value={kind}
-          onValueChange={(v) => setKind(v as DocsKind)}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="px-5 pt-3">
-            <TabsList className="grid w-full grid-cols-3">
-              {DOCS_TABS.map((t) => (
-                <TabsTrigger key={t.id} value={t.id}>{LIBRARY_KIND_LABELS[t.id]}</TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          {DOCS_TABS.map((t) => (
-            <TabsContent
-              key={t.id}
-              value={t.id}
-              className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
-            >
-              {/* Chỉ mount tab đang mở — mỗi tab là một lời gọi /library/items riêng. */}
-              {kind === t.id && <DocsPane convId={convId} kind={t.id} sendable={t.sendable} />}
-            </TabsContent>
-          ))}
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ── Nội dung một tab ────────────────────────────────────────────────
-
-function DocsPane({ convId, kind, sendable }: { convId: string; kind: DocsKind; sendable: boolean }) {
+  const [folderId, setFolderId] = useState<string>(ALL)
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const itemsQ = useLibraryItems(kind)
-  const send = useSendLibraryItems()
 
-  // Đổi hội thoại thì bỏ hết lựa chọn — tránh gửi nhầm tài liệu sang khách khác.
-  useEffect(() => { setSelected(new Set()) }, [convId])
+  const foldersQ = useDocFolders()
+  const assetsQ = useDocAssets({
+    folderId: folderId === ALL ? undefined : folderId,
+    q,
+    pageSize: 100,
+  })
+  const send = useSendDocAssets()
 
-  const query = q.trim().toLowerCase()
-  const match = (it: LibraryItem) =>
-    !query || `${it.title || ''} ${it.meta?.sku || ''} ${it.content || ''}`.toLowerCase().includes(query)
-
-  const groups = (itemsQ.data?.groups ?? [])
-    .map((g) => ({ ...g, items: g.items.filter(match) }))
-    .filter((g) => g.items.length > 0)
+  // Tài liệu nội bộ không được phép gửi khách nên không hiện ở màn này.
+  const folders = useMemo(
+    () => flatten((foldersQ.data ?? []).filter((f) => f.visibility !== 'internal')),
+    [foldersQ.data],
+  )
+  const assets = (assetsQ.data?.items ?? []).filter((a) => a.visibility === 'sales')
 
   const toggle = (id: string, on: boolean) =>
     setSelected((prev) => {
@@ -125,21 +88,11 @@ function DocsPane({ convId, kind, sendable }: { convId: string; kind: DocsKind; 
       return s
     })
 
-  const copy = async (it: LibraryItem) => {
-    try {
-      await navigator.clipboard.writeText(it.content || '')
-      setCopiedId(it.id)
-      setTimeout(() => setCopiedId((c) => (c === it.id ? null : c)), 1600)
-    } catch {
-      toast.error('Trình duyệt chặn sao chép. Bôi đen rồi Ctrl+C.')
-    }
-  }
-
   const doSend = () => {
-    const itemIds = [...selected]
-    if (!itemIds.length) return
+    const assetIds = [...selected]
+    if (!assetIds.length) return
     send.mutate(
-      { conversationId: convId, itemIds },
+      { conversationId: convId, assetIds },
       {
         onSuccess: (r) => {
           setSelected(new Set())
@@ -155,98 +108,99 @@ function DocsPane({ convId, kind, sendable }: { convId: string; kind: DocsKind; 
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative px-5 py-3">
-        <Search className="pointer-events-none absolute left-7.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Tìm theo tên, mã…"
-          className="h-9 pl-8 text-sm"
-        />
-      </div>
-
-      <ScrollArea className="min-h-0 flex-1 [&>div]:!block">
-        <div className="px-5 pb-4">
-          {itemsQ.isLoading ? (
-            <Loading className="py-10" />
-          ) : itemsQ.isError ? (
-            <ErrorState message={`Không tải được: ${apiError(itemsQ.error)}`} />
-          ) : groups.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {kind === 'content'
-                ? 'Chưa có tài liệu content nào.'
-                : `Chưa có ${kind === 'video' ? 'video' : 'hình ảnh'} nào được duyệt.`}
-            </p>
-          ) : kind === 'content' ? (
-            <div className="space-y-2">
-              {groups.flatMap((g) => g.items).map((it) => (
-                <div key={it.id} className="rounded-lg border px-3 py-2.5">
-                  <div className="mb-1 flex items-center gap-2">
-                    <div className="min-w-0 flex-1 truncate text-sm font-semibold">{it.title}</div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cn('h-7 shrink-0 px-2 text-xs', copiedId === it.id && 'border-success/40 bg-success/10 text-success')}
-                      onClick={() => copy(it)}
-                    >
-                      {copiedId === it.id ? <><Check /> Đã copy</> : <><Copy /> Copy</>}
-                    </Button>
-                  </div>
-                  <div className="whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
-                    {it.content || ''}
-                  </div>
-                </div>
-              ))}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[74vh] max-h-[74vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="border-b px-5 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle className="text-base">Tài liệu bán hàng</DialogTitle>
+              <DialogDescription className="flex items-center gap-1.5">
+                <Lock className="h-3 w-3 shrink-0" />
+                Chỉ xem và gửi — muốn sửa thì bấm Quản lý.
+              </DialogDescription>
             </div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.id} className="mb-4">
-                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold">📁 {g.name}</div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {g.items.map((it) => {
-                    const on = selected.has(it.id)
-                    const src = mediaUrl(it.thumbUrl || it.fullUrl)
-                    return (
-                      <label
-                        key={it.id}
-                        title={`${it.title}${it.meta?.sku ? ` — Mã: ${it.meta.sku}` : ''}`}
-                        className={cn(
-                          'relative flex aspect-square cursor-pointer flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border-2 bg-muted transition-shadow',
-                          on ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-border',
-                        )}
-                      >
-                        <Checkbox
-                          checked={on}
-                          onCheckedChange={(v) => toggle(it.id, v === true)}
-                          className="absolute left-1.5 top-1.5 z-10 bg-background"
-                        />
-                        {src && (
-                          <img
-                            src={src}
-                            alt=""
-                            loading="lazy"
-                            className="absolute inset-0 h-full w-full object-cover"
-                            onError={(e) => { e.currentTarget.style.display = 'none' }}
-                          />
-                        )}
-                        <span className="relative text-[22px] leading-none drop-shadow">
-                          {kind === 'video' ? '🎬' : '🍵'}
-                        </span>
-                        <span className="relative max-w-full truncate px-1 text-[9.5px] font-semibold text-foreground drop-shadow-sm">
-                          {it.title}
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </ScrollArea>
+            <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5">
+              <a href="/sales-docs" target="_blank" rel="noreferrer" title="Mở module Tài liệu bán hàng ở tab mới">
+                <Settings2 className="h-4 w-4" /> Quản lý <ExternalLink className="h-3 w-3" />
+              </a>
+            </Button>
+          </div>
+        </DialogHeader>
 
-      {sendable && (
+        <div className="grid min-h-0 flex-1 grid-cols-[190px_1fr] overflow-hidden">
+          {/* Cây thư mục — đi từ tổng quan */}
+          <aside className="min-h-0 overflow-y-auto border-r p-2">
+            <button
+              type="button"
+              onClick={() => setFolderId(ALL)}
+              className={cn(
+                'flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs',
+                folderId === ALL ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-accent',
+              )}
+            >
+              <Folder className="h-3.5 w-3.5 shrink-0 opacity-70" /> Tất cả
+            </button>
+            {foldersQ.isLoading ? (
+              <Loading className="py-6" />
+            ) : (
+              folders.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFolderId(f.id)}
+                  style={f.depth ? { paddingLeft: 8 + f.depth * 12 } : undefined}
+                  className={cn(
+                    'flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs',
+                    folderId === f.id ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-accent',
+                  )}
+                >
+                  <Folder className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                  <span className="min-w-0 flex-1 truncate">{f.icon ? `${f.icon} ` : ''}{f.name}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{f.assetCount}</span>
+                </button>
+              ))
+            )}
+          </aside>
+
+          {/* Lưới tài nguyên */}
+          <section className="flex min-h-0 flex-col">
+            <div className="relative px-4 py-2.5">
+              <Search className="pointer-events-none absolute left-6 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Tìm theo tên, mô tả, nội dung…"
+                className="h-9 pl-8 text-sm"
+              />
+            </div>
+
+            <ScrollArea className="min-h-0 flex-1 [&>div]:!block">
+              <div className="px-4 pb-4">
+                {assetsQ.isLoading ? (
+                  <Loading className="py-10" />
+                ) : assetsQ.error ? (
+                  <ErrorState message={apiError(assetsQ.error)} />
+                ) : assets.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    Chưa có tài liệu nào được phép gửi khách ở mục này.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {assets.map((a) => (
+                      <AssetPick
+                        key={a.id}
+                        a={a}
+                        checked={selected.has(a.id)}
+                        onToggle={(on) => toggle(a.id, on)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </section>
+        </div>
+
         <div className="border-t px-5 py-3">
           <Button
             className="w-full font-bold"
@@ -256,7 +210,54 @@ function DocsPane({ convId, kind, sendable }: { convId: string; kind: DocsKind; 
             <Send /> {send.isPending ? 'Đang gửi…' : `Gửi vào chat (${selected.size})`}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Một tài nguyên chọn được. Bấm cả thẻ để tick, không cần nhắm đúng ô vuông. */
+function AssetPick({
+  a, checked, onToggle,
+}: { a: DocAsset; checked: boolean; onToggle: (on: boolean) => void }) {
+  const Icon = KIND_ICON[a.kind] ?? FileText
+  const src = a.kind === 'product'
+    ? assetUrl(a.images?.[0])
+    : a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
+
+  return (
+    <label
+      title={a.description || a.title}
+      className={cn(
+        'relative flex cursor-pointer flex-col overflow-hidden rounded-lg border-2 bg-card transition-shadow',
+        checked ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-border',
       )}
-    </div>
+    >
+      <div className="relative aspect-square bg-muted">
+        {src ? (
+          <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground">
+            <Icon className="h-6 w-6" />
+            <span className="text-[10px]">{KIND_LABELS[a.kind]}</span>
+          </div>
+        )}
+        <Checkbox
+          checked={checked}
+          onCheckedChange={(v) => onToggle(v === true)}
+          className="absolute left-1.5 top-1.5 z-10 bg-background"
+        />
+      </div>
+      <div className="min-w-0 space-y-0.5 p-2">
+        <p className="line-clamp-2 text-[11px] font-medium leading-snug">{a.title}</p>
+        <div className="flex flex-wrap items-center gap-1">
+          {a.productCodes.slice(0, 2).map((c) => (
+            <span key={c} className="rounded bg-primary/10 px-1 font-mono text-[9px] text-primary">{c}</span>
+          ))}
+          {(a.images?.length ?? 0) > 1 && (
+            <span className="text-[9px] text-muted-foreground">{a.images.length} ảnh</span>
+          )}
+        </div>
+      </div>
+    </label>
   )
 }

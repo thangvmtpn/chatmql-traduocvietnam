@@ -9,6 +9,11 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import multipart from '@fastify/multipart'
 import { authMiddleware } from '../auth/auth-middleware.js'
+import { prisma } from '../../shared/prisma-client.js'
+import { logger } from '../../shared/logger.js'
+import { sendImageCore } from '../chat/send-image-core.js'
+import { emitNewMessage } from '../realtime/socket-gateway.js'
+import { transformMessageForFrontend } from '../chat/chat-routes.js'
 import {
   ASSET_KINDS, VISIBILITIES,
   listFolders, createFolder, updateFolder, deleteFolder,
@@ -171,4 +176,86 @@ export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
       originalName: file.filename,
     }
   })
+
+  /**
+   * Gửi tài nguyên đã chọn vào hội thoại.
+   *
+   * CHẶN Ở ĐÂY, không chỉ ở giao diện: chỉ tài nguyên `visibility = 'sales'`
+   * mới được gửi ra khách. Ảnh đi qua đúng đường gửi ảnh của hệ thống
+   * (sendImageCore) nên vẫn ra kênh Zalo như nhân viên gửi tay; phần chữ tạo
+   * một tin văn bản. Giới hạn 20 mục mỗi lần để không spam khách.
+   */
+  app.post<{ Body: { conversationId?: string; assetIds?: string[] } }>(
+    '/api/v1/doc-library/send',
+    async (request, reply) => {
+      const user = request.user as AuthUser
+      const { conversationId, assetIds } = request.body || {}
+
+      if (!conversationId?.trim()) return fail(reply, 400, 'Thiếu conversationId')
+      if (!assetIds?.length) return fail(reply, 400, 'Chưa chọn tài liệu nào')
+
+      const conv = await prisma.conversation.findFirst({
+        where: { id: conversationId.trim(), orgId: user.orgId },
+        select: { id: true },
+      })
+      if (!conv) return fail(reply, 404, 'Không tìm thấy hội thoại')
+
+      const sentIds: string[] = []
+      const skipped: Array<{ id: string; reason: string }> = []
+
+      for (const id of assetIds.slice(0, 20)) {
+        try {
+          const a = await prisma.docAsset.findFirst({ where: { id, orgId: user.orgId } })
+          if (!a) { skipped.push({ id, reason: 'Không tìm thấy tài liệu' }); continue }
+          if (a.visibility !== 'sales') {
+            skipped.push({ id, reason: 'Tài liệu nội bộ — không được gửi khách' })
+            continue
+          }
+
+          // Ảnh: ảnh đại diện của bộ ảnh, hoặc tệp ảnh đơn.
+          const image = a.images[0] ?? (a.kind === 'image' ? a.fileUrl : null)
+          if (image) {
+            const r = await sendImageCore({
+              orgId: user.orgId,
+              conversationId: conv.id,
+              imageUrl: image,
+              caption: a.title,
+              sender: 'staff',
+              repliedByUserId: user.id,
+            })
+            if (r.sent) sentIds.push(id)
+            else skipped.push({ id, reason: r.error || 'Không gửi được ảnh' })
+            continue
+          }
+
+          // Còn lại gửi dạng chữ: tiêu đề + mô tả/nội dung + link (nếu có).
+          const link = a.sourceUrl || a.videoUrls[0] || a.fileUrl
+          const body = [a.description, a.textContent].filter(Boolean).join('\n\n')
+          const text = [`**${a.title}**`, body, link].filter(Boolean).join('\n\n')
+
+          const msg = await prisma.message.create({
+            data: {
+              conversationId: conv.id,
+              senderType: 'user',
+              repliedByUserId: user.id,
+              contentType: 'text',
+              content: text,
+              sentAt: new Date(),
+            },
+          })
+          emitNewMessage(user.orgId, conv.id, transformMessageForFrontend(msg))
+          sentIds.push(id)
+        } catch (err) {
+          logger.error({ err, assetId: id }, '[doc-library] không gửi được tài liệu')
+          skipped.push({ id, reason: 'Lỗi hệ thống' })
+        }
+      }
+
+      logger.info(
+        { conversationId: conv.id, userId: user.id, sent: sentIds.length, skipped: skipped.length },
+        '[doc-library] nhân viên gửi tài liệu vào hội thoại',
+      )
+      return { sent: sentIds.length, sentIds, skipped }
+    },
+  )
 }
