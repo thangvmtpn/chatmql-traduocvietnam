@@ -18,11 +18,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Hand, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Hand, List, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export interface TourStep {
+  /**
+   * Chương chứa bước này. Tour dài phải chia chương thì người học mới biết
+   * mình đang ở đoạn nào và còn bao nhiêu — 20 bước trôi tuột không có mốc
+   * nghỉ là bỏ giữa chừng.
+   */
+  section?: string
   /** Mốc trên giao diện, ví dụ `[data-tour="chat-docs"]`. Bỏ trống = bảng giữa màn. */
   selector?: string
   title: string
@@ -33,6 +39,12 @@ export interface TourStep {
   clickToAdvance?: boolean
   /** Tự bấm hộ khi vào bước, cho những chỗ phải mở ra mới thấy. */
   autoClick?: boolean
+  /**
+   * Bấm phần tử này TRƯỚC khi tìm mốc chính. Dùng khi mốc nằm trong một tab
+   * chưa mở: người học đang ở tab khác thì không có gì để tô sáng, mà bắt họ
+   * tự mò đúng tab thì tour hết tác dụng.
+   */
+  prepareClick?: string
   /** Nới rộng vùng sáng (px), mặc định 6. */
   pad?: number
   /**
@@ -92,6 +104,7 @@ export function ProductTour({
   const [ready, setReady] = useState(false)
   /** Bước có mốc nhưng mốc chưa xuất hiện trên màn hình. */
   const [missing, setMissing] = useState(false)
+  const [tocOpen, setTocOpen] = useState(false)
   const targetRef = useRef<HTMLElement | null>(null)
 
   const step = tour.steps[idx]
@@ -111,11 +124,20 @@ export function ProductTour({
     targetRef.current = null
 
     const run = async () => {
-      if (step.route && window.location.pathname !== step.route) {
+      // So khớp theo NHÁNH đường dẫn, không so bằng tuyệt đối: đang mở
+      // /conversations/<id> mà thấy khác /conversations rồi điều hướng lại là
+      // đóng mất hội thoại, và mọi mốc phía sau biến sạch.
+      if (step.route && !window.location.pathname.startsWith(step.route)) {
         navigate(step.route)
         await new Promise((r) => setTimeout(r, 420))
       }
       if (!alive) return
+
+      if (step.prepareClick) {
+        visible(document.querySelector<HTMLElement>(step.prepareClick))?.click()
+        await new Promise((r) => setTimeout(r, 360))
+        if (!alive) return
+      }
 
       if (!step.selector) { setReady(true); return }
 
@@ -195,6 +217,7 @@ export function ProductTour({
     return () => window.removeEventListener('keydown', onKey)
   }, [next, onClose])
 
+  const sections = groupSections(tour.steps)
   const panel = placePanel(rect)
 
   return createPortal(
@@ -219,20 +242,57 @@ export function ProductTour({
         className="pointer-events-auto absolute w-[340px] rounded-xl border bg-card p-4 shadow-2xl transition-all duration-300"
         style={panel}
       >
-        <div className="mb-1.5 flex items-start gap-2">
-          <span className="mt-0.5 shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+        <div className="mb-1 flex items-center gap-1.5">
+          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
             {idx + 1}/{tour.steps.length}
           </span>
-          <b className="min-w-0 flex-1 text-[14px] leading-snug">{step.title}</b>
+          {step.section && (
+            <span className="min-w-0 truncate text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {step.section}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setTocOpen((v) => !v)}
+            aria-label="Mục lục"
+            title="Mục lục các chương"
+            className={cn(
+              'ml-auto shrink-0 rounded p-1 text-muted-foreground hover:bg-accent',
+              tocOpen && 'bg-accent text-foreground',
+            )}
+          >
+            <List className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={onClose}
             aria-label="Thoát hướng dẫn"
-            className="-mr-1 -mt-1 shrink-0 rounded p-1 text-muted-foreground hover:bg-accent"
+            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
+
+        {tocOpen && (
+          <div className="mb-2 max-h-44 overflow-y-auto rounded-lg border bg-muted/40 p-1">
+            {sections.map((sec) => (
+              <button
+                key={sec.name}
+                type="button"
+                onClick={() => { setIdx(sec.start); setTocOpen(false) }}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11.5px] transition-colors hover:bg-card',
+                  idx >= sec.start && idx <= sec.end ? 'bg-card font-semibold' : 'text-muted-foreground',
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{sec.name}</span>
+                <span className="shrink-0 text-[10px] opacity-70">{sec.end - sec.start + 1} bước</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <b className="mb-1 block text-[14px] leading-snug">{step.title}</b>
 
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">{step.body}</p>
 
@@ -272,6 +332,18 @@ export function ProductTour({
     </div>,
     document.body,
   )
+}
+
+/** Gom các bước liền nhau cùng chương để dựng mục lục. */
+function groupSections(steps: TourStep[]): Array<{ name: string; start: number; end: number }> {
+  const out: Array<{ name: string; start: number; end: number }> = []
+  steps.forEach((s, i) => {
+    const name = s.section ?? 'Nội dung'
+    const last = out[out.length - 1]
+    if (last && last.name === name) last.end = i
+    else out.push({ name, start: i, end: i })
+  })
+  return out
 }
 
 /** Bốn mảng tối quanh lỗ sáng — cách duy nhất vừa làm tối vừa cho bấm vào giữa. */

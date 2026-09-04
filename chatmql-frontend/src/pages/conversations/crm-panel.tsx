@@ -274,7 +274,7 @@ function CrmInfo({
   return (
     <div className="flex min-h-full flex-col">
       <div className="px-4 pb-4 pt-3.5">
-        <div className="mb-2.5 flex items-center gap-2">
+        <div data-tour="crm-head" className="mb-2.5 flex items-center gap-2">
           <span className="shrink-0 text-[11.5px] font-bold tracking-wide text-muted-foreground">THÔNG TIN TỪ CRM</span>
           {/* Hạng hội viên quyết định cách xưng hô và mức ưu đãi, nên đặt ngay
               cạnh tiêu đề thay vì nằm lẫn trong lưới hai chục trường. */}
@@ -300,7 +300,7 @@ function CrmInfo({
         </div>
 
         {/* 4 ô số liệu */}
-        <div className="mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border">
+        <div data-tour="crm-stats" className="mb-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border">
           <StatTile label="Lịch bán hàng" value={formatDateVi(crm.next_sales_at) ?? '—'} />
           <StatTile label="Lịch chăm sóc" value={formatDateVi(crm.next_care_at) ?? '—'} />
           <StatTile label="Số đơn" value={String(crm.order_count ?? profile.orders.length ?? 0)} />
@@ -323,7 +323,7 @@ function CrmInfo({
       <BirthdayCard birthday={crm.birthday} name={name} />
 
       {/* Nút dính đáy */}
-      <div className="sticky bottom-0 z-10 mt-auto flex flex-col gap-2 border-t bg-card px-3.5 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+      <div data-tour="crm-actions" className="sticky bottom-0 z-10 mt-auto flex flex-col gap-2 border-t bg-card px-3.5 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         <Button variant="outline" className="h-[38px] w-full" onClick={onOpenProfile}>
           <History /> Xem hồ sơ lịch sử mua hàng
         </Button>

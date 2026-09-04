@@ -151,7 +151,7 @@ function ModulePicker({
           {GUIDE_MODULES.map((m) => {
             const Icon = m.icon
             const isDone = done.has(m.id)
-            const hasTour = !!tourFor(m.id)
+            const tour = tourFor(m.id)
             return (
               <div
                 key={m.id}
@@ -182,13 +182,14 @@ function ModulePicker({
                   <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
                     {m.summary}
                   </span>
-                  {hasTour && (
+                  {tour && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onTour(m.id) }}
                       className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20"
                     >
-                      <MousePointerClick className="h-3 w-3" /> Tour tương tác
+                      <MousePointerClick className="h-3 w-3" />
+                      Tour tương tác · {tour.steps.length} bước
                     </button>
                   )}
                 </span>

@@ -105,6 +105,7 @@ export function ConversationList({
             <Input
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
+              data-tour="conv-search"
               placeholder="Tìm theo tên, số điện thoại…"
               className="pl-8"
             />
@@ -194,7 +195,7 @@ export function ConversationList({
       </div>
 
       {/* Danh sách */}
-      <ScrollArea className="flex-1">
+      <ScrollArea data-tour="conv-list" className="flex-1">
         {isLoading ? (
           <Loading label="Đang tải hội thoại…" />
         ) : isError ? (

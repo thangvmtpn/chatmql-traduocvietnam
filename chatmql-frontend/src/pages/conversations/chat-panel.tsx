@@ -572,7 +572,7 @@ export function ChatPanel({ convId }: { convId: string }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div data-tour="chat-header-tools" className="flex shrink-0 items-center gap-1.5">
           {/* Tìm trong hội thoại */}
           {searchOpen ? (
             <div className="relative">
@@ -619,6 +619,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
+            data-tour="chat-library"
             aria-label="Thư viện hội thoại"
             title="Thư viện: ảnh, tệp, liên kết"
             disabled={!convId}
@@ -638,6 +639,7 @@ export function ChatPanel({ convId }: { convId: string }) {
                 size="sm"
                 className="h-8 gap-1.5 px-2.5 text-xs"
                 disabled={!conv || setAiMode.isPending || setAiPause.isPending}
+                data-tour="chat-ai-mode"
                 aria-label="Chế độ AI"
               >
                 {isPaused ? (
@@ -736,7 +738,7 @@ export function ChatPanel({ convId }: { convId: string }) {
       </div>
 
       {/* Bộ lọc tin nhắn theo người gửi */}
-      <div className="flex items-center gap-1.5 border-b bg-background/40 px-3 py-2">
+      <div data-tour="chat-msg-filters" className="flex items-center gap-1.5 border-b bg-background/40 px-3 py-2">
         {SENDER_FILTERS.map((f) => (
           <button
             key={f.value}
@@ -911,6 +913,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             className="h-8 w-8 text-muted-foreground"
             onClick={() => imageInputRef.current?.click()}
             disabled={uploading}
+            data-tour="chat-image"
             aria-label="Gửi ảnh từ máy"
             title="Gửi ảnh"
           >
@@ -1024,6 +1027,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             className="h-8 gap-1.5 px-2.5 text-xs"
             onClick={handleSuggest}
             disabled={suggesting}
+            data-tour="chat-ai-suggest"
             aria-label="AI gợi ý trả lời"
           >
             {suggesting ? (
@@ -1245,6 +1249,7 @@ export function ChatPanel({ convId }: { convId: string }) {
               handleSend()
             }
           }}
+          data-tour="chat-input"
           placeholder="Nhập tin nhắn… (Shift+Enter xuống dòng)"
           className="max-h-32 min-h-[44px] flex-1 resize-none"
           rows={1}
@@ -1256,6 +1261,7 @@ export function ChatPanel({ convId }: { convId: string }) {
             sendMode === 'internal' && 'bg-amber-500 text-white hover:bg-amber-600',
             sendMode === 'private' && 'bg-violet-600 text-white hover:bg-violet-700',
           )}
+          data-tour="chat-send"
           onClick={handleSend}
           disabled={(!text.trim() && !(sendMode === 'external' && pendingImages.length > 0)) || sendMessage.isPending || uploading}
           aria-label={sendMode === 'external' ? 'Gửi khách hàng' : sendMode === 'internal' ? 'Gửi nội bộ' : 'Gửi riêng tư'}
