@@ -7,21 +7,24 @@
 export declare function getValidTikTokToken(channelAccountId: string): Promise<{
     accessToken: string;
     shopCipher: string;
+    orgId: string;
 } | null>;
 /**
- * Send text message to customer via TikTok Shop API.
+ * Dispatch an outbound text message to TikTok Shop chat.
  */
-export declare function sendTextViaTikTok(channelAccountId: string, externalThreadId: string | null, text: string): Promise<{
+export declare function sendTikTokText(channelAccountId: string, externalThreadId: string, text: string): Promise<{
     sent: boolean;
     error?: string;
     messageId?: string;
     csWindowExpired?: boolean;
 }>;
 /**
- * Upload and send image message to customer via TikTok Shop API.
+ * Dispatch an outbound image message to TikTok Shop chat.
  */
-export declare function sendImageViaTikTok(channelAccountId: string, externalThreadId: string | null, imageBuffer: Buffer, fileName: string): Promise<{
+export declare function sendTikTokImage(channelAccountId: string, externalThreadId: string, imageBuffer: Buffer, fileName?: string): Promise<{
     sent: boolean;
     error?: string;
     messageId?: string;
 }>;
+export declare const sendTextViaTikTok: typeof sendTikTokText;
+export declare const sendImageViaTikTok: typeof sendTikTokImage;

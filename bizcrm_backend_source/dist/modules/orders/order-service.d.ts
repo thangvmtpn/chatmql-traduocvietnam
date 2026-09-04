@@ -48,6 +48,13 @@ export interface CreateOrderInput {
      * bấm lại, để timeout rồi thử lại không đẻ ra đơn thứ hai.
      */
     requestId?: string;
+    /**
+     * Nguồn chốt đơn cho báo cáo Chat → Đơn: 'ai' khi đơn xuất phát từ nháp AI
+     * (pending action create_order được xác nhận), 'staff' cho mọi ca còn lại.
+     * KHÔNG để trình duyệt tự khai — route /orders/create tự xác minh
+     * aiPendingActionId với bảng AiPendingAction rồi mới đặt cờ này.
+     */
+    source?: 'ai' | 'staff';
 }
 export interface CreateOrderResult extends CrmCreateOrderResult {
     contactUpdated: boolean;

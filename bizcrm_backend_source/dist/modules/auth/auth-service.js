@@ -34,6 +34,7 @@ export async function setup(orgName, fullName, email, password) {
         fullName: result.user.fullName,
         role: result.user.role,
         orgId: result.org.id,
+        roleId: result.user.roleId,
     };
 }
 /** Verify credentials, return JWT payload */
@@ -56,7 +57,7 @@ export async function login(email, password) {
     // License gate: block login when the company is expired or suspended.
     // (super admin can still enter via /platform login-as, which bypasses this.)
     assertOrgUsable(user.org);
-    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, orgId: user.orgId };
+    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role, orgId: user.orgId, roleId: user.roleId };
 }
 /** Throw a 403 ORG_EXPIRED / ORG_SUSPENDED error when the org is unusable. */
 export function assertOrgUsable(org) {

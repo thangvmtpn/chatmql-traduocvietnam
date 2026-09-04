@@ -237,6 +237,13 @@ function CrmInfo({
     { label: 'Tổng chi tiêu', value: crm.gmv_total != null ? formatVnd(crm.gmv_total) : null },
     { label: 'Nghề nghiệp', value: crm.occupation },
     { label: 'Cấp Vip', value: formatCombinedVip(crm) },
+    {
+      label: 'Hội viên',
+      value: crm.member_code
+        ? `${crm.member_code} (${crm.member_tier || 'Hội viên'})`
+        : (crm.is_member ? (crm.member_tier || 'Hội viên') : 'Chưa đăng ký'),
+      cls: crm.member_code || crm.is_member ? 'font-medium text-amber-600 dark:text-amber-400' : undefined,
+    },
     { label: 'Giới tính', value: crm.gender },
     { label: 'Ngày sinh', value: formatDateVi(crm.birthday) },
     { label: 'Email', value: chat?.email },

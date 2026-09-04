@@ -21,6 +21,8 @@ import {
   fetchWarehouses,
   fetchProvinces,
   fetchWards,
+  fetchSaleChannels,
+  fetchCarriers,
   fetchProductCatalog,
   updateCustomerSchedule,
   fetchCustomerPoints,
@@ -233,15 +235,19 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
   // lượt round-trip riêng lẻ.
   app.get('/api/v1/orders/form-lookups', async (_request, reply) => {
     try {
-      const [statuses, warehouses, provinces] = await Promise.all([
+      const [statuses, warehouses, provinces, saleChannels, carriers] = await Promise.all([
         fetchOrderStatuses(),
         fetchWarehouses(),
         fetchProvinces(),
+        fetchSaleChannels(),
+        fetchCarriers(),
       ])
       return {
         statuses: statuses.statuses,
         warehouses: warehouses.warehouses,
         provinces: provinces.provinces,
+        saleChannels: saleChannels.sale_channels,
+        carriers: carriers.carriers,
       }
     } catch (err) {
       return replyCrmError(reply, err, 'lấy dữ liệu tra cứu cho form đơn')

@@ -20,21 +20,10 @@ import { retrieveProductSemantic } from '../../products/product-embedding.js';
 import { getThreadMemory } from '../../knowledge/memory-service.js';
 import { getToolsConfig } from '../tools-config-service.js';
 import { recordStep } from '../observability/trace-recorder.js';
-// ── Token / char budgets per layer ────────────────────────────────────────────
-const BUDGET_L0_CHARS = 2_000; // logic docs total
-const BUDGET_L1_CHARS = 2_000; // KB RAG snippets total
-const BUDGET_L2_CHARS = 800; // contact profile
-const BUDGET_L3_CHARS = 800; // thread memory facts total
-const BUDGET_L3B_CHARS = 800; // staff notes total
-const BUDGET_L5_CHARS = 4_000; // recent messages
-const BUDGET_L6_CHARS = 1_000; // current turn
+// Ngân sách ký tự theo model (base/large) — xem budgets.ts vì sao có 2 bậc.
+import { getContextBudgets, truncate } from './budgets.js';
 // Default KB retrieval topK (overridden by AiConfig.ragTopK when available)
 const DEFAULT_RAG_TOP_K = 5;
-function truncate(s, maxChars) {
-    if (s.length <= maxChars)
-        return s;
-    return s.slice(0, maxChars) + '…';
-}
 // ── Resolve conversation meta (contactId, ragTopK) ────────────────────────────
 async function loadConvMeta(orgId, convId) {
     const conv = await prisma.conversation.findFirst({
@@ -77,25 +66,26 @@ async function loadContactProfile(contactId) {
     };
 }
 // ── L3: Thread memory ─────────────────────────────────────────────────────────
-async function loadThreadMemory(orgId, contactId) {
+async function loadThreadMemory(orgId, contactId, maxChars) {
     const facts = await getThreadMemory(orgId, contactId);
     // Cap total chars across all facts
     let total = 0;
     const kept = [];
     for (const f of facts) {
         total += f.content.length;
-        if (total > BUDGET_L3_CHARS)
+        if (total > maxChars)
             break;
         kept.push({ id: f.id, kind: f.kind, content: f.content });
     }
     return kept;
 }
 // ── L3b: Staff notes (CRM internal notes) ────────────────────────────────────
-async function loadStaffNotes(orgId, convId, contactId) {
+async function loadStaffNotes(orgId, convId, contactId, maxChars = 800) {
     try {
         const notes = await prisma.note.findMany({
             where: {
                 orgId,
+                isDeleted: false,
                 OR: [
                     { conversationId: convId },
                     ...(contactId ? [{ contactId }] : []),
@@ -112,7 +102,7 @@ async function loadStaffNotes(orgId, convId, contactId) {
             if (!text)
                 continue;
             total += text.length;
-            if (total > BUDGET_L3B_CHARS)
+            if (total > maxChars)
                 break;
             kept.push({
                 content: text,
@@ -127,7 +117,7 @@ async function loadStaffNotes(orgId, convId, contactId) {
     }
 }
 // ── L1: KB RAG (semantic with keyword fallback) ───────────────────────────────
-async function loadKbSnippets(orgId, query, topK, tools, minScore) {
+async function loadKbSnippets(orgId, query, topK, tools, maxChars, minScore) {
     // One knowledge tool (search_knowledge) searches ALL KB formats (FAQ + articles).
     const jobs = [];
     if (tools.search_knowledge.enabled) {
@@ -150,20 +140,19 @@ async function loadKbSnippets(orgId, query, topK, tools, minScore) {
     const kept = [];
     for (const s of merged) {
         total += s.title.length + s.content.length + 5;
-        if (total > BUDGET_L1_CHARS)
+        if (total > maxChars)
             break;
         kept.push(s);
     }
     return kept;
 }
 // ── L0b: Scenarios (modular logic skills) ─────────────────────────────────────
-const BUDGET_L0B_CHARS = 2_500;
 /**
  * Always-on scenarios + the auto scenarios semantically relevant to this turn,
  * merged (dedupe by id) and char-capped. Loaded in BOTH pipeline and agent mode
  * — scenarios are logic, not data RAG, so they apply regardless of skipRag.
  */
-async function loadScenarios(orgId, turnText, topK, minScore) {
+async function loadScenarios(orgId, turnText, topK, maxChars, minScore) {
     const [always, relevant] = await Promise.all([
         getAlwaysScenarios(orgId),
         retrieveRelevantScenarios(orgId, turnText, topK, minScore),
@@ -176,15 +165,14 @@ async function loadScenarios(orgId, turnText, topK, minScore) {
             continue;
         seen.add(s.id);
         total += s.name.length + s.content.length + 5;
-        if (total > BUDGET_L0B_CHARS)
+        if (total > maxChars)
             break;
         kept.push(s);
     }
     return kept;
 }
 // ── L1b: Product RAG (semantic) ───────────────────────────────────────────────
-const BUDGET_PRODUCTS_CHARS = 1_500;
-async function loadProductSnippets(orgId, query, topK, tool, minScore) {
+async function loadProductSnippets(orgId, query, topK, tool, maxChars, minScore) {
     if (!tool.enabled)
         return [];
     const rows = await retrieveProductSemantic(orgId, query, topK, { categoryIds: tool.guardrail.categoryIds, minScore });
@@ -193,7 +181,7 @@ async function loadProductSnippets(orgId, query, topK, tool, minScore) {
     for (const r of rows) {
         const size = r.name.length + (r.description?.length ?? 0) + 20;
         total += size;
-        if (total > BUDGET_PRODUCTS_CHARS)
+        if (total > maxChars)
             break;
         kept.push({
             id: r.id, name: r.name, price: r.price, priceMax: r.priceMax, priceType: r.priceType,
@@ -203,7 +191,7 @@ async function loadProductSnippets(orgId, query, topK, tool, minScore) {
     return kept;
 }
 // ── L5: Recent messages ────────────────────────────────────────────────────────
-async function loadRecentMessages(convId, before) {
+async function loadRecentMessages(convId, maxChars, before) {
     // `before` = mốc của tin đầu tiên trong lượt đang xử lý. Không lọc thì tin
     // khách vừa gửi nằm cả trong "Conversation History" lẫn khối CUSTOMER —
     // model thấy hai lần, dễ trả lời lại câu cũ.
@@ -226,7 +214,7 @@ async function loadRecentMessages(convId, before) {
     const kept = [];
     for (let i = msgs.length - 1; i >= 0; i--) {
         total += msgs[i].text.length;
-        if (total > BUDGET_L5_CHARS)
+        if (total > maxChars)
             break;
         kept.unshift(msgs[i]);
     }
@@ -234,6 +222,9 @@ async function loadRecentMessages(convId, before) {
 }
 // ── Public assembler ──────────────────────────────────────────────────────────
 export async function assembleContext(orgId, convId, turnText, aiReplyRunId, opts = {}) {
+    // Ngân sách ký tự theo model sinh trả lời — caller (reply-generator) truyền
+    // budgets khớp model thực dùng; không truyền → bậc `base` an toàn chi phí.
+    const budgets = opts.budgets ?? getContextBudgets(null);
     // Resolve conversation meta + the per-function tool config (enable + guardrail).
     const [{ contactId, ragTopK }, tools] = await Promise.all([
         loadConvMeta(orgId, convId),
@@ -244,26 +235,28 @@ export async function assembleContext(orgId, convId, turnText, aiReplyRunId, opt
     // Parallelize all layer loads (each KB/product tool gated by its own config)
     const [logic, scenarios, contact, threadMemory, staffNotes, kbSnippets, products, recentMessages] = await Promise.all([
         getActiveLogicContext(orgId), // L0
-        loadScenarios(orgId, turnText, ragTopK, opts.minScore), // L0b
+        loadScenarios(orgId, turnText, ragTopK, budgets.l0bScenarios, opts.minScore), // L0b
         contactId ? loadContactProfile(contactId) : Promise.resolve(null), // L2
-        contactId ? loadThreadMemory(orgId, contactId) : Promise.resolve([]), // L3
-        loadStaffNotes(orgId, convId, contactId), // L3b
-        opts.skipRag ? Promise.resolve([]) : loadKbSnippets(orgId, turnText, ragTopK, tools, opts.minScore), // L1
-        opts.skipRag ? Promise.resolve([]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, opts.minScore), // L1b
-        loadRecentMessages(convId, opts.historyBefore), // L5
+        contactId ? loadThreadMemory(orgId, contactId, budgets.l3Memory) : Promise.resolve([]), // L3
+        loadStaffNotes(orgId, convId, contactId, budgets.l3Memory), // L3b
+        opts.skipRag ? Promise.resolve([]) : loadKbSnippets(orgId, turnText, ragTopK, tools, budgets.l1Kb, opts.minScore), // L1
+        opts.skipRag ? Promise.resolve([]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, budgets.products, opts.minScore), // L1b
+        loadRecentMessages(convId, budgets.l5Messages, opts.historyBefore), // L5
     ]);
-    // Char-cap L0 docs individually so no single doc dominates
+    // Char-cap L0 docs individually so no single doc dominates.
+    // Tỷ lệ giữ như trước: persona/index/handoff/mechanism = l0Total/4 → budgets.index|persona,
+    // playbook/criteria = l0Total/2 → budgets.playbook (criteria dùng chung mức playbook).
     const cappedLogic = {
-        index: logic.index ? truncate(logic.index, BUDGET_L0_CHARS / 4) : null,
-        persona: logic.persona ? truncate(logic.persona, BUDGET_L0_CHARS / 4) : null,
-        playbook: logic.playbook ? truncate(logic.playbook, BUDGET_L0_CHARS / 2) : null,
-        handoff_rules: logic.handoff_rules ? truncate(logic.handoff_rules, BUDGET_L0_CHARS / 4) : null,
-        mechanism: logic.mechanism ? truncate(logic.mechanism, BUDGET_L0_CHARS / 4) : null,
-        criteria: logic.criteria ? truncate(logic.criteria, BUDGET_L0_CHARS / 2) : null,
+        index: logic.index ? truncate(logic.index, budgets.index) : null,
+        persona: logic.persona ? truncate(logic.persona, budgets.persona) : null,
+        playbook: logic.playbook ? truncate(logic.playbook, budgets.playbook) : null,
+        handoff_rules: logic.handoff_rules ? truncate(logic.handoff_rules, budgets.index) : null,
+        mechanism: logic.mechanism ? truncate(logic.mechanism, budgets.index) : null,
+        criteria: logic.criteria ? truncate(logic.criteria, budgets.playbook) : null,
     };
     // Cap contact profile summary
     if (contact?.aiSummary) {
-        contact.aiSummary = truncate(contact.aiSummary, BUDGET_L2_CHARS);
+        contact.aiSummary = truncate(contact.aiSummary, budgets.l2Contact);
     }
     const assembled = {
         orgId,
@@ -276,7 +269,7 @@ export async function assembleContext(orgId, convId, turnText, aiReplyRunId, opt
         threadMemory,
         staffNotes,
         recentMessages,
-        turnText: truncate(turnText, BUDGET_L6_CHARS),
+        turnText: truncate(turnText, budgets.l6Turn),
     };
     // Fire-and-forget trace — MUST NOT block caller
     recordStep({

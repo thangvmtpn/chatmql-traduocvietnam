@@ -20,12 +20,16 @@ export interface OrderStatus {
 export interface Warehouse { id: number; name: string }
 export interface Province { id: number; name: string }
 export interface Ward { id: number; name: string }
+export interface SaleChannel { id: number; name: string; code: string; group: string | null }
+export interface Carrier { id: number; name: string }
 
 /** GET /orders/form-lookups */
 export interface FormLookups {
   statuses: OrderStatus[]
   warehouses: Warehouse[]
   provinces: Province[]
+  saleChannels?: SaleChannel[]
+  carriers?: Carrier[]
 }
 
 /** GET /orders/catalog — sản phẩm thật từ FM. */
@@ -60,6 +64,13 @@ export interface CrmCustomer {
   nhom_kh?: string | null
   priority_level?: string | null
   cap_vip?: string | null
+  member_code?: string | null
+  member_tier?: string | null
+  member_tier_raw?: string | null
+  is_member?: boolean
+  member_registered_at?: string | null
+  member_points?: number | null
+  member_gmv?: number | null
   [key: string]: unknown
 }
 

@@ -144,4 +144,6 @@ export interface HarnessOptions {
     signal?: AbortSignal;
     /** Chỉ lấy lịch sử TRƯỚC mốc này — tránh tin đang xử lý xuất hiện 2 lần. */
     historyBefore?: Date;
+    /** forceBotId: simulator's per-bot demo chat */
+    forceBotId?: string;
 }

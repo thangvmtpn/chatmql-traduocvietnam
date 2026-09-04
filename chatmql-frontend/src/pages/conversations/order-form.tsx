@@ -67,7 +67,7 @@ import {
   type CreateOrderBody,
   type CreateOrderResult,
 } from '@/hooks/use-order-form'
-import { formatCombinedVip } from '@/hooks/use-orders'
+import { formatCombinedVip, formatMemberInfo } from '@/hooks/use-orders'
 
 // ── Hằng số ───────────────────────────────────────────────────────────
 
@@ -152,6 +152,26 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
   const provinces = lookups.data?.provinces ?? []
   const statuses = lookups.data?.statuses ?? []
   const warehouses = lookups.data?.warehouses ?? []
+  const saleChannels = lookups.data?.saleChannels ?? []
+  const carriers = lookups.data?.carriers ?? []
+
+  const sourceOptions = useMemo(() => {
+    if (saleChannels.length) return saleChannels.map((s) => s.name)
+    return ORDER_SOURCE_OPTIONS
+  }, [saleChannels])
+
+  const carrierOptions = useMemo(() => {
+    if (carriers.length) {
+      return carriers.map((c) => ({
+        value: c.name,
+        label: c.name,
+      }))
+    }
+    return CARRIERS.map((c) => ({
+      value: c,
+      label: `${CARRIER_LABELS[c]}${CARRIER_FEES[c] ? ` - ${formatNumber(CARRIER_FEES[c])}đ` : ''}`,
+    }))
+  }, [carriers])
 
   // Điền sẵn từ ngữ cảnh hội thoại — một lần, không đè lên thứ nhân viên đã gõ.
   const prefilled = useRef(false)
@@ -184,13 +204,41 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
     return () => clearTimeout(t)
   }, [phone, lookupPhone])
 
-  // CRM tìm thấy khách → điền địa chỉ / tên nếu ô đang trống.
+  // CRM tìm thấy khách → điền địa chỉ / tên nếu ô đang trống + map Tỉnh/Thành & Phường/Xã.
   useEffect(() => {
     const c = crmQ.data?.found ? crmQ.data.customer : null
     if (!c) return
     if (c.address) setAddr((v) => (v.trim() ? v : c.address || ''))
     if (c.full_name) setName((v) => (v.trim() ? v : c.full_name || ''))
-  }, [crmQ.data])
+
+    const cCity = (c.city || (c as any).tinh as string | undefined)?.trim()
+    if (cCity && provinces.length && !provinceId) {
+      const cleanCity = cCity.toLowerCase().replace(/^(tỉnh|thành phố|tp\.?)\s*/i, '').trim()
+      const foundProv = provinces.find((p) => {
+        const pName = p.name.toLowerCase().replace(/^(tỉnh|thành phố|tp\.?)\s*/i, '').trim()
+        return pName === cleanCity || pName.includes(cleanCity) || cleanCity.includes(pName)
+      })
+      if (foundProv) {
+        setProvinceId(foundProv.id)
+      }
+    }
+  }, [crmQ.data, provinces, provinceId])
+
+  // Tự động map Phường/Xã khi danh sách phường của tỉnh tải xong
+  useEffect(() => {
+    const c = crmQ.data?.found ? crmQ.data.customer : null
+    const cWard = ((c as any)?.phuong as string | undefined)?.trim()
+    if (cWard && wards.data?.length && !wardId) {
+      const cleanWard = cWard.toLowerCase().replace(/^(phường|xã|thị trấn|tt\.?)\s*/i, '').trim()
+      const foundWard = wards.data.find((w) => {
+        const wName = w.name.toLowerCase().replace(/^(phường|xã|thị trấn|tt\.?)\s*/i, '').trim()
+        return wName === cleanWard || wName.includes(cleanWard) || cleanWard.includes(wName)
+      })
+      if (foundWard) {
+        setWardId(foundWard.id)
+      }
+    }
+  }, [wards.data, crmQ.data, wardId])
 
   // Đổi kho → bỏ dòng không còn trong danh mục kho mới (tồn kho khác nhau theo kho).
   useEffect(() => {
@@ -202,9 +250,10 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
   }, [catalog])
 
   // Đơn vị vận chuyển → phí mặc định của hãng.
-  function changeProvider(v: ShippingProvider) {
-    setShippingProvider(v)
-    setShippingFee(CARRIER_FEES[v])
+  function changeProvider(v: string) {
+    setShippingProvider(v as ShippingProvider)
+    const fee = (CARRIER_FEES as Record<string, number>)[v] ?? 30000
+    setShippingFee(fee)
   }
 
   // Đơn đổi trả → thêm/bớt dòng ghi chú chuẩn.
@@ -397,6 +446,7 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
 
   // ── Hiển thị ──
   const crm = crmQ.data?.found ? crmQ.data.customer : ctx.data?.crm ?? null
+  const memberInfo = useMemo(() => formatMemberInfo(crm), [crm])
   const submitDisabled = createOrder.isPending || lines.length === 0
   const wardList = wards.data ?? []
 
@@ -420,6 +470,17 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
             <span className="text-muted-foreground">
               Cấp: <b className="font-semibold text-success">{formatCombinedVip(crm)}</b>
             </span>
+          )}
+          {crm && (
+            memberInfo.isMember ? (
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold text-[10px]">
+                👑 {memberInfo.text}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                Chưa là hội viên
+              </Badge>
+            )
           )}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -508,7 +569,7 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
             <Select value={orderSource} onValueChange={setOrderSource}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Chọn nguồn" /></SelectTrigger>
               <SelectContent>
-                {ORDER_SOURCE_OPTIONS.map((o) => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
+                {sourceOptions.map((o) => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
               </SelectContent>
             </Select>
           </Field>
@@ -589,12 +650,12 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
         }
       >
         <Field label="Đơn vị vận chuyển">
-          <Select value={shippingProvider} onValueChange={(v) => changeProvider(v as ShippingProvider)} disabled={selfShipping}>
+          <Select value={shippingProvider} onValueChange={(v) => changeProvider(v)} disabled={selfShipping}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {CARRIERS.map((c) => (
-                <SelectItem key={c} value={c} className="text-xs">
-                  {CARRIER_LABELS[c]}{CARRIER_FEES[c] ? ` - ${formatNumber(CARRIER_FEES[c])}đ` : ''}
+              {carrierOptions.map((c) => (
+                <SelectItem key={c.value} value={c.value} className="text-xs">
+                  {c.label}
                 </SelectItem>
               ))}
             </SelectContent>

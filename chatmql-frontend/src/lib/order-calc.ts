@@ -26,7 +26,7 @@ export interface OrderLine {
 }
 
 export type DiscountType = 'pct' | 'vnd'
-export type ShippingProvider = 'jt_express' | 'viettel_post' | 'vnpost' | 'other'
+export type ShippingProvider = 'jt_express' | 'viettel_post' | 'vnpost' | 'other' | (string & {})
 export type TypeFeeDelivery = 'CC_CASH' | 'PP_CASH'
 export type PayStatus = 'unpaid' | 'partial' | 'paid' | 'over'
 

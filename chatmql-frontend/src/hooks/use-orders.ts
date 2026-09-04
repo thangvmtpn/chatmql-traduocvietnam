@@ -44,6 +44,13 @@ export interface CrmCustomer {
   next_care_at?: string | null
   appointment_type?: string | null
   profile_note?: string | null
+  member_code?: string | null
+  member_tier?: string | null
+  member_tier_raw?: string | null
+  is_member?: boolean
+  member_registered_at?: string | null
+  member_points?: number | null
+  member_gmv?: number | null
   [key: string]: unknown
 }
 
@@ -325,6 +332,35 @@ export function formatCombinedVip(crm?: CrmCustomer | null): string {
   const gmv = Number(crm.gmv_total ?? crm.gmv) || 0
   const aov = Number(crm.aov) || (crm.order_count ? gmv / crm.order_count : gmv)
   return `${getVipLevelFromGMV(gmv)}${getAOVClass(aov)}`
+}
+
+/** Format thông tin hội viên chuẩn từ CRM. */
+export function formatMemberInfo(crm?: CrmCustomer | null): {
+  isMember: boolean
+  code?: string
+  tier?: string
+  points: number
+  text: string
+  badgeText: string
+} {
+  if (!crm) return { isMember: false, points: 0, text: 'Chưa là hội viên', badgeText: 'Chưa là hội viên' }
+  const isMember = Boolean(crm.is_member || crm.member_code || crm.member_tier)
+  if (!isMember) return { isMember: false, points: 0, text: 'Chưa là hội viên', badgeText: 'Chưa là hội viên' }
+  const code = crm.member_code || ''
+  const tier = crm.member_tier || 'Hội viên'
+  const points = Number(crm.member_points) || 0
+  const parts: string[] = []
+  if (code) parts.push(code)
+  if (tier) parts.push(tier)
+  if (points > 0) parts.push(`${formatNumber(points)} điểm`)
+  return {
+    isMember: true,
+    code,
+    tier,
+    points,
+    text: parts.join(' · ') || 'Hội viên TDVN',
+    badgeText: code ? `${code} (${tier})` : tier,
+  }
 }
 
 // ── Khoá query ───────────────────────────────────────────────────────

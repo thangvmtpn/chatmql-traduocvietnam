@@ -136,7 +136,7 @@ export async function simulateRoutes(app) {
         if (!ownerAdminOnly(request, reply))
             return;
         const user = request.user;
-        const { conversationId, customerText, mode, includeTrace = true, persist } = request.body ?? {};
+        const { conversationId, customerText, mode, includeTrace = true, persist, botId } = request.body ?? {};
         if (!conversationId || !customerText?.trim()) {
             return reply.status(400).send({ error: 'conversationId và customerText là bắt buộc' });
         }
@@ -170,7 +170,8 @@ export async function simulateRoutes(app) {
                     data: { conversationId, senderType: 'contact', content: text, contentType: 'text', sentAt: turnAt },
                 });
             }
-            const result = await runHarness(user.orgId, conversationId, text, effMode);
+            // botId: thử NGHIỆM một Agent cụ thể mà không cần gán kênh cho nó trước.
+            const result = await runHarness(user.orgId, conversationId, text, effMode, { forceBotId: botId });
             // Persist the AI reply (if any) so the thread builds up turn by turn.
             let replyMessageId;
             if (effPersist && result.reply) {

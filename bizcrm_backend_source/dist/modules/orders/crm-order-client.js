@@ -124,6 +124,14 @@ export async function fetchProvinces() {
 export async function fetchWards(provinceId) {
     return callCrm(`/lookups/wards?id_prov=${provinceId}`, { method: 'GET' });
 }
+/** Kênh bán hàng / nguồn đơn từ FM.sale_channel. */
+export async function fetchSaleChannels() {
+    return callCrm('/lookups/sale-channels', { method: 'GET' });
+}
+/** Đối tác vận chuyển từ FM.parter_delivery. */
+export async function fetchCarriers() {
+    return callCrm('/lookups/carriers', { method: 'GET' });
+}
 /** Danh mục sản phẩm đầy đủ (tồn kho, đơn vị, VAT, khối lượng). */
 export async function fetchProductCatalog(opts = {}) {
     const qs = new URLSearchParams();

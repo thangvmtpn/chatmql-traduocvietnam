@@ -112,6 +112,16 @@ export interface Ward {
     id: number;
     name: string;
 }
+export interface SaleChannel {
+    id: number;
+    name: string;
+    code: string;
+    group: string | null;
+}
+export interface Carrier {
+    id: number;
+    name: string;
+}
 export interface CatalogProduct {
     id: number;
     code: string;
@@ -178,6 +188,14 @@ export declare function fetchProvinces(): Promise<{
 /** Phường/xã thuộc một tỉnh. */
 export declare function fetchWards(provinceId: number): Promise<{
     wards: Ward[];
+}>;
+/** Kênh bán hàng / nguồn đơn từ FM.sale_channel. */
+export declare function fetchSaleChannels(): Promise<{
+    sale_channels: SaleChannel[];
+}>;
+/** Đối tác vận chuyển từ FM.parter_delivery. */
+export declare function fetchCarriers(): Promise<{
+    carriers: Carrier[];
 }>;
 /** Danh mục sản phẩm đầy đủ (tồn kho, đơn vị, VAT, khối lượng). */
 export declare function fetchProductCatalog(opts?: {

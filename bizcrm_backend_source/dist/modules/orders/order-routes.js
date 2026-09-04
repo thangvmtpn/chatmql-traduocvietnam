@@ -1,7 +1,7 @@
 import { authMiddleware } from '../auth/auth-middleware.js';
 import { prisma } from '../../shared/prisma-client.js';
 import { createOrderAndSync } from './order-service.js';
-import { CrmApiError, fetchProducts, fetchCustomer, fetchCustomerOrders, getOrderSyncStatus, reconcilePendingFm, fetchOrderStatuses, fetchWarehouses, fetchProvinces, fetchWards, fetchProductCatalog, updateCustomerSchedule, fetchCustomerPoints, fetchPromotions, applyPromotion, fetchCustomerProducts, } from './crm-order-client.js';
+import { CrmApiError, fetchProducts, fetchCustomer, fetchCustomerOrders, getOrderSyncStatus, reconcilePendingFm, fetchOrderStatuses, fetchWarehouses, fetchProvinces, fetchWards, fetchSaleChannels, fetchCarriers, fetchProductCatalog, updateCustomerSchedule, fetchCustomerPoints, fetchPromotions, applyPromotion, fetchCustomerProducts, } from './crm-order-client.js';
 import { logger } from '../../shared/logger.js';
 /** Map lỗi từ CRM sang mã HTTP trả cho trình duyệt, kèm thông điệp tiếng Việt. */
 function replyCrmError(reply, err, context) {
@@ -198,15 +198,19 @@ export async function orderRoutes(app) {
     // lượt round-trip riêng lẻ.
     app.get('/api/v1/orders/form-lookups', async (_request, reply) => {
         try {
-            const [statuses, warehouses, provinces] = await Promise.all([
+            const [statuses, warehouses, provinces, saleChannels, carriers] = await Promise.all([
                 fetchOrderStatuses(),
                 fetchWarehouses(),
                 fetchProvinces(),
+                fetchSaleChannels(),
+                fetchCarriers(),
             ]);
             return {
                 statuses: statuses.statuses,
                 warehouses: warehouses.warehouses,
                 provinces: provinces.provinces,
+                saleChannels: saleChannels.sale_channels,
+                carriers: carriers.carriers,
             };
         }
         catch (err) {
@@ -708,6 +712,21 @@ export async function orderRoutes(app) {
             if (contact)
                 contactId = contact.id;
         }
+        // Cờ nguồn đơn cho báo cáo Chat → Đơn: đơn chỉ được tính là 'ai' khi
+        // client gửi kèm aiPendingActionId trỏ tới một nháp đơn AI THẬT của org
+        // (AiPendingAction type=create_order). Không tin cờ tự khai từ trình duyệt.
+        // Lưu ý: confirmAction() ở pending-action-service.ts hiện chỉ đánh dấu
+        // confirmed chứ KHÔNG tự tạo đơn — luồng dự kiến là FE prefill form từ
+        // payload nháp rồi gọi route này kèm aiPendingActionId.
+        let orderSource = 'staff';
+        if (body.aiPendingActionId) {
+            const pendingAi = await prisma.aiPendingAction.findFirst({
+                where: { id: body.aiPendingActionId, orgId: user.orgId, type: 'create_order' },
+                select: { id: true },
+            });
+            if (pendingAi)
+                orderSource = 'ai';
+        }
         try {
             const result = await createOrderAndSync({
                 ...body,
@@ -715,6 +734,7 @@ export async function orderRoutes(app) {
                 contactId,
                 orgId: user.orgId,
                 createdUserId: user.id,
+                source: orderSource,
                 // Người lên đơn LUÔN là người đang đăng nhập, lấy từ JWT.
                 //
                 // Trước đây lấy body.sellerName do trình duyệt gửi lên, mà giao diện lại

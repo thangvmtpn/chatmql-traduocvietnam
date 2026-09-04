@@ -4,6 +4,11 @@ export interface JwtPayload {
     fullName: string;
     role: string;
     orgId: string;
+    /**
+     * Vai trò động. Token cũ (phát trước khi có RBAC) không có trường này —
+     * lúc đó hệ thống lùi về cột `role`, nên không cần bắt đăng nhập lại.
+     */
+    roleId?: string | null;
 }
 /** Check if first-run setup is needed */
 export declare function checkSetupStatus(): Promise<{
@@ -23,6 +28,7 @@ export declare function getProfile(userId: string): Promise<{
     id: string;
     orgId: string;
     createdAt: Date;
+    role: string;
     org: {
         id: string;
         name: string;
@@ -31,7 +37,6 @@ export declare function getProfile(userId: string): Promise<{
     };
     email: string;
     fullName: string;
-    role: string;
     avatarUrl: string | null;
     isActive: boolean;
 }>;

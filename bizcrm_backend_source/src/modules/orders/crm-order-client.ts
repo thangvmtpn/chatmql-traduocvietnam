@@ -197,6 +197,8 @@ export interface OrderStatus { id: number; label: string; group_id: number | nul
 export interface Warehouse { id: number; name: string }
 export interface Province { id: number; name: string }
 export interface Ward { id: number; name: string }
+export interface SaleChannel { id: number; name: string; code: string; group: string | null }
+export interface Carrier { id: number; name: string }
 
 export interface CatalogProduct {
   id: number
@@ -258,6 +260,16 @@ export async function fetchProvinces(): Promise<{ provinces: Province[] }> {
 /** Phường/xã thuộc một tỉnh. */
 export async function fetchWards(provinceId: number): Promise<{ wards: Ward[] }> {
   return callCrm(`/lookups/wards?id_prov=${provinceId}`, { method: 'GET' })
+}
+
+/** Kênh bán hàng / nguồn đơn từ FM.sale_channel. */
+export async function fetchSaleChannels(): Promise<{ sale_channels: SaleChannel[] }> {
+  return callCrm('/lookups/sale-channels', { method: 'GET' })
+}
+
+/** Đối tác vận chuyển từ FM.parter_delivery. */
+export async function fetchCarriers(): Promise<{ carriers: Carrier[] }> {
+  return callCrm('/lookups/carriers', { method: 'GET' })
 }
 
 /** Danh mục sản phẩm đầy đủ (tồn kho, đơn vị, VAT, khối lượng). */

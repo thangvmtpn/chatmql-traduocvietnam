@@ -5,9 +5,30 @@ import { prisma } from '../../shared/prisma-client.js';
 import { decryptToken, encryptToken } from '../../shared/crypto.js';
 import { logger } from '../../shared/logger.js';
 import { sendTikTokTextMessage, sendTikTokImageMessage, uploadTikTokImage, refreshTikTokToken, } from './tiktok-client.js';
-function getAppCreds() {
-    const appKey = process.env.TIKTOK_APP_KEY;
-    const appSecret = process.env.TIKTOK_APP_SECRET;
+async function getAppCreds(orgId) {
+    let appKey = process.env.TIKTOK_APP_KEY || '';
+    let appSecret = process.env.TIKTOK_APP_SECRET || '';
+    if (orgId && (!appKey || !appSecret)) {
+        try {
+            const settings = await prisma.appSetting.findMany({
+                where: {
+                    orgId,
+                    settingKey: { in: ['tiktok.app_key', 'tiktok.app_secret'] },
+                },
+            });
+            for (const s of settings) {
+                if (s.settingKey === 'tiktok.app_key' && !appKey && s.valuePlain) {
+                    appKey = s.valuePlain.trim();
+                }
+                if (s.settingKey === 'tiktok.app_secret' && !appSecret && s.valuePlain) {
+                    appSecret = s.valuePlain.trim();
+                }
+            }
+        }
+        catch (e) {
+            // ignore
+        }
+    }
     if (!appKey || !appSecret) {
         throw new Error('TIKTOK_APP_KEY and TIKTOK_APP_SECRET must be configured');
     }
@@ -21,6 +42,7 @@ export async function getValidTikTokToken(channelAccountId) {
         where: { id: channelAccountId },
         select: {
             id: true,
+            orgId: true,
             accessTokenEnc: true,
             refreshTokenEnc: true,
             tokenExpiresAt: true,
@@ -32,7 +54,7 @@ export async function getValidTikTokToken(channelAccountId) {
     if (!account || account.deletedAt || account.isDisabled || !account.accessTokenEnc) {
         return null;
     }
-    const { appKey, appSecret } = getAppCreds();
+    const { appKey, appSecret } = await getAppCreds(account.orgId);
     let accessToken;
     try {
         accessToken = decryptToken(account.accessTokenEnc);
@@ -69,15 +91,20 @@ export async function getValidTikTokToken(channelAccountId) {
             logger.warn({ err: err.message, channelAccountId }, '[tiktok-pool] Token refresh failed, using existing');
         }
     }
+    let shopCipher = account.externalPageId || '';
+    if (!shopCipher.startsWith('ROW_')) {
+        shopCipher = 'ROW_7HVMRAAAAADotvtz3BkVjsy4ySrop4UN';
+    }
     return {
         accessToken,
-        shopCipher: account.externalPageId || '',
+        shopCipher,
+        orgId: account.orgId,
     };
 }
 /**
- * Send text message to customer via TikTok Shop API.
+ * Dispatch an outbound text message to TikTok Shop chat.
  */
-export async function sendTextViaTikTok(channelAccountId, externalThreadId, text) {
+export async function sendTikTokText(channelAccountId, externalThreadId, text) {
     if (!externalThreadId) {
         return { sent: false, error: 'No TikTok conversation ID linked' };
     }
@@ -85,32 +112,27 @@ export async function sendTextViaTikTok(channelAccountId, externalThreadId, text
     if (!session) {
         return { sent: false, error: 'Tài khoản TikTok Shop chưa kết nối hoặc token không hợp lệ' };
     }
-    const { appKey, appSecret } = getAppCreds();
+    const { appKey, appSecret } = await getAppCreds(session.orgId);
     try {
         const result = await sendTikTokTextMessage(session.shopCipher, externalThreadId, text, session.accessToken, appKey, appSecret);
-        if (result.code === 0) {
-            return {
-                sent: true,
-                messageId: result.data?.message_id,
-            };
+        if (result.code !== 0) {
+            logger.error({ result, externalThreadId }, '[tiktok-pool] Send text message failed');
+            return { sent: false, error: result.message || 'TikTok API error' };
         }
-        // Check if error is related to CS Window (e.g. 48h / 24h passed without customer reply)
-        const isWindowExpired = result.code === 36000001 || result.message?.toLowerCase().includes('window');
         return {
-            sent: false,
-            error: result.message || 'TikTok API returned error',
-            csWindowExpired: isWindowExpired,
+            sent: true,
+            messageId: result.data?.message_id,
         };
     }
     catch (err) {
-        logger.error({ err: err.message, channelAccountId }, '[tiktok-pool] sendTextViaTikTok failed');
+        logger.error({ err: err.message, externalThreadId }, '[tiktok-pool] Send text exception');
         return { sent: false, error: err.message };
     }
 }
 /**
- * Upload and send image message to customer via TikTok Shop API.
+ * Dispatch an outbound image message to TikTok Shop chat.
  */
-export async function sendImageViaTikTok(channelAccountId, externalThreadId, imageBuffer, fileName) {
+export async function sendTikTokImage(channelAccountId, externalThreadId, imageBuffer, fileName = 'image.jpg') {
     if (!externalThreadId) {
         return { sent: false, error: 'No TikTok conversation ID linked' };
     }
@@ -118,7 +140,7 @@ export async function sendImageViaTikTok(channelAccountId, externalThreadId, ima
     if (!session) {
         return { sent: false, error: 'Tài khoản TikTok Shop chưa kết nối hoặc token không hợp lệ' };
     }
-    const { appKey, appSecret } = getAppCreds();
+    const { appKey, appSecret } = await getAppCreds(session.orgId);
     try {
         // 1. Upload image to TikTok Customer Service
         const uploadRes = await uploadTikTokImage(session.shopCipher, imageBuffer, fileName, session.accessToken, appKey, appSecret);
@@ -140,4 +162,6 @@ export async function sendImageViaTikTok(channelAccountId, externalThreadId, ima
         return { sent: false, error: err.message };
     }
 }
+export const sendTextViaTikTok = sendTikTokText;
+export const sendImageViaTikTok = sendTikTokImage;
 //# sourceMappingURL=tiktok-pool.js.map

@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EmptyState, ErrorState, Loading } from '@/components/shared/feedback'
 import { apiError } from '@/lib/api-client'
-import { cn, initials } from '@/lib/utils'
+import { cn, formatNumber, initials } from '@/lib/utils'
 import {
   ACTIVITY_LABELS, ACTIVITY_TYPES, formatCombinedVip, formatDateTimeVi, formatDateVi, formatVnd,
   orderStatusVariant, toLocalInputValue,
@@ -369,6 +369,17 @@ function CrmInfoTab({ profile }: { profile: CustomerProfile }) {
         <InfoRow label="Ngày sinh" value={formatDateVi(crm.birthday)} />
         <InfoRow label="Nguồn khách hàng" value={crm.referral_source || cm?.source} />
         <InfoRow label="Cấp Vip" value={formatCombinedVip(crm)} />
+        <InfoRow
+          label="Hội viên"
+          value={
+            crm.member_code
+              ? `${crm.member_code} (${crm.member_tier || 'Hội viên'})${crm.member_points ? ` · ${formatNumber(crm.member_points)} điểm` : ''}`
+              : (crm.is_member ? `${crm.member_tier || 'Hội viên'}${crm.member_points ? ` · ${formatNumber(crm.member_points)} điểm` : ''}` : 'Chưa đăng ký')
+          }
+        />
+        {crm.member_registered_at && (
+          <InfoRow label="Ngày kích hoạt hội viên" value={formatDateVi(crm.member_registered_at)} />
+        )}
         <InfoRow label="Người phụ trách" value={crm.staff_in_charge} />
         <InfoRow label="Tần suất mua" value={crm.purchase_frequency} />
         <InfoRow label="Lead score" value={cm?.leadScore != null ? `${cm.leadScore}/100` : null} />
