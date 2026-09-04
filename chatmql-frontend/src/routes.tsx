@@ -30,6 +30,8 @@ import { AutomationPage } from '@/pages/automation/automation-page'
 import { AutomationFlowPage } from '@/pages/automation/automation-flow-page'
 // Sản phẩm & Tri thức
 import { ProductsPage } from '@/pages/knowledge/products-page'
+// Sản phẩm lấy thẳng từ CRM (chỉ đọc)
+import { CrmProductsPage } from '@/pages/crm-products/crm-products-page'
 // Tài liệu bán hàng (thư mục: biểu giá → danh mục → sản phẩm → chi tiết)
 import { SalesDocsPage } from '@/pages/sales-docs/sales-docs-page'
 // Tích hợp
@@ -83,6 +85,8 @@ export const router = createBrowserRouter([
       { path: 'automation/flow/:ruleId', element: <ProtectedRoute permission={'automation.view'} roles={['owner', 'admin', 'manager']}><AutomationFlowPage /></ProtectedRoute> },
 
       { path: 'knowledge-base', element: <ProtectedRoute permission={'products.view'}><ProductsPage /></ProtectedRoute> },
+
+      { path: 'crm-products', element: <ProtectedRoute permission={'products.view'}><CrmProductsPage /></ProtectedRoute> },
 
       { path: 'sales-docs', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
       { path: 'sales-docs/c/:catId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },

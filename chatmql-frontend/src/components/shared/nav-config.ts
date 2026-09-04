@@ -9,6 +9,7 @@ import {
   Settings,
   Database,
   FolderOpen,
+  PackageSearch,
   type LucideIcon,
 } from 'lucide-react'
 import type { Role } from '@/types/api'
@@ -43,6 +44,8 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'Tự động hóa', to: '/automation', icon: Zap, roles: ['owner', 'admin', 'manager'], permission: 'automation.view' },
   { label: 'CDP', to: '/cdp', icon: Database, roles: ['owner', 'admin', 'manager'], permission: 'cdp.view' },
   { label: 'Sản phẩm & Tri thức', to: '/knowledge-base', icon: Package, permission: 'products.view' },
+  // Sản phẩm đọc thẳng từ CRM — không lưu bản sao ở ChatMQL.
+  { label: 'Sản phẩm (CRM)', to: '/crm-products', icon: PackageSearch, permission: 'products.view' },
   // Thư mục tài liệu bán hàng (biểu giá → danh mục → sản phẩm → chi tiết ảnh/mô tả/video); admin quản trị.
   { label: 'Tài liệu bán hàng', to: '/sales-docs', icon: FolderOpen, permission: 'products.view' },
   { label: 'AI', to: '/ai', icon: Sparkles, permission: 'ai.view' },
