@@ -6,11 +6,12 @@
  *
  * Bố cục:
  *   ┌ Header dính: avatar · tên · mã KH · SĐT
- *   ├ Thanh tab: Thông tin | Ghi chú nhanh | Tạo đơn ‖ Tài liệu bán hàng
+ *   ├ Thanh tab: Thông tin | Tạo đơn | Sản phẩm  (Ghi chú nhanh vào bằng nút)
  *   └ Nội dung tab
  *       • Thông tin   — số liệu CRM, lưới trường, thiệp sinh nhật, 2 nút dính đáy
  *       • Ghi chú nhanh — ghi chú theo hội thoại + trạng thái tương tác
  *       • Tạo đơn     — `orderSlot` (form do cha truyền) + đơn gần đây
+ *       • Sản phẩm    — thẻ hàng ngang, gửi khách link Mini App
  *       • Tài liệu bán hàng — kho tài liệu ĐÃ DUYỆT, chọn nhiều, gửi vào chat
  *
  * Khách chưa có SĐT (backend trả 400) là tình trạng bình thường, KHÔNG toast
@@ -20,7 +21,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  Cake, History, RefreshCw, Save, ShoppingCart, Sparkles, Users,
+  ArrowLeft, Cake, History, NotebookPen, RefreshCw, Save, ShoppingCart, Sparkles, Users,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -43,15 +44,20 @@ import {
 import {
   noteToneVariant, useConversationNotes, useCreateQuickNote, useNoteStatuses,
 } from '@/hooks/use-quick-notes'
+import { ProductTab } from './product-tab'
 import { CustomerProfileDrawer } from './customer-profile-drawer'
 import { Customer360Dialog } from './customer-360-dialog'
 
-export type CrmTab = 'info' | 'notes' | 'order'
+export type CrmTab = 'info' | 'notes' | 'order' | 'products'
 
+/**
+ * Ghi chú nhanh KHÔNG nằm ở đây: bốn tab làm thanh tab chật và chữ bị cắt.
+ * Lối vào là nút hình ghi chú cạnh nút đồng bộ trong tab Thông tin.
+ */
 const TABS: Array<{ id: CrmTab; label: string }> = [
   { id: 'info', label: 'Thông tin' },
-  { id: 'notes', label: 'Ghi chú nhanh' },
   { id: 'order', label: 'Tạo đơn' },
+  { id: 'products', label: 'Sản phẩm' },
 ]
 
 const UNNAMED = 'Khách chưa định danh'
@@ -133,18 +139,30 @@ export function CrmPanel({
               query={profileQ}
               name={name}
               onGoOrder={() => onTabChange('order')}
+              onGoNotes={() => onTabChange('notes')}
               onOpenProfile={() => setDrawerOpen(true)}
               onOpenC360={() => setC360Open(true)}
             />
           )
         )}
-        {activeTab === 'notes' && <QuickNotesTab convId={convId} contactId={conv?.contact?.id} />}
+        {activeTab === 'notes' && (
+          <div>
+            {/* Ghi chú không còn ở thanh tab nên phải có đường quay lại. */}
+            <div className="border-b px-3 py-2">
+              <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => onTabChange('info')}>
+                <ArrowLeft className="h-3.5 w-3.5" /> Thông tin khách
+              </Button>
+            </div>
+            <QuickNotesTab convId={convId} contactId={conv?.contact?.id} />
+          </div>
+        )}
         {activeTab === 'order' && (
           <div>
             {orderSlot}
             <RecentOrders phone={isGroup ? '' : phone} />
           </div>
         )}
+        {activeTab === 'products' && <ProductTab convId={convId} />}
       </div>
 
       <CustomerProfileDrawer
@@ -163,11 +181,12 @@ export function CrmPanel({
 // Tab "Thông tin"
 // ══════════════════════════════════════════════════════════════════════
 function InfoTab({
-  query, name, onGoOrder, onOpenProfile, onOpenC360,
+  query, name, onGoOrder, onGoNotes, onOpenProfile, onOpenC360,
 }: {
   query: ReturnType<typeof useCustomerProfile>
   name: string
   onGoOrder: () => void
+  onGoNotes: () => void
   onOpenProfile: () => void
   onOpenC360: () => void
 }) {
@@ -201,6 +220,7 @@ function InfoTab({
       name={name}
       refreshing={query.isFetching}
       onRefresh={() => query.refetch()}
+      onGoNotes={onGoNotes}
       onOpenProfile={onOpenProfile}
       onOpenC360={onOpenC360}
     />
@@ -208,12 +228,13 @@ function InfoTab({
 }
 
 function CrmInfo({
-  profile, name, refreshing, onRefresh, onOpenProfile, onOpenC360,
+  profile, name, refreshing, onRefresh, onGoNotes, onOpenProfile, onOpenC360,
 }: {
   profile: CustomerProfile
   name: string
   refreshing: boolean
   onRefresh: () => void
+  onGoNotes: () => void
   onOpenProfile: () => void
   onOpenC360: () => void
 }) {
@@ -227,6 +248,7 @@ function CrmInfo({
     [crm.profile_note],
   )
   const points = pointsQ.data ? String(pointsQ.data.balance ?? 0) : '—'
+  const vipRank = formatCombinedVip(crm)
 
   const fields: Array<{ label: string; value: string | null | undefined; full?: boolean; cls?: string }> = [
     { label: 'Mã khách hàng', value: crm.customer_code },
@@ -236,7 +258,6 @@ function CrmInfo({
     { label: 'Điểm', value: points, cls: 'text-success' },
     { label: 'Tổng chi tiêu', value: crm.gmv_total != null ? formatVnd(crm.gmv_total) : null },
     { label: 'Nghề nghiệp', value: crm.occupation },
-    { label: 'Cấp Vip', value: formatCombinedVip(crm) },
     { label: 'Nhóm KH', value: crm.nhom_kh || crm.priority_level },
     { label: 'Giới tính', value: crm.gender },
     { label: 'Ngày sinh', value: formatDateVi(crm.birthday) },
@@ -253,14 +274,29 @@ function CrmInfo({
   return (
     <div className="flex min-h-full flex-col">
       <div className="px-4 pb-4 pt-3.5">
-        <div className="mb-2.5 flex items-center justify-between">
-          <span className="text-[11.5px] font-bold tracking-wide text-muted-foreground">THÔNG TIN TỪ CRM</span>
-          <Button
-            variant="ghost" size="icon" className="h-7 w-7"
-            title="Đồng bộ lại từ CRM" onClick={onRefresh} disabled={refreshing}
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
-          </Button>
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="shrink-0 text-[11.5px] font-bold tracking-wide text-muted-foreground">THÔNG TIN TỪ CRM</span>
+          {/* Hạng hội viên quyết định cách xưng hô và mức ưu đãi, nên đặt ngay
+              cạnh tiêu đề thay vì nằm lẫn trong lưới hai chục trường. */}
+          {vipRank && vipRank !== '—' && (
+            <Badge variant="secondary" className="h-[18px] shrink-0 px-1.5 text-[10px] font-bold tracking-wide">
+              {vipRank}
+            </Badge>
+          )}
+          <div className="ml-auto flex shrink-0 items-center">
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7"
+              title={`Ghi chú nhanh${notesCount ? ` (${notesCount})` : ''}`} onClick={onGoNotes}
+            >
+              <NotebookPen className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7"
+              title="Đồng bộ lại từ CRM" onClick={onRefresh} disabled={refreshing}
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+            </Button>
+          </div>
         </div>
 
         {/* 4 ô số liệu */}

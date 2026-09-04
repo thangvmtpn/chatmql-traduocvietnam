@@ -1,13 +1,13 @@
 /**
  * crm-panel-store.ts — trạng thái cột phải màn Hội thoại (TDVN).
  *
- * Khung chat (nút "Lên đơn") và cột phải (4 tab: Thông tin · Ghi chú nhanh ·
- * Tạo đơn · Tài liệu bán hàng) là hai cây component khác nhau, nên tab đang mở
+ * Khung chat (nút "Lên đơn") và cột phải (Thông tin · Ghi chú nhanh ·
+ * Tạo đơn · Sản phẩm) là hai cây component khác nhau, nên tab đang mở
  * đặt ở store nhỏ này thay vì truyền prop xuyên nhiều lớp.
  */
 import { create } from 'zustand'
 
-export type CrmTab = 'info' | 'notes' | 'order'
+export type CrmTab = 'info' | 'notes' | 'order' | 'products'
 
 interface CrmPanelState {
   activeTab: CrmTab

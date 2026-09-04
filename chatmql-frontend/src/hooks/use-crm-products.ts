@@ -26,6 +26,8 @@ export interface CrmProduct {
   categoryName: string | null
   brand: string | null
   status: string | null
+  /** Ảnh đại diện để dựng thẻ sản phẩm; thiếu thì vẽ ô trống. */
+  imageUrl: string | null
   /** Bản ghi gốc CRM — dùng khi cần cột chưa được chuẩn hoá. */
   raw: Record<string, unknown>
 }
@@ -46,15 +48,21 @@ export interface CrmProductListResult {
   meta: { page: number; pageSize: number; total: number; totalPages: number }
 }
 
-export type CrmProductSource = 'bridge' | 'dashboard'
+export type CrmProductSource = 'bridge' | 'dashboard' | 'local'
 
 export const SOURCE_LABELS: Record<CrmProductSource, string> = {
   bridge: 'Cầu nối ChatMQL ↔ CRM (service key)',
   dashboard: 'API dashboard CRM (Bearer token)',
+  local: 'Bảng sản phẩm nội bộ (tạm, chờ API chính thức)',
 }
 
 export function useCrmProductSource() {
-  return useQuery<{ source: CrmProductSource; dashboardConfigured: boolean }>({
+  return useQuery<{
+    source: CrmProductSource
+    dashboardConfigured: boolean
+    /** Mẫu link Mini App, chứa {code}/{id}. Rỗng = chưa cấu hình. */
+    miniAppUrlTemplate: string
+  }>({
     queryKey: ['crm-products', 'source'],
     queryFn: async () => (await api.get('/crm-products/source')).data,
     staleTime: 5 * 60_000,

@@ -72,6 +72,11 @@ export interface CrmProduct {
   brand: string | null
   /** active | inactive | ngừng bán… theo hệ thống nguồn. */
   status: string | null
+  /**
+   * Ảnh đại diện để dựng thẻ sản phẩm. Bộ ảnh đầy đủ vẫn thuộc tài liệu bán
+   * hàng — đây chỉ là một tấm để nhận diện, thiếu thì giao diện vẽ ô trống.
+   */
+  imageUrl: string | null
   /** Bản ghi gốc — giữ lại để hiện thêm cột mà không phải sửa backend. */
   raw: Record<string, unknown>
 }
@@ -119,8 +124,23 @@ export function normalizeProduct(row: Record<string, unknown>): CrmProduct {
     categoryName: str(pick(row, ['category_name', 'category', 'danh_muc', 'nhom_sp', 'ten_nhom'])),
     brand: str(pick(row, ['brand', 'thuong_hieu', 'brand_name'])),
     status: str(pick(row, ['status', 'trang_thai', 'active'])),
+    imageUrl: firstImage(row),
     raw: row,
   }
+}
+
+/** Ảnh đại diện: nhận cả trường ảnh đơn lẫn mảng ảnh, tuỳ endpoint CRM. */
+function firstImage(row: Record<string, unknown>): string | null {
+  const single = str(pick(row, ['image_url', 'image', 'thumbnail', 'thumb', 'avatar', 'picture', 'anh']))
+  if (single) return single
+  for (const k of ['images', 'photos', 'gallery', 'anh_sp']) {
+    const v = row[k]
+    if (Array.isArray(v) && v.length) {
+      const first = str(v[0])
+      if (first) return first
+    }
+  }
+  return null
 }
 
 /** Bóc mảng bản ghi ra khỏi các kiểu vỏ bọc phổ biến của CRM. */
@@ -224,6 +244,7 @@ async function searchViaLocal(orgId: string, q: string, limit: number): Promise<
       categoryName: r.category?.name ?? null,
       brand: null,
       status: r.status,
+      imageUrl: r.images[0] ?? null,
       // Ảnh/mô tả/video có sẵn trong bảng nội bộ — đưa qua `raw` để thư viện tài
       // liệu dựng được nội dung mà cấu trúc chuẩn không phải phình thêm cột.
       raw: {

@@ -9,10 +9,17 @@ import { searchCrmProducts, listCrmProducts, resolveSource } from './crm-product
 export async function crmProductRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware)
 
-  /** Nguồn đang dùng + đã cấu hình chưa — để FE báo đúng nguyên nhân khi lỗi. */
+  /**
+   * Nguồn đang dùng + đã cấu hình chưa — để FE báo đúng nguyên nhân khi lỗi.
+   *
+   * `miniAppUrlTemplate` là mẫu link Mini App gửi khách, chứa chỗ thay `{code}`
+   * (và `{id}` cho hệ thống đánh số thay vì mã). Chưa cấu hình thì trả rỗng để
+   * giao diện khoá nút gửi — thà không gửi còn hơn gửi khách một link hỏng.
+   */
   app.get('/api/v1/crm-products/source', async () => ({
     source: resolveSource(),
     dashboardConfigured: !!process.env.CRM_DASHBOARD_TOKEN,
+    miniAppUrlTemplate: process.env.ZALO_MINIAPP_PRODUCT_URL || '',
   }))
 
   /** Danh sách để duyệt — không cần gõ từ khoá. */
