@@ -17,9 +17,10 @@ import { getAlwaysScenarios, retrieveRelevantScenarios } from '../scenario-servi
 import { retrieveKb } from '../../knowledge/kb-service.js'
 import { retrieveKbSemantic } from '../../knowledge/embedding-service.js'
 import { retrieveProductSemantic } from '../../products/product-embedding.js'
+import { retrieveProductDocs } from '../../product-docs/product-docs-service.js'
 import { getThreadMemory } from '../../knowledge/memory-service.js'
 import { getToolsConfig, type ToolsConfig, type ToolConfig } from '../tools-config-service.js'
-import type { HarnessContext, ContactProfile, KbSnippet, ProductSnippet, MemoryFact, ScenarioSnippet, StaffNoteSnippet } from './harness-types.js'
+import type { HarnessContext, ContactProfile, KbSnippet, ProductSnippet, ProductDocSnippet, MemoryFact, ScenarioSnippet, StaffNoteSnippet } from './harness-types.js'
 import { recordStep } from '../observability/trace-recorder.js'
 // Ngân sách ký tự theo model (base/large) — xem budgets.ts vì sao có 2 bậc.
 // Thay cho các hằng BUDGET_L*_CHARS cứng trước đây; bậc `base` giữ đúng các số cũ.
@@ -266,7 +267,7 @@ export async function assembleContext(
   // In agent mode (skipRag) the generator fetches KB/products via tool calls,
   // so we don't pre-fetch them here (avoids double retrieval).
   // Parallelize all layer loads (each KB/product tool gated by its own config)
-  const [logic, scenarios, contact, threadMemory, staffNotes, kbSnippets, products, recentMessages] = await Promise.all([
+  const [logic, scenarios, contact, threadMemory, staffNotes, kbSnippets, products, productDocs, recentMessages] = await Promise.all([
     getActiveLogicContext(orgId),                                                          // L0
     loadScenarios(orgId, turnText, ragTopK, budgets.l0bScenarios, opts.minScore),          // L0b
     contactId ? loadContactProfile(contactId) : Promise.resolve(null),                    // L2
@@ -274,6 +275,9 @@ export async function assembleContext(
     loadStaffNotes(orgId, convId, contactId, budgets.l3bStaffNotes),                        // L3b
     opts.skipRag ? Promise.resolve([] as KbSnippet[]) : loadKbSnippets(orgId, turnText, ragTopK, tools, budgets.l1Kb, opts.minScore),          // L1
     opts.skipRag ? Promise.resolve([] as ProductSnippet[]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, budgets.products, opts.minScore), // L1b
+    // L1c — tài liệu bán hàng theo mã SP. Nạp cả ở chế độ agent: đây là tri thức
+    // ChatMQL tự soạn, không nằm trong công cụ tra cứu nào của mô hình.
+    retrieveProductDocs(orgId, turnText, 5).catch(() => [] as ProductDocSnippet[]),          // L1c
     loadRecentMessages(convId, budgets.l5Messages, opts.historyBefore),                     // L5
   ])
 
@@ -301,6 +305,7 @@ export async function assembleContext(
     scenarios,
     kbSnippets,
     products,
+    productDocs,
     contact,
     threadMemory,
     staffNotes,
@@ -323,6 +328,7 @@ export async function assembleContext(
         : null,
       tri_thuc_KB_dung: kbSnippets.map((s) => ({ tieu_de: s.title, diem: s.score ?? null })),
       san_pham_dung: products.map((p) => ({ ten: p.name, diem: p.score ?? null })),
+      tai_lieu_ban_hang_dung: productDocs.map((d) => ({ ma: d.productCode, ten: d.name })),
       // ── Công cụ (function) đang bật + guardrail từng cái ([] = không giới hạn) ──
       cong_cu: {
         search_products: { bat: tools.search_products.enabled, gioi_han_danh_muc: tools.search_products.guardrail.categoryIds },

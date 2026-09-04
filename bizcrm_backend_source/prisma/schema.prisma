@@ -76,6 +76,7 @@ model Organization {
   quoteTemplates        QuoteTemplate[]
   quoteEvents           QuoteEvent[]
   websiteWidgets        WebsiteWidget[]
+  productDocs           ProductDoc[]
   aiEvalCases           AiEvalCase[]
   aiEvalRuns            AiEvalRun[]
   roles                 Role[]
@@ -2150,4 +2151,32 @@ model AiEvalResult {
 
   @@index([runId])
   @@map("ai_eval_results")
+}
+
+/// Tài liệu bán hàng của MỘT sản phẩm (ảnh, mô tả, video) — tri thức do ChatMQL
+/// sở hữu, gắn vào sản phẩm theo MÃ (productCode) chứ không theo id bảng
+/// `products` nội bộ. Nhờ vậy khi chuyển sang nguồn sản phẩm chính thức của
+/// TDVN, toàn bộ tài liệu đã soạn vẫn bám đúng sản phẩm.
+/// Vừa là tư liệu cho nhân viên, vừa là nguồn tri thức AI đọc khi tư vấn.
+model ProductDoc {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  /// Mã sản phẩm ở hệ thống nguồn. Khoá liên kết duy nhất.
+  productCode String   @map("product_code")
+  /// Tên tại thời điểm soạn — để hiện khi hệ thống nguồn lỗi/chậm.
+  name        String?
+  description String?
+  images      String[] @default([])
+  videoUrls   String[] @default([]) @map("video_urls")
+  /// Từ khoá/tên gọi khác, giúp AI tìm đúng tài liệu.
+  keywords    String?
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, productCode])
+  @@index([orgId])
+  @@map("product_docs")
 }

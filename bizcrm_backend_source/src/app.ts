@@ -87,6 +87,7 @@ import { platformReportRoutes } from './modules/platform/report-routes.js'
 import { platformBrandingRoutes } from './modules/platform/platform-branding-routes.js'
 import { productRoutes, PRODUCT_UPLOADS_DIR } from './modules/products/product-routes.js'
 import { crmProductRoutes } from './modules/crm-products/crm-products-routes.js'
+import { productDocRoutes } from './modules/product-docs/product-docs-routes.js'
 import { crmSyncRoutes } from './modules/integrations/crm-sync/crm-sync-routes.js'
 import { orderRoutes } from './modules/orders/order-routes.js'
 import { promotionAdminRoutes } from './modules/orders/promotion-admin-routes.js'
@@ -314,6 +315,7 @@ await app.register(platformBrandingRoutes)
 // ── Product Knowledge Base ───────────────────────────────────────────
 await app.register(productRoutes)
 await app.register(crmProductRoutes)  // /crm-products — đọc sản phẩm thẳng từ CRM
+await app.register(productDocRoutes)  // /product-docs — tài liệu bán hàng theo mã SP
 
 // ── CRM & FM Integrations + Order Dispatch ───────────────────────────
 await app.register(crmSyncRoutes)

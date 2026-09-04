@@ -11,12 +11,14 @@ import { getToolsConfig } from './tools-config-service.js'
 import { retrieveKb } from '../knowledge/kb-service.js'
 import { retrieveKbSemantic } from '../knowledge/embedding-service.js'
 import { retrieveProductSemantic } from '../products/product-embedding.js'
+import { retrieveProductDocs } from '../product-docs/product-docs-service.js'
 import { resolveBotById } from './ai-bot-service.js'
 import { getContextBudgets, truncate } from './harness/budgets.js'
 
 const TOP_K = 5
 const MAX_KB_CHARS = 3000
 const MAX_PRODUCT_CHARS = 1500
+const MAX_DOC_CHARS = 2500
 const MAX_HISTORY_TURNS = 6
 
 export interface AssistantTurn {
@@ -26,7 +28,7 @@ export interface AssistantTurn {
 
 export interface AskAssistantResult {
   reply: string
-  usedSources: { kb: number; products: number }
+  usedSources: { kb: number; products: number; docs: number }
 }
 
 async function loadKbContext(orgId: string, query: string): Promise<{ text: string; count: number }> {
@@ -65,6 +67,22 @@ async function loadProductContext(orgId: string, query: string): Promise<{ text:
   return { text: kept.join('\n'), count: kept.length }
 }
 
+async function loadDocContext(orgId: string, query: string): Promise<{ text: string; count: number }> {
+  // Tài liệu bán hàng do công ty soạn — nguồn tri thức sản phẩm chính.
+  const docs = await retrieveProductDocs(orgId, query, 5).catch(() => [])
+  let total = 0
+  const kept: string[] = []
+  for (const d of docs) {
+    const media = [d.imageCount ? `${d.imageCount} ảnh` : '', d.videoCount ? `${d.videoCount} video` : '']
+      .filter(Boolean).join(' · ')
+    const block = `- [${d.productCode}] ${d.name ?? ''}${media ? ` (có ${media})` : ''}: ${d.description ?? ''}`
+    total += block.length
+    if (total > MAX_DOC_CHARS) break
+    kept.push(block)
+  }
+  return { text: kept.join('\n'), count: kept.length }
+}
+
 function buildSystemPrompt(bot: { name: string; persona: string | null; playbook: string | null } | null): string {
   const base = [
     'Bạn là TRỢ LÝ AI NỘI BỘ, chỉ phục vụ NHÂN VIÊN của công ty tra cứu thông tin — không phải chatbot chăm sóc khách hàng.',
@@ -88,12 +106,14 @@ function buildUserPrompt(
   history: AssistantTurn[],
   kb: { text: string; count: number },
   products: { text: string; count: number },
+  docs: { text: string; count: number },
 ): string {
   const parts: string[] = []
 
-  if (kb.count > 0 || products.count > 0) {
+  if (kb.count > 0 || products.count > 0 || docs.count > 0) {
     parts.push('### Dữ liệu tham khảo')
     if (products.count > 0) parts.push(`Sản phẩm liên quan:\n${products.text}`)
+    if (docs.count > 0) parts.push(`Tài liệu bán hàng (do công ty soạn):\n${docs.text}`)
     if (kb.count > 0) parts.push(`Kiến thức công ty liên quan:\n${kb.text}`)
   }
 
@@ -138,9 +158,10 @@ export async function askAssistant(input: {
   const apiKey = await getProviderApiKey(input.orgId, provider)
   if (!apiKey) throw new Error(`AI provider key for "${provider}" is not configured`)
 
-  const [kb, products] = await Promise.all([
+  const [kb, products, docs] = await Promise.all([
     loadKbContext(input.orgId, message),
     loadProductContext(input.orgId, message),
+    loadDocContext(input.orgId, message),
   ])
 
   const budgets = getContextBudgets(model)
@@ -153,7 +174,7 @@ export async function askAssistant(input: {
         }
       : null,
   )
-  const userPrompt = buildUserPrompt(message, input.history ?? [], kb, products)
+  const userPrompt = buildUserPrompt(message, input.history ?? [], kb, products, docs)
 
   const raw = await dispatchProvider(provider, apiKey, model, system, userPrompt, { maxTokens: 900 })
 
@@ -166,5 +187,5 @@ export async function askAssistant(input: {
     raw,
   })
 
-  return { reply: raw.text, usedSources: { kb: kb.count, products: products.count } }
+  return { reply: raw.text, usedSources: { kb: kb.count, products: products.count, docs: docs.count } }
 }
