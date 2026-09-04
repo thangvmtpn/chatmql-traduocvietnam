@@ -128,7 +128,7 @@ export async function fetchWards(provinceId) {
 export async function fetchSaleChannels() {
     return callCrm('/lookups/sale-channels', { method: 'GET' });
 }
-/** Đối tác vận chuyển từ FM.parter_delivery. */
+/** Đối tác vận chuyển từ CRM/FM và cấu hình phí vận chuyển. */
 export async function fetchCarriers() {
     return callCrm('/lookups/carriers', { method: 'GET' });
 }

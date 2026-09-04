@@ -235,7 +235,7 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
   // lượt round-trip riêng lẻ.
   app.get('/api/v1/orders/form-lookups', async (_request, reply) => {
     try {
-      const [statuses, warehouses, provinces, saleChannels, carriers] = await Promise.all([
+      const [statuses, warehouses, provinces, saleChannels, carriersData] = await Promise.all([
         fetchOrderStatuses(),
         fetchWarehouses(),
         fetchProvinces(),
@@ -247,7 +247,12 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
         warehouses: warehouses.warehouses,
         provinces: provinces.provinces,
         saleChannels: saleChannels.sale_channels,
-        carriers: carriers.carriers,
+        carriers: carriersData.carriers,
+        defaultShippingFee: carriersData.default_shipping_fee ?? 25000,
+        overweightRule: carriersData.overweight_rule ?? {
+          base_weight_limit_kg: 3,
+          extra_fee_per_kg: 6000,
+        },
       }
     } catch (err) {
       return replyCrmError(reply, err, 'lấy dữ liệu tra cứu cho form đơn')

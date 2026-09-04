@@ -267,8 +267,17 @@ export async function fetchSaleChannels(): Promise<{ sale_channels: SaleChannel[
   return callCrm('/lookups/sale-channels', { method: 'GET' })
 }
 
-/** Đối tác vận chuyển từ FM.parter_delivery. */
-export async function fetchCarriers(): Promise<{ carriers: Carrier[] }> {
+export interface CarriersLookupResult {
+  carriers: Carrier[]
+  default_shipping_fee?: number
+  overweight_rule?: {
+    base_weight_limit_kg: number
+    extra_fee_per_kg: number
+  }
+}
+
+/** Đối tác vận chuyển từ CRM/FM và cấu hình phí vận chuyển. */
+export async function fetchCarriers(): Promise<CarriersLookupResult> {
   return callCrm('/lookups/carriers', { method: 'GET' })
 }
 

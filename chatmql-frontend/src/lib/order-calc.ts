@@ -90,25 +90,63 @@ export const POINT_RATE = 1000
 /** Khối lượng mặc định (gram) khi FM không trả weight — theo bridge. */
 export const DEFAULT_ITEM_WEIGHT = 100
 
-/** Phí ship mặc định theo hãng — bridge gán khi đổi đơn vị vận chuyển. */
+/** Phí ship mặc định từ cấu hình CRM (25.000đ). */
+export const DEFAULT_SHIPPING_FEE = 25000
+
+/** Mốc cân nặng chuẩn không tính thêm phí (3kg). */
+export const BASE_WEIGHT_LIMIT_KG = 3
+
+/** Phí vượt cân nặng: 6.000đ cho mỗi 1kg vượt quá 3kg (theo CRM). */
+export const OVERWEIGHT_FEE_PER_KG = 6000
+
+/**
+ * Tính cước phí vận chuyển chuẩn theo rule CRM:
+ * - Dưới 3kg: baseFee (mặc định 25.000đ)
+ * - Từ 3kg trở lên: baseFee + Math.ceil(weightInKg - 3) * 6.000đ
+ * - Tự vận chuyển (isSelfShipping): phí tự giao do nhân sự nhập (mặc định 0đ)
+ */
+export function calcShippingFeeByWeight(
+  weightInGrams: number,
+  baseFee = DEFAULT_SHIPPING_FEE,
+  isSelfShipping = false,
+  selfFee = 0
+): number {
+  if (isSelfShipping) return nonNeg(selfFee)
+  const weightInKg = Math.max(0, weightInGrams) / 1000
+  if (weightInKg < BASE_WEIGHT_LIMIT_KG) {
+    return baseFee
+  }
+  const extraKg = Math.ceil(weightInKg - BASE_WEIGHT_LIMIT_KG)
+  return baseFee + extraKg * OVERWEIGHT_FEE_PER_KG
+}
+
+/** Phí ship mặc định theo hãng — chuẩn CRM là 25.000đ. */
 export const CARRIER_FEES: Record<ShippingProvider, number> = {
-  jt_express: 30000,
+  jt_express: 25000,
   vnpost: 25000,
-  viettel_post: 28000,
+  viettel_post: 25000,
   other: 0,
 }
 
-export const CARRIER_LABELS: Record<ShippingProvider, string> = {
+export const CARRIER_LABELS: Record<string, string> = {
   jt_express: 'J&T Express',
   vnpost: 'VN Post',
   viettel_post: 'Viettel Post',
+  'J&T Express': 'J&T Express',
+  'VN Post': 'VN Post',
+  'Viettel Post': 'Viettel Post',
+  'Việt Nam Post': 'VN Post',
   other: 'Khác',
 }
 
-export const CARRIER_INFO: Record<ShippingProvider, string> = {
-  jt_express: 'J&T Express - Chuyển phát nhanh chuyên nghiệp',
-  vnpost: 'VN Post - Mạng lưới bưu cục phủ khắp toàn quốc',
-  viettel_post: 'Viettel Post - Giao nhanh, mạng lưới rộng khắp',
+export const CARRIER_INFO: Record<string, string> = {
+  jt_express: 'J&T Express — Chuyển phát nhanh chuyên nghiệp',
+  vnpost: 'VN Post — Mạng lưới bưu cục phủ khắp toàn quốc',
+  viettel_post: 'Viettel Post — Giao nhanh, mạng lưới rộng khắp',
+  'J&T Express': 'J&T Express — Chuyển phát nhanh chuyên nghiệp',
+  'VN Post': 'VN Post — Mạng lưới bưu cục phủ khắp toàn quốc',
+  'Viettel Post': 'Viettel Post — Giao nhanh, mạng lưới rộng khắp',
+  'Việt Nam Post': 'VN Post — Mạng lưới bưu cục phủ khắp toàn quốc',
   other: 'Đơn vị vận chuyển khác',
 }
 

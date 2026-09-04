@@ -30,6 +30,11 @@ export interface FormLookups {
   provinces: Province[]
   saleChannels?: SaleChannel[]
   carriers?: Carrier[]
+  defaultShippingFee?: number
+  overweightRule?: {
+    base_weight_limit_kg: number
+    extra_fee_per_kg: number
+  }
 }
 
 /** GET /orders/catalog — sản phẩm thật từ FM. */

@@ -193,10 +193,16 @@ export declare function fetchWards(provinceId: number): Promise<{
 export declare function fetchSaleChannels(): Promise<{
     sale_channels: SaleChannel[];
 }>;
-/** Đối tác vận chuyển từ FM.parter_delivery. */
-export declare function fetchCarriers(): Promise<{
+export interface CarriersLookupResult {
     carriers: Carrier[];
-}>;
+    default_shipping_fee?: number;
+    overweight_rule?: {
+        base_weight_limit_kg: number;
+        extra_fee_per_kg: number;
+    };
+}
+/** Đối tác vận chuyển từ CRM/FM và cấu hình phí vận chuyển. */
+export declare function fetchCarriers(): Promise<CarriersLookupResult>;
 /** Danh mục sản phẩm đầy đủ (tồn kho, đơn vị, VAT, khối lượng). */
 export declare function fetchProductCatalog(opts?: {
     warehouseId?: number;

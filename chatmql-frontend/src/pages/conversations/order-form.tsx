@@ -36,7 +36,10 @@ import {
   CARRIER_FEES,
   CARRIER_INFO,
   CARRIER_LABELS,
+  DEFAULT_SHIPPING_FEE,
   PAY_STATUS_LABELS,
+  calcShippingFeeByWeight,
+  calcTotalWeight,
   clampPoints,
   computeTotals,
   formatVnd,
@@ -119,8 +122,9 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
   const [lines, setLines] = useState<OrderLine[]>([])
 
   // Vận chuyển
-  const [shippingProvider, setShippingProvider] = useState<ShippingProvider>('jt_express')
-  const [shippingFee, setShippingFee] = useState<number>(CARRIER_FEES.jt_express)
+  const [shippingProvider, setShippingProvider] = useState<ShippingProvider>('J&T Express')
+  const [shippingFee, setShippingFee] = useState<number>(DEFAULT_SHIPPING_FEE)
+  const [isManualShippingFee, setIsManualShippingFee] = useState(false)
   const [typeFeeDelivery, setTypeFeeDelivery] = useState<TypeFeeDelivery>('CC_CASH')
   const [selfShipping, setSelfShipping] = useState(false)
   const [isFragile, setIsFragile] = useState(false)
@@ -154,6 +158,7 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
   const warehouses = lookups.data?.warehouses ?? []
   const saleChannels = lookups.data?.saleChannels ?? []
   const carriers = lookups.data?.carriers ?? []
+  const defaultShippingFee = lookups.data?.defaultShippingFee ?? DEFAULT_SHIPPING_FEE
 
   const sourceOptions = useMemo(() => {
     if (saleChannels.length) return saleChannels.map((s) => s.name)
@@ -161,16 +166,25 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
   }, [saleChannels])
 
   const carrierOptions = useMemo(() => {
+    // 3 đơn vị vận chuyển tiêu chuẩn trên CRM: J&T Express, Viettel Post, VN Post
+    const STANDARD_CARRIERS = [
+      { value: 'J&T Express', label: 'J&T Express' },
+      { value: 'Viettel Post', label: 'Viettel Post' },
+      { value: 'VN Post', label: 'VN Post' },
+    ]
     if (carriers.length) {
-      return carriers.map((c) => ({
-        value: c.name,
-        label: c.name,
-      }))
+      const filtered = carriers
+        .filter((c) => {
+          const n = c.name.toLowerCase()
+          return n.includes('j&t') || n.includes('viettel') || n.includes('vn') || n.includes('việt nam post')
+        })
+        .map((c) => {
+          const name = c.name.includes('Việt Nam Post') ? 'VN Post' : c.name
+          return { value: name, label: name }
+        })
+      if (filtered.length) return filtered
     }
-    return CARRIERS.map((c) => ({
-      value: c,
-      label: `${CARRIER_LABELS[c]}${CARRIER_FEES[c] ? ` - ${formatNumber(CARRIER_FEES[c])}đ` : ''}`,
-    }))
+    return STANDARD_CARRIERS
   }, [carriers])
 
   // Điền sẵn từ ngữ cảnh hội thoại — một lần, không đè lên thứ nhân viên đã gõ.
@@ -249,11 +263,28 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
     })
   }, [catalog])
 
-  // Đơn vị vận chuyển → phí mặc định của hãng.
+  // Tổng khối lượng sản phẩm (gram)
+  const totalWeight = useMemo(() => calcTotalWeight(lines), [lines])
+
+  // Tự động tính phí vận chuyển theo cân nặng chuẩn CRM
+  useEffect(() => {
+    if (selfShipping) {
+      if (!isManualShippingFee) setShippingFee(0)
+      return
+    }
+    if (!isManualShippingFee) {
+      const calculatedFee = calcShippingFeeByWeight(totalWeight, defaultShippingFee, false)
+      setShippingFee(calculatedFee)
+    }
+  }, [totalWeight, defaultShippingFee, selfShipping, isManualShippingFee])
+
+  // Đơn vị vận chuyển
   function changeProvider(v: string) {
     setShippingProvider(v as ShippingProvider)
-    const fee = (CARRIER_FEES as Record<string, number>)[v] ?? 30000
-    setShippingFee(fee)
+    if (!isManualShippingFee) {
+      const fee = calcShippingFeeByWeight(totalWeight, defaultShippingFee, selfShipping)
+      setShippingFee(fee)
+    }
   }
 
   // Đơn đổi trả → thêm/bớt dòng ghi chú chuẩn.
@@ -662,8 +693,32 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Phí vận chuyển">
-            <MoneyInput value={shippingFee} onChange={setShippingFee} suffix="đ" disabled={selfShipping} />
+          <Field
+            label={
+              <div className="flex items-center justify-between">
+                <span>Phí vận chuyển</span>
+                {isManualShippingFee && !selfShipping && (
+                  <button
+                    type="button"
+                    onClick={() => setIsManualShippingFee(false)}
+                    className="text-[10px] text-primary hover:underline font-normal"
+                    title="Khôi phục tự tính cước phí theo cân nặng chuẩn CRM"
+                  >
+                    ↺ Tự tính
+                  </button>
+                )}
+              </div>
+            }
+          >
+            <MoneyInput
+              value={shippingFee}
+              onChange={(val) => {
+                setIsManualShippingFee(true)
+                setShippingFee(val)
+              }}
+              suffix="đ"
+              disabled={selfShipping}
+            />
           </Field>
           <Field label="Loại phí ship">
             <Select value={typeFeeDelivery} onValueChange={(v) => setTypeFeeDelivery(v as TypeFeeDelivery)} disabled={selfShipping}>
@@ -675,9 +730,37 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
             </Select>
           </Field>
         </div>
+
+        {/* Rule cân nặng CRM */}
+        {!selfShipping && (
+          <div className="rounded border bg-muted/40 px-2.5 py-1.5 text-[11px] space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">
+                Khối lượng: <b>{formatNumber(totals.totalWeight)}g</b> ({(totals.totalWeight / 1000).toFixed(2)} kg)
+              </span>
+              <span>
+                {totals.totalWeight / 1000 < 3 ? (
+                  <span className="text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded text-[10px]">
+                    ≤ 3kg: {formatVnd(defaultShippingFee)}
+                  </span>
+                ) : (
+                  <span className="text-amber-600 font-medium bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded text-[10px]">
+                    Vượt 3kg: +{Math.ceil(totals.totalWeight / 1000 - 3)}kg × 6k
+                  </span>
+                )}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground flex items-center justify-between">
+              <span>Rule CRM: {formatVnd(defaultShippingFee)} cho ≤ 3kg đầu, vượt +6.000đ/kg.</span>
+              {typeFeeDelivery === 'PP_CASH' && (
+                <span className="text-primary font-medium">Shop trả ship</span>
+              )}
+            </p>
+          </div>
+        )}
         {!selfShipping && (
           <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
-            <Info className="mt-0.5 h-3 w-3 shrink-0" /> {CARRIER_INFO[shippingProvider]}
+            <Info className="mt-0.5 h-3 w-3 shrink-0" /> {CARRIER_INFO[shippingProvider] || `${shippingProvider} — Chuyển phát nhanh`}
           </p>
         )}
         {selfShipping && (
@@ -893,7 +976,7 @@ function Section({
 function Field({
   label, icon: Icon, hint, children,
 }: {
-  label: string
+  label: React.ReactNode
   icon?: typeof MapPin
   hint?: string
   children: React.ReactNode
