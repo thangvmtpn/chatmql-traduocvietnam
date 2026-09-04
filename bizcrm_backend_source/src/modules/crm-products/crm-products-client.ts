@@ -11,20 +11,27 @@
  *                   của MỘT tài khoản CRM. Token này hết hạn theo phiên đăng
  *                   nhập nên chỉ hợp cho thử nghiệm, trừ khi CRM cấp token
  *                   dịch vụ dài hạn.
+ *   3. `local`    → bảng `products` nội bộ — danh mục thật đã có sẵn trong hệ
+ *                   thống, dùng khi CRM chưa mở API. Đây là NGUỒN TẠM: khi
+ *                   TDVN cấp API chính thức thì đổi biến môi trường sang
+ *                   bridge/dashboard, bảng nội bộ sẽ bỏ. Vì vậy dữ liệu vẫn đi
+ *                   qua đúng `CrmProduct` chứ không lộ hình dạng bảng ra ngoài.
  *
  * Token/key chỉ nằm ở backend, không bao giờ đi ra trình duyệt.
  */
 import { logger } from '../../shared/logger.js'
+import { prisma } from '../../shared/prisma-client.js'
 import { fetchProductCatalog } from '../orders/crm-order-client.js'
 
 const TIMEOUT_MS = 15_000
 
 /** Nguồn dữ liệu đang bật. Thiếu cấu hình dashboard thì tự về bridge. */
-export type CrmProductSource = 'bridge' | 'dashboard'
+export type CrmProductSource = 'bridge' | 'dashboard' | 'local'
 
 export function resolveSource(): CrmProductSource {
   const want = (process.env.CRM_PRODUCT_SOURCE || '').toLowerCase()
   if (want === 'dashboard' && process.env.CRM_DASHBOARD_TOKEN) return 'dashboard'
+  if (want === 'local') return 'local'
   return 'bridge'
 }
 
@@ -168,6 +175,70 @@ async function searchViaDashboard(q: string, limit: number): Promise<CrmProduct[
   }
 }
 
+/**
+ * Đọc từ bảng `products` nội bộ và map về `CrmProduct`.
+ *
+ * Bảng nội bộ không quản kho nên `inventory`/`warehouse` để trống — trống nghĩa
+ * là "không theo dõi ở nguồn này", khác với 0 là hết hàng, nên giao diện không
+ * được hiểu nhầm thành ngừng bán.
+ *
+ * `priceType='range'` bên nội bộ tương ứng cặp price/priceMax của cấu trúc
+ * chuẩn; các kiểu còn lại (contact/free) để giá trống cho đúng nghĩa.
+ */
+async function searchViaLocal(orgId: string, q: string, limit: number): Promise<CrmProduct[]> {
+  const needle = q.trim()
+  const rows = await prisma.product.findMany({
+    where: {
+      orgId,
+      ...(needle
+        ? {
+            OR: [
+              { name: { contains: needle, mode: 'insensitive' as const } },
+              { code: { contains: needle, mode: 'insensitive' as const } },
+              { keywords: { contains: needle, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    },
+    include: { category: { select: { id: true, name: true } } },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    take: limit,
+  })
+
+  return rows.map((r) => {
+    const priced = r.priceType === 'fixed' || r.priceType === 'range'
+    return {
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      price: priced && r.price != null ? Number(r.price) : null,
+      priceMax: r.priceType === 'range' && r.priceMax != null ? Number(r.priceMax) : null,
+      currency: r.currency,
+      unit: null,
+      vatNote: null,
+      inventory: null,
+      weight: null,
+      warehouseId: null,
+      warehouseName: null,
+      categoryId: r.category?.id ?? null,
+      categoryName: r.category?.name ?? null,
+      brand: null,
+      status: r.status,
+      // Ảnh/mô tả/video có sẵn trong bảng nội bộ — đưa qua `raw` để thư viện tài
+      // liệu dựng được nội dung mà cấu trúc chuẩn không phải phình thêm cột.
+      raw: {
+        description: r.description,
+        images: r.images,
+        video_urls: r.videoUrls,
+        keywords: r.keywords,
+        tags: r.tags,
+        price_type: r.priceType,
+        slug: r.slug,
+      },
+    }
+  })
+}
+
 async function searchViaBridge(q: string, limit: number, warehouseId?: number): Promise<CrmProduct[]> {
   // Bridge trả cả danh mục theo kho; lọc theo từ khoá ngay tại backend.
   const { products } = await fetchProductCatalog({ q: q || undefined, warehouseId })
@@ -182,20 +253,36 @@ async function searchViaBridge(q: string, limit: number, warehouseId?: number): 
   return rows.map(normalizeProduct)
 }
 
-/** Tìm sản phẩm trên CRM. Không đụng gì tới bảng products nội bộ. */
+/**
+ * Tìm sản phẩm ở hệ thống nguồn đang bật.
+ *
+ * `orgId` chỉ cần cho nguồn `local` (bảng nội bộ có nhiều tổ chức); hai nguồn
+ * kia đã bị ràng buộc tổ chức bằng chính khoá/token cấu hình.
+ */
 export async function searchCrmProducts(
   q: string,
   limit = 20,
+  orgId?: string,
 ): Promise<{ source: CrmProductSource; products: CrmProduct[] }> {
   const source = resolveSource()
   const safeLimit = Math.min(100, Math.max(1, limit))
   const products = source === 'dashboard'
     ? await searchViaDashboard(q, safeLimit)
-    : await searchViaBridge(q, safeLimit)
+    : source === 'local'
+      ? await searchViaLocal(requireOrg(orgId), q, safeLimit)
+      : await searchViaBridge(q, safeLimit)
   return { source, products }
 }
 
+/** Nguồn nội bộ mà thiếu tổ chức là lỗi lập trình, không phải lỗi cấu hình. */
+function requireOrg(orgId?: string): string {
+  if (!orgId) throw new Error('Nguồn sản phẩm nội bộ cần orgId')
+  return orgId
+}
+
 export interface ListParams {
+  /** Bắt buộc khi nguồn là `local`. */
+  orgId?: string
   q?: string
   warehouseId?: number
   category?: string
@@ -227,7 +314,9 @@ export async function listCrmProducts(params: ListParams = {}): Promise<ListResu
 
   const all = source === 'dashboard'
     ? await searchViaDashboard(params.q ?? '', 200)
-    : await searchViaBridge('', 1000, params.warehouseId)
+    : source === 'local'
+      ? await searchViaLocal(requireOrg(params.orgId), '', 1000)
+      : await searchViaBridge('', 1000, params.warehouseId)
 
   const needle = (params.q ?? '').trim().toLowerCase()
   let rows = all.filter((p) => {

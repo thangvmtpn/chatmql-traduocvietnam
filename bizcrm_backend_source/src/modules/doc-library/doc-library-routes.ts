@@ -69,12 +69,12 @@ async function buildProductMessage(a: {
   textContent: string | null
   productCodes: string[]
   videoUrls: string[]
-}): Promise<string> {
+}, orgId: string): Promise<string> {
   const lines: string[] = [`🍵 ${a.title}`]
 
   for (const code of a.productCodes.slice(0, 3)) {
     try {
-      const { products } = await searchCrmProducts(code, 10)
+      const { products } = await searchCrmProducts(code, 10, orgId)
       const p = products.find((x) => x.code?.toUpperCase() === code.toUpperCase())
       if (!p) continue
       const price = p.price != null
@@ -316,7 +316,7 @@ export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
         const wantIntro = part.includeIntro !== false
 
         if (a.kind === 'product') {
-          if (wantIntro && !(await sendText(await buildProductMessage({ ...a, videoUrls: pickedVideos })))) {
+          if (wantIntro && !(await sendText(await buildProductMessage({ ...a, videoUrls: pickedVideos }, user.orgId)))) {
             failedText.push('tin giới thiệu sản phẩm')
           }
           let imgOk = 0

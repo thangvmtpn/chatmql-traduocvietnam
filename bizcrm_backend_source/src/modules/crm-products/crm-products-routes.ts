@@ -26,6 +26,7 @@ export async function crmProductRoutes(app: FastifyInstance): Promise<void> {
     }
     try {
       return await listCrmProducts({
+        orgId: (request.user as { orgId: string }).orgId,
         q: qy.q,
         warehouseId: int(qy.warehouseId),
         category: qy.category || undefined,
@@ -47,7 +48,11 @@ export async function crmProductRoutes(app: FastifyInstance): Promise<void> {
       const q = (request.query.q ?? '').trim()
       const limit = Number.parseInt(request.query.limit ?? '20', 10)
       try {
-        return await searchCrmProducts(q, Number.isFinite(limit) ? limit : 20)
+        return await searchCrmProducts(
+          q,
+          Number.isFinite(limit) ? limit : 20,
+          (request.user as { orgId: string }).orgId,
+        )
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Không rõ lỗi'
         app.log.error({ err }, '[crm-products] tìm sản phẩm thất bại')
