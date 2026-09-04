@@ -84,10 +84,19 @@ export interface HarnessContext {
   contact: ContactProfile | null
   /** L3 — thread/contact memory facts (active facts for this contact). */
   threadMemory: MemoryFact[]
+  /** L3b — recent staff notes for this contact/conversation (bounded). */
+  staffNotes?: StaffNoteSnippet[]
   /** L5 — recent conversation transcript (bounded). */
   recentMessages: Array<{ role: 'customer' | 'agent'; text: string }>
   /** L6 — the current customer turn (debounced). */
   turnText: string
+}
+
+/** Staff note snippet from internal CRM notes. */
+export interface StaffNoteSnippet {
+  content: string
+  status?: string | null
+  createdAt?: string | null
 }
 
 /**
@@ -127,4 +136,20 @@ export interface HarnessResult {
   runId: string
   /** Ảnh gửi kèm; orchestrator gửi sau khi phần chữ đã ra kênh. */
   images?: ReplyImage[]
+  /**
+   * Lỗi HẠ TẦNG (router chết, model lỗi, hết quota, trả lời rỗng…). Khác với
+   * "AI quyết định không trả lời" — cái đó reply=null nhưng KHÔNG có error.
+   * Orchestrator dựa vào trường này để không tiến con trỏ và chuyển người.
+   */
+  error?: string
+}
+
+/** Tuỳ chọn cho một lượt chạy harness. */
+export interface HarnessOptions {
+  /** Huỷ mọi lệnh gọi model khi hết ngân sách thời gian của lượt. */
+  signal?: AbortSignal
+  /** Chỉ lấy lịch sử TRƯỚC mốc này — tránh tin đang xử lý xuất hiện 2 lần. */
+  historyBefore?: Date
+  /** Ép dùng một Agent cụ thể thay vì bot gán theo kênh (trình mô phỏng / demo theo bot). */
+  forceBotId?: string
 }

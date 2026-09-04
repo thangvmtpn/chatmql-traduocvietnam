@@ -63,7 +63,8 @@ import { processTriggerJob, processDelayJob } from './modules/automation/automat
 import { initWorkers, shutdownQueue } from './shared/queue.js'
 import { embedAndStoreKbEntry } from './modules/knowledge/embedding-service.js'
 import { prisma as _prisma } from './shared/prisma-client.js'
-import { initAiReplyOrchestrator } from './modules/ai/harness/auto-reply-orchestrator.js'
+import { recoverPendingAiReplies } from './modules/ai/harness/auto-reply-orchestrator.js'
+import { initTraceRetentionCron } from './modules/ai/observability/trace-retention-cron.js'
 import { traceRoutes } from './modules/ai/observability/trace-routes.js'
 import { simulateRoutes } from './modules/ai/simulate-routes.js'
 import { initTraceCleanup } from './modules/ai/observability/trace-cleanup-job.js'
@@ -76,6 +77,8 @@ import { registerPerfexIntegration } from './modules/integrations/perfex/perfex-
 import { perfexRoutes } from './modules/integrations/perfex/perfex-routes.js'
 import { pancakeWebhookRoutes } from './modules/pancake/pancake-webhook.js'
 import { pancakeRoutes } from './modules/pancake/pancake-routes.js'
+import { tiktokOAuthRoutes } from './modules/tiktok-shop/oauth-routes.js'
+import { tiktokWebhookRoutes } from './modules/tiktok-shop/tiktok-webhook.js'
 import { platformAuthRoutes } from './modules/platform/platform-auth-routes.js'
 import { platformOrgRoutes } from './modules/platform/org-admin-routes.js'
 import { platformProvisioningRoutes } from './modules/platform/provisioning-routes.js'
@@ -296,6 +299,8 @@ await app.register(traceRoutes)
 await app.register(simulateRoutes)
 await app.register(pancakeWebhookRoutes)  // Public webhook — no JWT
 await app.register(pancakeRoutes)         // JWT-protected settings
+await app.register(tiktokWebhookRoutes)   // Public TikTok Shop webhook — no JWT
+await app.register(tiktokOAuthRoutes)     // TikTok Shop OAuth routes
 
 // ── Platform (super admin / multi-tenant control plane) ──────────────
 await app.register(platformAuthRoutes)
@@ -396,7 +401,10 @@ try {
   console.log('🧬 KB & Product embedding worker started')
 
   // ── AI auto-reply orchestrator (debounced, per-conversation) ──
-  initAiReplyOrchestrator()
+  // Hàng đợi BullMQ cho AI đã bỏ — chỉ còn debounce trong tiến trình. Bù phần
+  // mất khi restart: xếp lịch lại các tin khách chưa được trả lời.
+  recoverPendingAiReplies().catch(err => console.error('AI reply recovery failed:', err?.message))
+  initTraceRetentionCron()
   console.log('🤖 AI reply orchestrator started')
 
   // ── AI trace cleanup (purges expired AiTrace rows, every 6h) ──

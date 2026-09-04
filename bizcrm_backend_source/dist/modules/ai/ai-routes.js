@@ -482,6 +482,26 @@ export async function aiRoutes(app) {
             return sendError(reply, err, 'Failed to delete API key');
         }
     });
+    /** GET /api/v1/ai/suggestions?conversationId=&limit= — gợi ý đã lưu, chưa dùng (đọc lại khi mở hội thoại muộn) */
+    app.get('/api/v1/ai/suggestions', async (request, reply) => {
+        try {
+            const user = request.user;
+            const { conversationId, limit } = request.query;
+            if (!conversationId)
+                return reply.status(400).send({ error: 'conversationId là bắt buộc' });
+            const items = await prisma.aiSuggestion.findMany({
+                where: { orgId: user.orgId, conversationId, accepted: false },
+                orderBy: { createdAt: 'desc' },
+                take: Math.min(parseInt(limit ?? '5', 10) || 5, 20),
+                select: { id: true, content: true, confidence: true, createdAt: true },
+            });
+            return { items };
+        }
+        catch (err) {
+            app.log.error({ err }, '[ai] list suggestions failed');
+            return sendError(reply, err, 'Failed to list suggestions');
+        }
+    });
     app.post('/api/v1/ai/suggestions/:id/accept', async (request, reply) => {
         try {
             const user = request.user;

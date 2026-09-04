@@ -6,7 +6,7 @@
   const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:4520'
+        ? 'https://chatmql.traduocvietnam.com'
         : '');
 
   // Trình duyệt KHÔNG gọi thẳng sang CRM nữa. Mọi thứ liên quan tới đơn hàng
@@ -795,7 +795,6 @@
           ${infoRow('Nghề nghiệp', crm.occupation)}
           ${infoRow('Nguồn khách hàng', crm.referral_source || cm.source)}
           ${infoRow('Cấp Vip', formatCombinedVip(crm))}
-          ${infoRow('Nhóm KH', crm.nhom_kh || crm.priority_level)}
           ${infoRow('Người phụ trách', crm.staff_in_charge)}
           ${infoRow('Địa chỉ', crm.address || cm.address)}
           ${infoRow('Địa chỉ 2', crm.address2)}
@@ -2547,7 +2546,6 @@
                 <div style="display:flex; align-items:center; gap:8px;">
                   <span class="chatmql-crm-badge" id="order-crm-badge" style="font-size:11px; padding:2px 8px; border-radius:4px; background:${crmData ? '#dcfce7' : '#f1f5f9'}; color:${crmData ? '#15803d' : '#64748b'}; font-weight:700;">${crmData ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}</span>
                   <span style="font-weight:700; font-size:12px; color:#15803d;">Cấp Vip: <span id="order-crm-group">${formatCombinedVip(crmData)}</span></span>
-                  <span style="font-weight:600; font-size:12px; color:#475569; margin-left:8px;">Nhóm KH: <b style="color:#0f172a;">${crmData?.nhom_kh || crmData?.priority_level || '—'}</b></span>
                 </div>
                 <div style="font-size:12px; font-weight:600; color:#1e293b;">
                   👤 Care: <span style="color:#b91c1c; font-weight:700;" id="order-crm-staff">${staffCare}</span>
@@ -3735,10 +3733,10 @@
       }
       const currentSrc = img.src || '';
       // Fix local vs live uploads origin mismatch
-      if (window.location.protocol === 'https:' && currentSrc.includes('http://localhost:4520/uploads/')) {
-        img.src = currentSrc.replace('http://localhost:4520/uploads/', `${API_BASE}/uploads/`);
-      } else if (window.location.hostname === 'localhost' && currentSrc.includes('https://tracrm-api.bizino.ai/uploads/')) {
-        img.src = currentSrc.replace('https://tracrm-api.bizino.ai/uploads/', 'http://localhost:4520/uploads/');
+      if (window.location.protocol === 'https:' && currentSrc.includes('https://chatmql.traduocvietnam.com/uploads/')) {
+        img.src = currentSrc.replace('https://chatmql.traduocvietnam.com/uploads/', `${API_BASE}/uploads/`);
+      } else if (window.location.hostname === 'localhost' && currentSrc.includes('https://chatmql.traduocvietnam.com/uploads/')) {
+        img.src = currentSrc.replace('https://chatmql.traduocvietnam.com/uploads/', 'https://chatmql.traduocvietnam.com/uploads/');
       }
 
       // If image failed and span error exists, attempt proxy recovery
@@ -4912,7 +4910,6 @@ body.resizing-detail{cursor:col-resize; user-select:none;}
               ${row('Tổng chi tiêu', ccFmtMoney(crm.gmv_total))}
               ${row('Nghề nghiệp', crm.occupation)}
               ${row('Cấp Vip', formatCombinedVip(crm))}
-              ${row('Nhóm KH', crm.nhom_kh || crm.priority_level)}
               ${row('Giới tính', crm.gender)}
               ${row('Ngày sinh', crm.birthday ? ccFmtDate(crm.birthday) : null)}
               ${row('Email', chat.email)}

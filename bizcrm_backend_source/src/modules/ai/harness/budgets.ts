@@ -31,6 +31,8 @@ export interface ContextBudgets {
   l2Contact: number
   /** L3 — tổng ghi nhớ hội thoại (memory facts) */
   l3Memory: number
+  /** L3b — ghi chú nhân viên gắn vào hội thoại/khách */
+  l3bStaffNotes: number
   /** L5 — tổng tin nhắn gần đây */
   l5Messages: number
   /** L6 — tin nhắn của lượt hiện tại */
@@ -50,6 +52,7 @@ const BASE_BUDGETS: ContextBudgets = {
   l1Kb: 2_000,
   l2Contact: 800,
   l3Memory: 800,
+  l3bStaffNotes: 800,
   l5Messages: 4_000,
   l6Turn: 1_000,
   products: 1_500,
@@ -65,6 +68,7 @@ const LARGE_BUDGETS: ContextBudgets = {
   l1Kb: 6_000,
   l2Contact: 1_600,
   l3Memory: 1_600,
+  l3bStaffNotes: 1_600,
   l5Messages: 10_000,
   l6Turn: 2_000,
   products: 4_000,

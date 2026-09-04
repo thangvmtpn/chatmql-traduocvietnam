@@ -1,0 +1,17 @@
+{
+  "cleanUrls": false,
+  "rewrites": [
+    {
+      "source": "train-ai",
+      "destination": "/train-ai.html"
+    },
+    {
+      "source": "train-ai/",
+      "destination": "/train-ai.html"
+    },
+    {
+      "source": "**",
+      "destination": "/index.html"
+    }
+  ]
+}

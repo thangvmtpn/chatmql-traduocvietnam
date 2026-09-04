@@ -24,12 +24,15 @@ export async function generateWithGemini(
   model: string,
   system: string,
   userPrompt: string,
-  options: { jsonMode?: boolean; maxTokens?: number } = {},
+  options: { jsonMode?: boolean; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<GeminiResult> {
   const maxTokens = options.maxTokens ?? 1024
   const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs)
+  // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+  // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal
 
   try {
     const response = await fetch(url, {
@@ -44,7 +47,7 @@ export async function generateWithGemini(
           ...(options.jsonMode ? { responseMimeType: 'application/json' } : {}),
         },
       }),
-      signal: controller.signal,
+      signal,
     })
 
     if (!response.ok) {

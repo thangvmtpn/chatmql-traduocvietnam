@@ -19,6 +19,7 @@ export const Platform = {
     PANCAKE_IG: 31, // Pancake — Instagram
     PANCAKE_TIKTOK: 32, // Pancake — TikTok
     PANCAKE_OTHER: 39, // Pancake — other/unknown sub-platform
+    TIKTOK_SHOP: 40, // native TikTok Shop Open Platform (official)
 };
 /** Human-readable labels for each platform */
 export const PlatformLabel = {
@@ -32,6 +33,7 @@ export const PlatformLabel = {
     [Platform.PANCAKE_IG]: 'Pancake (Instagram)',
     [Platform.PANCAKE_TIKTOK]: 'Pancake (TikTok)',
     [Platform.PANCAKE_OTHER]: 'Pancake',
+    [Platform.TIKTOK_SHOP]: 'TikTok Shop',
 };
 /** Check if a platform ID belongs to the Pancake family */
 export function isPancakePlatform(platform) {
@@ -40,6 +42,10 @@ export function isPancakePlatform(platform) {
 /** Check if a platform ID is the native (official) Facebook Page channel */
 export function isFacebookPage(platform) {
     return platform === Platform.FACEBOOK_PAGE;
+}
+/** Check if a platform ID is the native (official) TikTok Shop channel */
+export function isTikTokShop(platform) {
+    return platform === Platform.TIKTOK_SHOP;
 }
 /** Map Pancake's platform string to our PlatformId */
 export function pancakePlatformToId(pancakePlatform) {

@@ -16,6 +16,7 @@ export declare const Platform: {
     readonly PANCAKE_IG: 31;
     readonly PANCAKE_TIKTOK: 32;
     readonly PANCAKE_OTHER: 39;
+    readonly TIKTOK_SHOP: 40;
 };
 export type PlatformId = (typeof Platform)[keyof typeof Platform];
 /** Human-readable labels for each platform */
@@ -24,6 +25,8 @@ export declare const PlatformLabel: Record<number, string>;
 export declare function isPancakePlatform(platform: number): boolean;
 /** Check if a platform ID is the native (official) Facebook Page channel */
 export declare function isFacebookPage(platform: number): boolean;
+/** Check if a platform ID is the native (official) TikTok Shop channel */
+export declare function isTikTokShop(platform: number): boolean;
 /** Map Pancake's platform string to our PlatformId */
 export declare function pancakePlatformToId(pancakePlatform: string): number;
 export declare const SenderType: {

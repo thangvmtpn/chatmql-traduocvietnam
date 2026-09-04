@@ -182,6 +182,12 @@ export async function chatRoutes(app) {
         else if (platform === 'personal' || platform === '2' || platform === 'user' || platform === 'zalo_user') {
             where.channelAccount = { ...(where.channelAccount || {}), platform: Platform.ZALO_USER };
         }
+        else if (platform === 'facebook' || platform === 'fb' || platform === '10' || platform === '30') {
+            where.channelAccount = { ...(where.channelAccount || {}), platform: { in: [Platform.FACEBOOK_PAGE, Platform.PANCAKE_FB] } };
+        }
+        else if (platform === 'tiktok' || platform === 'tt' || platform === '40' || platform === '32') {
+            where.channelAccount = { ...(where.channelAccount || {}), platform: { in: [Platform.TIKTOK_SHOP, Platform.PANCAKE_TIKTOK] } };
+        }
         if (search) {
             where.OR = [
                 { displayName: { contains: search, mode: 'insensitive' } },

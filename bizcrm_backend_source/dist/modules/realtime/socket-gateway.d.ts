@@ -18,7 +18,6 @@ import type { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 export declare function getIO(): Server;
 export declare function initSocketGateway(httpServer: HttpServer): Server;
-/** Emit new message to all members of a conversation */
 export declare function emitNewMessage(orgId: string, convId: string, message: unknown): void;
 /**
  * AI processing indicator for a conversation (test chat + inbox viewers).

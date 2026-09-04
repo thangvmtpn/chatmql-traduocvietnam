@@ -8,6 +8,9 @@ export async function generateWithGemini(baseUrl, apiKey, model, system, userPro
     const url = `${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs);
+    // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+    // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -21,7 +24,7 @@ export async function generateWithGemini(baseUrl, apiKey, model, system, userPro
                     ...(options.jsonMode ? { responseMimeType: 'application/json' } : {}),
                 },
             }),
-            signal: controller.signal,
+            signal,
         });
         if (!response.ok) {
             const body = await response.text().catch(() => '');

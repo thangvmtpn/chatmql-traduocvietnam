@@ -8,4 +8,5 @@ export type AnthropicResult = {
 export declare function generateWithAnthropic(baseUrl: string, apiKey: string, model: string, system: string, userPrompt: string, options?: {
     enableCaching?: boolean;
     maxTokens?: number;
+    signal?: AbortSignal;
 }): Promise<AnthropicResult>;

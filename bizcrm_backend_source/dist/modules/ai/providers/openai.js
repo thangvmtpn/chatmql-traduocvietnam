@@ -19,6 +19,9 @@ export async function generateWithOpenai(baseUrl, apiKey, model, system, userPro
     const url = `${baseUrl}/v1/chat/completions`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs);
+    // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+    // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -35,7 +38,7 @@ export async function generateWithOpenai(baseUrl, apiKey, model, system, userPro
                 ],
                 ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
             }),
-            signal: controller.signal,
+            signal,
         });
         if (!response.ok) {
             const body = await response.text().catch(() => '');
@@ -60,6 +63,9 @@ export async function generateWithOpenaiMessages(baseUrl, apiKey, model, message
     const url = `${baseUrl}/v1/chat/completions`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs);
+    // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+    // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -70,7 +76,7 @@ export async function generateWithOpenaiMessages(baseUrl, apiKey, model, message
                 messages,
                 ...(tools && tools.length > 0 ? { tools, tool_choice: options.toolChoice ?? 'auto' } : {}),
             }),
-            signal: controller.signal,
+            signal,
         });
         if (!response.ok) {
             const body = await response.text().catch(() => '');

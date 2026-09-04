@@ -7,12 +7,13 @@
  */
 import { prisma } from '../../shared/prisma-client.js'
 import { SenderType, Platform, isPancakePlatform, ResponseSource } from '../../shared/constants.js'
-import { emitNewMessage } from '../realtime/socket-gateway.js'
+import { emitNewMessage, emitSendError } from '../realtime/socket-gateway.js'
 import { runAutomationRules } from '../automation/automation-engine.js'
 import { getPoolEntry, sendViaPool } from '../zalo/zalo-pool.js'
 import { sendTextViaOa, isCsWindowError } from '../zalo-oa/oa-pool.js'
 import { sendViaPancake } from '../pancake/pancake-send.js'
 import { sendTextViaFb, isFbCsWindowError } from '../facebook-page/fb-pool.js'
+import { sendTextViaTikTok } from '../tiktok-shop/tiktok-pool.js'
 import { checkLimits, recordAction } from '../zalo/zalo-rate-limiter.js'
 import { logger } from '../../shared/logger.js'
 import { transformMessageForFrontend } from './chat-routes.js'
@@ -122,6 +123,21 @@ async function sendChunk(conv: ConvData, text: string, quote?: Record<string, un
     }
   }
 
+  // ── TikTok Shop (official TTS Open Platform) ────────────────────
+  if (conv.channelAccount?.platform === Platform.TIKTOK_SHOP) {
+    if (!conv.externalThreadId) {
+      logger.debug('[send-core] No externalThreadId for TikTok Shop — local message only')
+      return { sent: false }
+    }
+    const result = await sendTextViaTikTok(conv.channelAccountId, conv.externalThreadId, text)
+    return {
+      sent: result.sent,
+      error: result.error,
+      externalMsgId: result.messageId,
+      csWindowExpired: result.csWindowExpired,
+    }
+  }
+
   const isOa = conv.channelAccount?.platform === Platform.ZALO_OA
   const recipientUid = isOa ? conv.externalThreadId : (conv.externalThreadId || conv.contact?.zaloUid)
 
@@ -150,8 +166,10 @@ async function sendChunk(conv: ConvData, text: string, quote?: Record<string, un
   // Personal Zalo via pool
   const poolEntry = getPoolEntry(conv.channelAccountId)
   if (!poolEntry || poolEntry.status !== 'connected') {
-    logger.debug(`[send-core] Zalo account ${conv.channelAccountId} not connected — local only`)
-    return { sent: false }
+    // Trước đây trả về im lặng ở mức debug → AI "trả lời" mà khách không nhận,
+    // giao diện vẫn hiện như đã gửi. Phải nói rõ lý do để tầng trên xử lý.
+    logger.warn(`[send-core] Zalo account ${conv.channelAccountId} not connected — message saved locally only`)
+    return { sent: false, error: 'Tài khoản Zalo chưa kết nối — tin chỉ lưu trong hệ thống', errorCode: 'NOT_CONNECTED' }
   }
 
   const rateCheck = checkLimits(conv.channelAccountId, 'message')
@@ -161,8 +179,8 @@ async function sendChunk(conv: ConvData, text: string, quote?: Record<string, un
 
   const targetUid = conv.externalThreadId || conv.contact?.zaloUid
   if (!targetUid) {
-    logger.debug(`[send-core] No target UID for conv ${conv.id} — local only`)
-    return { sent: false }
+    logger.warn(`[send-core] No target UID for conv ${conv.id} — local only`)
+    return { sent: false, error: 'Không có địa chỉ người nhận trên kênh', errorCode: 'NO_RECIPIENT' }
   }
 
   const result = await sendViaPool(
@@ -259,6 +277,17 @@ export async function sendMessageCore(params: SendMessageCoreParams): Promise<Se
     try {
       emitNewMessage(orgId, conversationId, fePayload)
     } catch { /* socket not connected */ }
+  }
+
+  // Tin AI không ra được kênh → báo cho người đang xem + sidebar, giống đường
+  // gửi tay của nhân viên. Trước đây chỉ nhân viên gửi tay mới được báo lỗi.
+  if (sender === 'ai' && !overallSentViaZalo && conv.channelAccount?.platform !== Platform.WEBCHAT) {
+    try {
+      emitSendError(orgId, conversationId, {
+        messageId: (results[0] as { id?: string } | undefined)?.id,
+        reason: lastError ?? 'AI đã soạn trả lời nhưng không gửi được tới kênh',
+      })
+    } catch { /* socket not ready */ }
   }
 
   // Update conversation metadata once (after all chunks)

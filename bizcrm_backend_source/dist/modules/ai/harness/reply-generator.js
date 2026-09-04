@@ -47,6 +47,7 @@ async function callProvider(provider, apiKey, model, system, userPrompt, options
         return generateWithAnthropic(def.baseUrl, apiKey, model, system, userPrompt, {
             enableCaching: true,
             maxTokens: options.maxTokens,
+            signal: options.signal,
         });
     }
     if (provider === 'gemini') {
@@ -97,7 +98,7 @@ async function runAgentLoop(args) {
         // grounds in real data instead of hallucinating (or imitating earlier
         // ungrounded replies in the history). Soft prose can't guarantee this.
         const toolChoice = round === 0 && args.forceFirstToolCall && offerTools ? 'required' : 'auto';
-        const step = await generateWithOpenaiMessages(def.baseUrl, args.apiKey, args.model, messages, offerTools, { maxTokens: 1_000, toolChoice });
+        const step = await generateWithOpenaiMessages(def.baseUrl, args.apiKey, args.model, messages, offerTools, { maxTokens: 1_000, toolChoice, signal: args.signal });
         tokensIn += step.tokensIn;
         tokensOut += step.tokensOut;
         if (step.toolCalls.length === 0) {
@@ -285,7 +286,8 @@ async function createReplyRun(orgId, convId, status, handoff, decisionJson, late
     return run.id;
 }
 // ── Main harness function ─────────────────────────────────────────────────────
-export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
+export async function runHarness(orgId, convId, turnText, mode = 'suggest', // 'suggest' | 'auto' (validated upstream; manual never reaches here)
+opts = {}) {
     const started = Date.now();
     // Pre-generate runId so traces can be linked before AiReplyRun row is written
     const provisionalRunId = randomUUID();
@@ -318,14 +320,14 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
     const anyToolEnabled = toolsCfg.search_products.enabled || toolsCfg.search_knowledge.enabled;
     const agentMode = isOpenAiCompatible(genCfg.provider) && anyToolEnabled;
     // ── Assemble context (L0/L2/L5/L6; RAG pre-fetch skipped in agent mode) ─────
-    const ctx = await assembleContext(orgId, convId, turnText, provisionalRunId, { skipRag: agentMode, minScore: cfg.ragMinScore ?? undefined });
+    const ctx = await assembleContext(orgId, convId, turnText, provisionalRunId, { skipRag: agentMode, minScore: cfg.ragMinScore ?? undefined, historyBefore: opts.historyBefore });
     // ── Pass 1: router ──────────────────────────────────────────────────────────
     const routerCfg = getEffectiveConfigForTask(cfg, 'ai_router');
     const routerKey = await getProviderApiKey(orgId, routerCfg.provider);
     if (!routerKey) {
         logger.warn('[harness] No API key for ai_router provider=%s', routerCfg.provider);
-        const runId = await createReplyRun(orgId, convId, 'skipped', false, { reason: 'no_api_key' }, undefined, provisionalRunId);
-        return { reply: null, routerDecision: { shouldReply: false }, runId };
+        const runId = await createReplyRun(orgId, convId, 'error', false, { reason: 'no_api_key' }, undefined, provisionalRunId);
+        return { reply: null, routerDecision: { shouldReply: false }, runId, error: 'no_api_key: ' + routerCfg.provider };
     }
     const routerStarted = Date.now();
     const routerSystem = 'You are a routing assistant. Respond only with JSON.';
@@ -333,7 +335,7 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
     let routerRaw;
     let routerDecision;
     try {
-        routerRaw = await callProvider(routerCfg.provider, routerKey, routerCfg.model, routerSystem, routerUserPrompt, { jsonMode: true, maxTokens: 400 });
+        routerRaw = await callProvider(routerCfg.provider, routerKey, routerCfg.model, routerSystem, routerUserPrompt, { jsonMode: true, maxTokens: 400, signal: opts.signal });
         routerDecision = parseRouterDecision(routerRaw.text);
     }
     catch (err) {
@@ -343,8 +345,10 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
             step: 'error', level: 'error',
             payload: { pass: 'router', error: String(err), system_prompt: routerSystem, user_prompt: routerUserPrompt },
         });
-        const runId = await createReplyRun(orgId, convId, 'skipped', false, { reason: 'router_error' }, undefined, provisionalRunId);
-        return { reply: null, routerDecision: { shouldReply: false }, runId };
+        // Lỗi hạ tầng ≠ "AI chọn không trả lời": ghi status=error và trả về error
+        // để orchestrator KHÔNG tiến con trỏ, thử lại rồi chuyển người nếu vẫn hỏng.
+        const runId = await createReplyRun(orgId, convId, 'error', false, { reason: 'router_error', error: String(err) }, undefined, provisionalRunId);
+        return { reply: null, routerDecision: { shouldReply: false }, runId, error: 'router_error: ' + String(err?.message ?? err) };
     }
     // Trace router decision (fire-and-forget)
     recordStep({
@@ -395,8 +399,8 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
     const genKey = await getProviderApiKey(orgId, genCfg.provider);
     if (!genKey) {
         logger.warn('[harness] No API key for auto_reply provider=%s', genCfg.provider);
-        const runId = await createReplyRun(orgId, convId, 'skipped', false, routerDecision, undefined, provisionalRunId);
-        return { reply: null, routerDecision, runId };
+        const runId = await createReplyRun(orgId, convId, 'error', false, { ...routerDecision, reason: 'no_api_key' }, undefined, provisionalRunId);
+        return { reply: null, routerDecision, runId, error: 'no_api_key: ' + genCfg.provider };
     }
     const genStarted = Date.now();
     // Guardrail awareness: tell the model its EXACT query surface (enabled tools +
@@ -427,6 +431,7 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
                 system: genSystem, userPrompt: genUserPrompt,
                 tools: toolsCfg, topK: cfg.ragTopK ?? 5, minScore: cfg.ragMinScore ?? undefined,
                 forceFirstToolCall, customerText: ctx.turnText,
+                signal: opts.signal,
             });
             genRaw = { text: agent.text, tokensIn: agent.tokensIn, tokensOut: agent.tokensOut };
             toolCalls = agent.toolCalls;
@@ -436,7 +441,7 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
             replyImages = agent.images;
         }
         else {
-            genRaw = await callProvider(genCfg.provider, genKey, genCfg.model, genSystem, genUserPrompt, { jsonMode: false, maxTokens: 1_000 });
+            genRaw = await callProvider(genCfg.provider, genKey, genCfg.model, genSystem, genUserPrompt, { jsonMode: false, maxTokens: 1_000, signal: opts.signal });
             replyText = genRaw.text.trim();
             // Pipeline grounding = pre-injected KB + products (for the critic).
             grounding = [
@@ -452,8 +457,8 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
             step: 'error', level: 'error',
             payload: { pass: 'generator', error: String(err), system_prompt: genSystem, user_prompt: genUserPrompt },
         });
-        const runId = await createReplyRun(orgId, convId, 'error', false, routerDecision, undefined, provisionalRunId);
-        return { reply: null, routerDecision, runId };
+        const runId = await createReplyRun(orgId, convId, 'error', false, { ...routerDecision, error: String(err) }, undefined, provisionalRunId);
+        return { reply: null, routerDecision, runId, error: 'generator_error: ' + String(err?.message ?? err) };
     }
     // Agent invoked the handoff action → escalate to a human (no AI reply).
     if (agentHandoff) {
@@ -463,6 +468,17 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
     // Normalize markdown → plain text: replies are delivered to Zalo (no markdown
     // rendering), so **bold**/#headings/[links] would show literally to the customer.
     replyText = markdownToPlainText(replyText);
+    // Router bảo "phải trả lời" mà generator trả rỗng (hết vòng tool, model câm…):
+    // đây là lỗi, không phải quyết định — im lặng ở đây là khách bị bỏ rơi.
+    if (!replyText) {
+        recordStep({
+            orgId, conversationId: convId, aiReplyRunId: provisionalRunId,
+            step: 'error', level: 'error',
+            payload: { pass: 'generator', error: 'empty_reply', so_lan_goi_cong_cu: toolCalls },
+        });
+        const runId = await createReplyRun(orgId, convId, 'error', false, { ...routerDecision, error: 'empty_reply' }, Date.now() - started, provisionalRunId, mode);
+        return { reply: null, routerDecision, runId, error: 'empty_reply' };
+    }
     // ── Critic / verify-before-send (P6) — second opinion; fail → handoff ───────
     if (cfg.verifyBeforeSend && replyText) {
         const criticStarted = Date.now();
@@ -477,7 +493,7 @@ export async function runHarness(orgId, convId, turnText, mode = 'suggest') {
                 scenarios: ctx.scenarios,
                 grounding,
             });
-            const criticRaw = await callProvider(genCfg.provider, genKey, genCfg.model, criticSystem, criticPrompt, { jsonMode: true, maxTokens: 300 });
+            const criticRaw = await callProvider(genCfg.provider, genKey, genCfg.model, criticSystem, criticPrompt, { jsonMode: true, maxTokens: 300, signal: opts.signal });
             const verdict = parseCriticVerdict(criticRaw.text);
             recordStep({
                 orgId, conversationId: convId, aiReplyRunId: provisionalRunId, step: 'critic',

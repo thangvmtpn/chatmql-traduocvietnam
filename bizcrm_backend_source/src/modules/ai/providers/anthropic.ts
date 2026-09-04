@@ -29,13 +29,16 @@ export async function generateWithAnthropic(
   model: string,
   system: string,
   userPrompt: string,
-  options: { enableCaching?: boolean; maxTokens?: number } = {},
+  options: { enableCaching?: boolean; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<AnthropicResult> {
   const enableCaching = options.enableCaching ?? true
   const maxTokens = options.maxTokens ?? 1024
   const url = `${baseUrl}/v1/messages`
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.aiTimeoutMs)
+  // Gộp timeout của riêng lệnh gọi với ngân sách thời gian của cả lượt (nếu có):
+  // hết ngân sách là HUỶ THẬT ở tầng HTTP, không để lệnh gọi chạy mồ côi.
+  const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal
 
   // Cache the system block when caching is on. Reduces cost across calls
   // sharing the same system prompt within the 5-min ephemeral TTL window.
@@ -57,7 +60,7 @@ export async function generateWithAnthropic(
         system: systemBlocks,
         messages: [{ role: 'user', content: userPrompt }],
       }),
-      signal: controller.signal,
+      signal,
     })
 
     if (!response.ok) {

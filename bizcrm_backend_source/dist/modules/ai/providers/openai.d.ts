@@ -6,6 +6,7 @@ export type OpenaiResult = {
 export declare function generateWithOpenai(baseUrl: string, apiKey: string, model: string, system: string, userPrompt: string, options?: {
     jsonMode?: boolean;
     maxTokens?: number;
+    signal?: AbortSignal;
 }): Promise<OpenaiResult>;
 export type OpenaiMessage = {
     role: 'system' | 'user';
@@ -49,4 +50,5 @@ export type OpenaiToolStep = {
 export declare function generateWithOpenaiMessages(baseUrl: string, apiKey: string, model: string, messages: OpenaiMessage[], tools: OpenaiToolDef[] | undefined, options?: {
     maxTokens?: number;
     toolChoice?: 'auto' | 'required';
+    signal?: AbortSignal;
 }): Promise<OpenaiToolStep>;

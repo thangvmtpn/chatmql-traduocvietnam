@@ -44,10 +44,12 @@ function sendError(reply: FastifyReply, status: number, message: string) {
 // ── Ẩn danh ─────────────────────────────────────────────────────────────────
 export function anonymize(text: string): string {
   return text
+    // dãy số dài (số tài khoản ngân hàng, mã vận đơn, CCCD…) >= 11 chữ số
+    .replace(/\b\d{11,}\b/g, '[số]')
     // SĐT Việt Nam: 0xxxxxxxxx / +84 / có chấm, cách, gạch giữa các cụm số
     .replace(/(\+?84|0)[\s.\-]?\d{2,3}([\s.\-]?\d{2,4}){2,3}\b/g, '[SĐT]')
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]')
-    // dãy số dài (số tài khoản, mã vận đơn…)
+    // dãy số còn lại >= 8 chữ số
     .replace(/\b\d{8,}\b/g, '[số]')
 }
 
@@ -69,6 +71,15 @@ async function phonesWithInvoices(phones: string[]): Promise<Set<string>> {
   } catch { return new Set() } // CRM không với tới được → rơi về heuristic
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  won: 'Chốt thành công',
+  consulting: 'Đang tư vấn',
+  callback: 'Hẹn gọi lại',
+  opportunity: 'Cơ hội',
+  no_contact: 'Không kết nối',
+  at_risk: 'Nguy cơ rời bỏ',
+}
+
 // ── Gom & dựng transcript từ hội thoại trong hệ thống ───────────────────────
 async function buildTranscriptFromSystem(
   orgId: string,
@@ -88,6 +99,7 @@ async function buildTranscriptFromSystem(
     take: 400,
     select: {
       id: true,
+      contactId: true,
       contact: { select: { phone: true } },
       channelAccount: { select: { displayName: true } },
     },
@@ -98,29 +110,80 @@ async function buildTranscriptFromSystem(
   const phoneByConv = new Map<string, string>()
   for (const c of convs) {
     if (scored.length >= 120) break
-    const msgs = await prisma.message.findMany({
-      where: {
-        conversationId: c.id,
-        contentType: 'text',
-        isDeleted: false,
-        ...(since ? { sentAt: { gte: since } } : {}),
-      },
-      orderBy: { sentAt: 'desc' },
-      take: MAX_MSG_PER_CONV,
-      select: { senderType: true, content: true, aiGenerated: true },
-    })
+    const [msgs, notes] = await Promise.all([
+      prisma.message.findMany({
+        where: {
+          conversationId: c.id,
+          contentType: 'text',
+          isDeleted: false,
+          ...(since ? { sentAt: { gte: since } } : {}),
+        },
+        orderBy: { sentAt: 'desc' },
+        take: MAX_MSG_PER_CONV,
+        select: { senderType: true, content: true, aiGenerated: true, sentAt: true },
+      }),
+      prisma.note.findMany({
+        where: {
+          orgId,
+          OR: [
+            { conversationId: c.id },
+            ...(c.contactId ? [{ contactId: c.contactId }] : []),
+          ],
+          ...(since ? { createdAt: { gte: since } } : {}),
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 10,
+        select: { content: true, status: true, createdAt: true },
+      }),
+    ])
+
     const staffTurns = msgs.filter((m) => m.senderType === 'self' && !m.aiGenerated)
     const custTurns = msgs.filter((m) => m.senderType === 'contact')
     if (staffTurns.length < 3 || custTurns.length < 2) continue
 
-    const lines = msgs.reverse()
-      .filter((m) => m.content?.trim())
-      .map((m) => (m.senderType === 'contact' ? 'KH: ' : m.aiGenerated ? 'AI: ' : 'NV: ') + (m.content || '').trim().slice(0, 400))
+    // Kết hợp tin nhắn và ghi chú nội bộ theo dòng thời gian
+    type TimelineItem =
+      | { type: 'msg'; time: number; senderType: string; aiGenerated?: boolean | null; content: string }
+      | { type: 'note'; time: number; status?: string | null; content: string }
+
+    const timeline: TimelineItem[] = [
+      ...msgs.map((m) => ({
+        type: 'msg' as const,
+        time: m.sentAt ? new Date(m.sentAt).getTime() : 0,
+        senderType: m.senderType,
+        aiGenerated: m.aiGenerated,
+        content: m.content || '',
+      })),
+      ...notes.map((n) => ({
+        type: 'note' as const,
+        time: n.createdAt ? new Date(n.createdAt).getTime() : 0,
+        status: n.status,
+        content: n.content || '',
+      })),
+    ]
+
+    timeline.sort((a, b) => a.time - b.time)
+
+    const lines = timeline
+      .filter((item) => item.content?.trim())
+      .map((item) => {
+        if (item.type === 'note') {
+          const st = item.status ? (STATUS_LABELS[item.status] || item.status) : ''
+          const tag = st ? `[GHI CHÚ NV (${st})]: ` : '[GHI CHÚ NV]: '
+          return tag + item.content.trim().slice(0, 400)
+        }
+        return (item.senderType === 'contact' ? 'KH: ' : item.aiGenerated ? 'AI: ' : 'NV: ') + item.content.trim().slice(0, 400)
+      })
+
     // bỏ hội thoại toàn AI trả lời
     if (!lines.some((l) => l.startsWith('NV: '))) continue
 
     let score = staffTurns.length
     if (opts.preferOrders && lines.some((l) => CLOSE_KEYWORDS.test(l))) score += 50
+    // Ưu tiên hội thoại có ghi chú chốt đơn hoặc ghi chú chăm sóc chi tiết
+    if (notes.some((n) => n.status === 'won' || CLOSE_KEYWORDS.test(n.content))) score += 80
+    else if (notes.length > 0) score += 25
+
     if (c.contact?.phone) phoneByConv.set(c.id, c.contact.phone)
     scored.push({ id: c.id, score, lines })
   }
@@ -167,7 +230,7 @@ async function dispatchProvider(
 }
 
 const ANALYZE_SYSTEM = `Bạn là chuyên gia huấn luyện AI bán hàng cho Trà Dược Việt Nam.
-Nhiệm vụ: đọc các hội thoại tư vấn THẬT (NV = nhân viên thật, KH = khách, AI = máy trả lời — chỉ học theo NV, KHÔNG học theo AI) và viết lại tài liệu Persona cho trợ lý AI sao cho bắt đúng giọng nhân viên giỏi nhất.
+Nhiệm vụ: đọc các hội thoại tư vấn THẬT (NV = nhân viên thật, KH = khách, AI = máy trả lời — chỉ học theo NV, KHÔNG học theo AI; [GHI CHÚ NV] = ghi chú nội bộ của nhân viên về khách hàng/kết quả tư vấn) và viết lại tài liệu Persona cho trợ lý AI sao cho bắt đúng giọng nhân viên giỏi nhất.
 
 Phân tích và đưa vào Persona mới:
 - Cách xưng hô thật (em/chị/anh/quý khách…), câu chào mở đầu đặc trưng
@@ -175,6 +238,7 @@ Phân tích và đưa vào Persona mới:
 - Cách xử lý khi khách chê đắt / phân vân
 - Nhịp chốt đơn (mấy bước, hỏi gì trước khi xin địa chỉ)
 - Emoji và dấu câu hay dùng, độ dài câu điển hình
+- Đọc kỹ các [GHI CHÚ NV] để nắm bắt: lý do khách mua/từ chối, thông tin khách cần lưu ý (bệnh lý, sở thích, băn khoăn về giá), kinh nghiệm xử lý chốt đơn mà nhân viên đúc kết.
 - Cuối tài liệu thêm mục "## Bộ mẫu câu chuẩn" gồm 8-12 mẫu câu NGUYÊN VĂN học từ nhân viên (đã ẩn danh), nhóm theo tình huống: chào, báo giá, chê đắt, chốt đơn, cảm ơn.
 
 Ràng buộc:

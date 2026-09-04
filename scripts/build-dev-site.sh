@@ -47,18 +47,13 @@ while IFS= read -r f; do
   printf "  ✓ %-34s %s chỗ\n" "$(basename "$f")" "$c"
 done < <(find "$OUT" \( -name "*.js" -o -name "*.html" \))
 
-# 2) Script chọn API base trong index.html và order-ui-bridge.js.
-#    Hai file này tự dò hostname: localhost thì gọi localhost, còn lại gọi
-#    tracrm-api.bizino.ai (API của bản live cũ). Trên site dev phải trỏ về API
-#    dev, nếu không dữ liệu dev sẽ ghi thẳng vào hệ thống thật.
-for f in "$OUT/index.html" "$OUT/order-ui-bridge.js"; do
-  [ -f "$f" ] || continue
+while IFS= read -r f; do
   c=$(grep -o "https://tracrm-api.bizino.ai" "$f" 2>/dev/null | wc -l | tr -d ' ' || true)
   [ "$c" = "0" ] && continue
   LC_ALL=C sed -i '' "s|https://tracrm-api.bizino.ai|$API_ORIGIN|g" "$f"
   N=$((N + c))
   printf "  ✓ %-34s %s chỗ (API bản live cũ)\n" "$(basename "$f")" "$c"
-done
+done < <(find "$OUT" \( -name "*.js" -o -name "*.html" \))
 
 echo
 echo "▸ Đã thay $N chỗ."

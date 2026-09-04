@@ -179,6 +179,7 @@ export async function handleIncomingMessage(msg) {
                     autoReplyEnabled: aiReplyCfg.autoReplyEnabled,
                     defaultAiMode: aiReplyCfg.defaultAiMode,
                     convAiMode: conversation.aiMode ?? null,
+                    convAiModeReason: conversation.aiModeReason ?? null,
                     schedule: aiReplyCfg.schedule,
                 });
                 const isPaused = !!(conversation.aiPausedUntil)
@@ -255,9 +256,14 @@ async function upsertContact(msg, orgId) {
     // For self messages on user threads, the contact is the thread recipient
     const contactUid = msg.isSelf ? msg.threadId : msg.senderUid;
     const contactName = msg.isSelf ? '' : msg.senderName;
-    // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid.
-    const isZalo = (msg.identityField ?? 'zaloUid') === 'zaloUid';
-    const idWhere = isZalo ? { zaloUid: contactUid } : { fbPsid: contactUid };
+    // Channel-specific identity column: Zalo (personal + OA) → zaloUid, Facebook → fbPsid, TikTok Shop → tiktokUid.
+    const identityField = msg.identityField ?? 'zaloUid';
+    const isZalo = identityField === 'zaloUid';
+    const idWhere = identityField === 'tiktokUid'
+        ? { tiktokUid: contactUid }
+        : identityField === 'fbPsid'
+            ? { fbPsid: contactUid }
+            : { zaloUid: contactUid };
     let contact = await prisma.contact.findFirst({
         where: { ...idWhere, orgId },
         select: { id: true, fullName: true, avatarUrl: true },
@@ -498,7 +504,7 @@ async function findOrCreateConversation(msg, orgId, contactId, displayName) {
     const externalThreadId = msg.threadId;
     const existing = await prisma.conversation.findFirst({
         where: { channelAccountId: msg.accountId, externalThreadId },
-        select: { id: true, displayName: true, aiMode: true, aiPausedUntil: true },
+        select: { id: true, displayName: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
     });
     if (existing) {
         // Self-heal: update displayName if currently null/Unknown and we have a valid name
@@ -533,7 +539,7 @@ async function findOrCreateConversation(msg, orgId, contactId, displayName) {
             isReplied: msg.isSelf,
             aiMode: defaultAiMode,
         },
-        select: { id: true, aiMode: true, aiPausedUntil: true },
+        select: { id: true, aiMode: true, aiModeReason: true, aiPausedUntil: true },
     });
 }
 // ── Update conversation metadata after new message ────────────────────
