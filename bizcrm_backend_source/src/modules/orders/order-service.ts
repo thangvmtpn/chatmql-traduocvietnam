@@ -78,6 +78,13 @@ export interface CreateOrderInput {
    * bấm lại, để timeout rồi thử lại không đẻ ra đơn thứ hai.
    */
   requestId?: string
+  /**
+   * Nguồn chốt đơn cho báo cáo Chat → Đơn: 'ai' khi đơn xuất phát từ nháp AI
+   * (pending action create_order được xác nhận), 'staff' cho mọi ca còn lại.
+   * KHÔNG để trình duyệt tự khai — route /orders/create tự xác minh
+   * aiPendingActionId với bảng AiPendingAction rồi mới đặt cờ này.
+   */
+  source?: 'ai' | 'staff'
 }
 
 export interface CreateOrderResult extends CrmCreateOrderResult {
@@ -225,6 +232,60 @@ export async function createOrderAndSync(input: CreateOrderInput): Promise<Creat
   // (nếu không sẽ đẻ ra thẻ đơn hàng thứ hai trong hội thoại).
   if (result.replayed) {
     return { ...result, contactUpdated: false, chatMessageCreated: false }
+  }
+
+  // ── 1b. Ghi sự kiện 'order_created' cho báo cáo Chat → Đơn ─────────
+  // ChatMQL không có bảng đơn hàng local (đơn nằm ở CRM), nên báo cáo
+  // /api/v1/reports/chat-to-order đếm đơn/doanh số từ cdp_events. Chỉ ghi khi
+  // CRM đã thực sự nhận đơn (đến được đây là thành công) và KHÔNG replayed.
+  // CdpEvent.contactId là FK bắt buộc → thiếu contactId thì tra theo số điện
+  // thoại trong org; vẫn không có contact thì đành bỏ qua event (ghi warn),
+  // không thể fabricate contact. Hỏng ở đây KHÔNG làm hỏng đơn.
+  try {
+    let eventContactId = input.contactId ?? null
+    if (!eventContactId && input.customerPhone?.trim()) {
+      const byPhone = await prisma.contact.findFirst({
+        where: { orgId: input.orgId, phone: input.customerPhone.trim(), deletedAt: null },
+        select: { id: true },
+      })
+      eventContactId = byPhone?.id ?? null
+    }
+    // Kênh của đơn — để báo cáo lọc được theo kênh/tài khoản tương tác.
+    // Không có hội thoại (lên đơn ngoài chat) thì để trống, báo cáo lọc theo
+    // kênh sẽ không tính đơn này (đúng: không biết nó thuộc kênh nào).
+    let eventChannelAccountId: string | null = null
+    if (input.conversationId) {
+      const cvChan = await prisma.conversation.findUnique({
+        where: { id: input.conversationId },
+        select: { channelAccountId: true },
+      })
+      eventChannelAccountId = cvChan?.channelAccountId ?? null
+    }
+    if (eventContactId) {
+      await prisma.cdpEvent.create({
+        data: {
+          orgId: input.orgId,
+          contactId: eventContactId,
+          eventName: 'order_created',
+          properties: {
+            orderCode: result.order_code,
+            total: result.total_amount, // VND nguyên
+            source: input.source ?? 'staff',
+            ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+            ...(eventChannelAccountId ? { channelAccountId: eventChannelAccountId } : {}),
+          },
+          source: 'chatmql',
+          timestamp: new Date(),
+        },
+      })
+    } else {
+      logger.warn(
+        { orderCode: result.order_code, orgId: input.orgId },
+        '[orders] Không tìm được contact — bỏ qua event order_created (báo cáo Chat → Đơn sẽ thiếu đơn này)',
+      )
+    }
+  } catch (err) {
+    logger.error({ err, orderCode: result.order_code }, '[orders] Ghi event order_created thất bại')
   }
 
   // ── 2. Việc riêng của ChatMQL — hỏng ở đây KHÔNG làm hỏng đơn ──────

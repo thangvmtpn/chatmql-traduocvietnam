@@ -69,6 +69,28 @@ export interface HandleMessageResult {
   contactId: string | null
 }
 
+/**
+ * Các giá trị `content` có thể ứng với cùng một sticker.
+ *
+ * Tin do CRM tạo lưu ID trần ("172"); tiếng vọng từ Zalo lưu nguyên payload
+ * {"id":172,"catId":1,"type":2}. Trả về cả hai dạng để truy vấn khử trùng khớp
+ * được bản ghi CRM vừa tạo trước đó vài chục mili-giây.
+ */
+function stickerIdCandidates(content?: string | null): string[] {
+  const raw = (content || '').trim()
+  if (!raw) return []
+  const out = new Set<string>([raw])
+  if (/^\d+$/.test(raw)) return [...out]
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>
+    const id = obj.id ?? obj.stickerId ?? obj.sticker_id
+    if (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id))) out.add(String(id))
+  } catch {
+    /* không phải JSON — chỉ dùng chuỗi gốc */
+  }
+  return [...out]
+}
+
 export async function handleIncomingMessage(
   msg: IncomingMessage,
 ): Promise<HandleMessageResult | null> {
@@ -136,12 +158,21 @@ export async function handleIncomingMessage(
       // 2) Content+time match — catch echoes where CRM record has no externalMsgId yet
       //    Use 15s window to minimize false positives on repeated short messages
       const isMedia = msg.contentType === 'image' || msg.contentType === 'file' || msg.contentType === 'video'
+      // Sticker: bản ghi do CRM tạo lưu content là ID trần ("172"), còn tiếng vọng
+      // từ Zalo lưu nguyên payload {"id":172,"catId":1,"type":2}. So sánh nguyên
+      // chuỗi thì KHÔNG BAO GIỜ khớp → mỗi sticker gửi đi bị ghi thành hai tin và
+      // nhân viên thấy sticker hiện hai lần. So theo ID mới nhận ra là một.
+      const stickerIds = msg.contentType === 'sticker' ? stickerIdCandidates(msg.content) : []
       const recentDupe = await prisma.message.findFirst({
         where: {
           conversationId: conversation.id,
           senderType: SenderType.SELF,
           externalMsgId: null, // only match records missing externalMsgId (CRM-created)
-          ...(isMedia ? { contentType: msg.contentType } : { content: msg.content || '' }),
+          ...(isMedia
+            ? { contentType: msg.contentType }
+            : stickerIds.length > 0
+              ? { contentType: 'sticker', content: { in: stickerIds } }
+              : { content: msg.content || '' }),
           sentAt: { gte: new Date(Date.now() - 15_000) },
         },
         select: { id: true, content: true },
