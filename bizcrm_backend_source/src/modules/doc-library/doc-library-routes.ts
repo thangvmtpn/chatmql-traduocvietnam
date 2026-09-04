@@ -11,8 +11,7 @@ import { authMiddleware } from '../auth/auth-middleware.js'
 import { prisma } from '../../shared/prisma-client.js'
 import { logger } from '../../shared/logger.js'
 import { sendImageCore } from '../chat/send-image-core.js'
-import { emitNewMessage } from '../realtime/socket-gateway.js'
-import { transformMessageForFrontend } from '../chat/chat-routes.js'
+import { sendMessageCore } from '../chat/send-core.js'
 import { searchCrmProducts } from '../crm-products/crm-products-client.js'
 import { DOC_ASSETS_DIR } from './doc-assets-store.js'
 import {
@@ -222,120 +221,156 @@ export async function docLibraryRoutes(app: FastifyInstance): Promise<void> {
   })
 
   /**
-   * Gửi tài nguyên đã chọn vào hội thoại.
+   * Gửi tài liệu vào hội thoại theo GÓI do nhân viên tự soạn.
    *
-   * CHẶN Ở ĐÂY, không chỉ ở giao diện: chỉ tài nguyên `visibility = 'sales'`
-   * mới được gửi ra khách. Ảnh đi qua đúng đường gửi ảnh của hệ thống
-   * (sendImageCore) nên vẫn ra kênh Zalo như nhân viên gửi tay; phần chữ tạo
-   * một tin văn bản. Giới hạn 20 mục mỗi lần để không spam khách.
+   * Sale không gửi "cả cục tài nguyên" — họ chọn đúng thứ khách đang hỏi: giới
+   * thiệu kèm giá, hai ba tấm ảnh, có khi thêm video. Nên body nhận từng phần:
+   *
+   *   items: [{ assetId, includeIntro, imageUrls, videoUrls }]
+   *
+   * `imageUrls`/`videoUrls` được ĐỐI CHIẾU lại với chính tài liệu đó — client
+   * không thể mượn endpoint này để gửi URL bất kỳ ra kênh khách.
+   * Vẫn nhận `assetIds` (gửi trọn bộ) để không gãy chỗ gọi cũ.
    */
-  app.post<{ Body: { conversationId?: string; assetIds?: string[] } }>(
-    '/api/v1/doc-library/send',
-    async (request, reply) => {
-      const user = request.user as AuthUser
-      const { conversationId, assetIds } = request.body || {}
+  app.post<{
+    Body: {
+      conversationId?: string
+      assetIds?: string[]
+      items?: Array<{
+        assetId: string
+        includeIntro?: boolean
+        imageUrls?: string[]
+        videoUrls?: string[]
+      }>
+      /** Lời nhắn của nhân viên, gửi TRƯỚC gói tài liệu. */
+      note?: string
+    }
+  }>('/api/v1/doc-library/send', async (request, reply) => {
+    const user = request.user as AuthUser
+    const { conversationId, assetIds, items, note } = request.body || {}
 
-      if (!conversationId?.trim()) return fail(reply, 400, 'Thiếu conversationId')
-      if (!assetIds?.length) return fail(reply, 400, 'Chưa chọn tài liệu nào')
+    if (!conversationId?.trim()) return fail(reply, 400, 'Thiếu conversationId')
 
-      const conv = await prisma.conversation.findFirst({
-        where: { id: conversationId.trim(), orgId: user.orgId },
-        select: { id: true },
+    // Chuẩn hoá về một dạng: gửi trọn bộ = bật hết các phần.
+    const plan = items?.length
+      ? items
+      : (assetIds ?? []).map((assetId) => ({ assetId, includeIntro: true, imageUrls: undefined, videoUrls: undefined }))
+    if (!plan.length) return fail(reply, 400, 'Chưa chọn tài liệu nào')
+
+    const conv = await prisma.conversation.findFirst({
+      where: { id: conversationId.trim(), orgId: user.orgId },
+      select: { id: true },
+    })
+    if (!conv) return fail(reply, 404, 'Không tìm thấy hội thoại')
+
+    const sentIds: string[] = []
+    const skipped: Array<{ id: string; reason: string }> = []
+    let messageCount = 0
+
+    /**
+     * Gửi một tin chữ qua ĐÚNG đường gửi của hệ thống.
+     *
+     * Không tự ghi thẳng vào bảng message: làm vậy tin chỉ nằm trong máy, không
+     * ra được Zalo, và ghi sai `senderType` thì khung chat hiển thị tin của
+     * nhân viên sang phía khách. `sendMessageCore` lo đẩy kênh, lưu đúng
+     * senderType 'self', cập nhật trạng thái hội thoại và bắn socket.
+     *
+     * Tắt automation: cả gói tài liệu là MỘT thao tác bán hàng, không phải
+     * nhiều lượt trả lời — đường gửi ảnh cũng không kích hoạt automation.
+     */
+    const sendText = async (text: string): Promise<boolean> => {
+      const r = await sendMessageCore({
+        orgId: user.orgId,
+        conversationId: conv.id,
+        text,
+        sender: 'staff',
+        repliedByUserId: user.id,
+        triggerAutomation: false,
       })
-      if (!conv) return fail(reply, 404, 'Không tìm thấy hội thoại')
+      messageCount++
+      return r.sentViaZalo
+    }
 
-      const sentIds: string[] = []
-      const skipped: Array<{ id: string; reason: string }> = []
+    // Tin chữ ra được kênh hay không thì sale phải biết: tin nằm lại trong máy
+    // mà báo "đã gửi" là để khách chờ. (Web Chat luôn tính là gửi được.)
+    const failedText: string[] = []
+    if (note?.trim() && !(await sendText(note.trim()))) failedText.push('lời nhắn mở đầu')
 
-      for (const id of assetIds.slice(0, 20)) {
-        try {
-          const a = await prisma.docAsset.findFirst({ where: { id, orgId: user.orgId } })
-          if (!a) { skipped.push({ id, reason: 'Không tìm thấy tài liệu' }); continue }
-          if (a.visibility !== 'sales') {
-            skipped.push({ id, reason: 'Tài liệu nội bộ — không được gửi khách' })
-            continue
+    for (const part of plan.slice(0, 20)) {
+      try {
+        const a = await prisma.docAsset.findFirst({ where: { id: part.assetId, orgId: user.orgId } })
+        if (!a) { skipped.push({ id: part.assetId, reason: 'Không tìm thấy tài liệu' }); continue }
+        if (a.visibility !== 'sales') {
+          skipped.push({ id: part.assetId, reason: 'Tài liệu nội bộ — không được gửi khách' })
+          continue
+        }
+
+        // Chỉ chấp nhận ảnh/video THUỘC tài liệu này.
+        const pickedImages = part.imageUrls
+          ? part.imageUrls.filter((u) => a.images.includes(u))
+          : (a.kind === 'product' ? a.images.slice(0, MAX_IMAGES_PER_PRODUCT) : [])
+        const pickedVideos = part.videoUrls
+          ? part.videoUrls.filter((u) => a.videoUrls.includes(u))
+          : a.videoUrls
+
+        const wantIntro = part.includeIntro !== false
+
+        if (a.kind === 'product') {
+          if (wantIntro && !(await sendText(await buildProductMessage({ ...a, videoUrls: pickedVideos })))) {
+            failedText.push('tin giới thiệu sản phẩm')
           }
-
-          // ── Loại `product`: gửi TRỌN BỘ như một bài giới thiệu ──
-          // Thứ tự: một tin chữ tóm tắt (tên · giá · mô tả · link video) rồi tới
-          // ảnh. Khách đọc biết là gì trước, xem ảnh sau. Cắt tối đa 5 ảnh để
-          // không dội chuông khách hàng chục lần.
-          if (a.kind === 'product') {
-            const text = await buildProductMessage(a)
-            const msg = await prisma.message.create({
-              data: {
-                conversationId: conv.id,
-                senderType: 'user',
-                repliedByUserId: user.id,
-                contentType: 'text',
-                content: text,
-                sentAt: new Date(),
-              },
-            })
-            emitNewMessage(user.orgId, conv.id, transformMessageForFrontend(msg))
-
-            let imgOk = 0
-            for (const img of a.images.slice(0, MAX_IMAGES_PER_PRODUCT)) {
-              const r = await sendImageCore({
-                orgId: user.orgId,
-                conversationId: conv.id,
-                imageUrl: img,
-                sender: 'staff',
-                repliedByUserId: user.id,
-              })
-              if (r.sent) imgOk++
-            }
-            if (a.images.length && imgOk === 0) {
-              skipped.push({ id, reason: 'Đã gửi phần chữ nhưng không gửi được ảnh' })
-            }
-            sentIds.push(id)
-            continue
-          }
-
-          // Ảnh đơn: gửi ảnh kèm chú thích là tiêu đề.
-          const image = a.kind === 'image' ? (a.fileUrl ?? a.images[0]) : null
-          if (image) {
+          let imgOk = 0
+          for (const img of pickedImages.slice(0, MAX_IMAGES_PER_PRODUCT)) {
             const r = await sendImageCore({
               orgId: user.orgId,
               conversationId: conv.id,
-              imageUrl: image,
-              caption: a.title,
+              imageUrl: img,
               sender: 'staff',
               repliedByUserId: user.id,
             })
-            if (r.sent) sentIds.push(id)
-            else skipped.push({ id, reason: r.error || 'Không gửi được ảnh' })
+            if (r.sent) { imgOk++; messageCount++ }
+          }
+          if (pickedImages.length && imgOk === 0) {
+            skipped.push({ id: part.assetId, reason: 'Đã gửi phần chữ nhưng không gửi được ảnh' })
+          }
+          if (!wantIntro && !pickedImages.length && !pickedVideos.length) {
+            skipped.push({ id: part.assetId, reason: 'Không chọn phần nào để gửi' })
             continue
           }
-
-          // Còn lại gửi dạng chữ: tiêu đề + mô tả/nội dung + link (nếu có).
-          const link = a.sourceUrl || a.videoUrls[0] || a.fileUrl
-          const body = [a.description, a.textContent].filter(Boolean).join('\n\n')
-          const text = [a.title, body, link].filter(Boolean).join('\n\n')
-
-          const msg = await prisma.message.create({
-            data: {
-              conversationId: conv.id,
-              senderType: 'user',
-              repliedByUserId: user.id,
-              contentType: 'text',
-              content: text,
-              sentAt: new Date(),
-            },
-          })
-          emitNewMessage(user.orgId, conv.id, transformMessageForFrontend(msg))
-          sentIds.push(id)
-        } catch (err) {
-          logger.error({ err, assetId: id }, '[doc-library] không gửi được tài liệu')
-          skipped.push({ id, reason: 'Lỗi hệ thống' })
+          sentIds.push(part.assetId)
+          continue
         }
-      }
 
-      logger.info(
-        { conversationId: conv.id, userId: user.id, sent: sentIds.length, skipped: skipped.length },
-        '[doc-library] nhân viên gửi tài liệu vào hội thoại',
-      )
-      return { sent: sentIds.length, sentIds, skipped }
-    },
-  )
+        // Ảnh đơn: gửi ảnh kèm chú thích là tiêu đề.
+        const image = a.kind === 'image' ? (a.fileUrl ?? a.images[0]) : null
+        if (image) {
+          const r = await sendImageCore({
+            orgId: user.orgId,
+            conversationId: conv.id,
+            imageUrl: image,
+            caption: a.title,
+            sender: 'staff',
+            repliedByUserId: user.id,
+          })
+          if (r.sent) { sentIds.push(part.assetId); messageCount++ }
+          else skipped.push({ id: part.assetId, reason: r.error || 'Không gửi được ảnh' })
+          continue
+        }
+
+        const link = a.sourceUrl || a.videoUrls[0] || a.fileUrl
+        const body = [a.description, a.textContent].filter(Boolean).join('\n\n')
+        await sendText([a.title, body, link].filter(Boolean).join('\n\n'))
+        sentIds.push(part.assetId)
+      } catch (err) {
+        logger.error({ err, assetId: part.assetId }, '[doc-library] không gửi được tài liệu')
+        skipped.push({ id: part.assetId, reason: 'Lỗi hệ thống' })
+      }
+    }
+
+    logger.info(
+      { conversationId: conv.id, userId: user.id, assets: sentIds.length, messages: messageCount },
+      '[doc-library] nhân viên gửi tài liệu vào hội thoại',
+    )
+    return { sent: sentIds.length, sentIds, messages: messageCount, skipped, failedText }
+  })
 }

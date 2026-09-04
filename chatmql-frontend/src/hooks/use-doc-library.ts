@@ -167,13 +167,37 @@ export function assetUrl(u?: string | null): string | undefined {
  * Gửi tài nguyên đã chọn vào hội thoại.
  * Backend chặn lại lần nữa theo `visibility` — giao diện lọc chỉ là lớp trải nghiệm.
  */
+/** Một tài liệu trong gói gửi, đã chọn sẵn phần nào đi phần nào ở lại. */
+export interface SendDocItem {
+  assetId: string
+  /** Sản phẩm: gửi kèm tin giới thiệu + giá. Mặc định bật. */
+  includeIntro?: boolean
+  /** Ảnh được chọn. Bỏ trống nghĩa là gửi bộ mặc định của tài liệu. */
+  imageUrls?: string[]
+  videoUrls?: string[]
+}
+
+export interface SendDocInput {
+  conversationId: string
+  /** Gửi trọn bộ — giữ cho các chỗ gọi cũ. */
+  assetIds?: string[]
+  /** Gói tự soạn: chọn đúng phần muốn gửi. */
+  items?: SendDocItem[]
+  /** Lời nhắn đi TRƯỚC gói tài liệu. */
+  note?: string
+}
+
 export function useSendDocAssets() {
   return useMutation({
-    mutationFn: async (input: { conversationId: string; assetIds: string[] }) =>
+    mutationFn: async (input: SendDocInput) =>
       (await api.post<{
         sent: number
         sentIds: string[]
+        /** Số tin khách thực nhận — khác số tài liệu vì một sản phẩm ra nhiều tin. */
+        messages: number
         skipped: Array<{ id: string; reason: string }>
+        /** Tin chữ soạn xong nhưng kênh không nhận — khách chưa thấy. */
+        failedText: string[]
       }>('/doc-library/send', input)).data,
   })
 }
