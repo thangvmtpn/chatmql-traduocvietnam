@@ -16,6 +16,7 @@
 import { randomUUID, createHash } from 'crypto'
 import { prisma } from '../../shared/prisma-client.js'
 import { logger } from '../../shared/logger.js'
+import { buildOrderBill, loadCompanyInfo } from './order-bill.js'
 import {
   createOrderOnCrm,
   CrmApiError,
@@ -138,39 +139,39 @@ function cleanCustomerName(name: string, phone: string): string {
  * ra màn hình, nên `**đậm**` hiện nguyên cả hai dấu sao — khách nhìn thấy y hệt
  * nhân viên. Muốn nhấn mạnh thì dùng chữ HOA và ký tự phân cách.
  */
-function buildOrderCard(result: CrmCreateOrderResult, input: CreateOrderInput): string {
-  const name = cleanCustomerName(input.customerName || '', input.customerPhone || '')
-  const itemList = input.items
-    .map(i => `• ${i.productName} × ${i.quantity}${i.isGift ? ' (quà tặng)' : ''}`)
-    .join('\n')
-  const payLabel = input.paymentMethod === 'vietqr'
-    ? 'Chuyển khoản VietQR'
-    : 'Thanh toán khi nhận hàng (COD)'
-
-  const lines = [
-    `🛍️ ĐƠN HÀNG MỚI — ${result.order_code}`,
-    '━━━━━━━━━━━━━━━━━━━━',
-    `👤 Người nhận: ${name}`,
-    `📞 Điện thoại: ${input.customerPhone}`,
-    `📍 Địa chỉ: ${input.shippingAddress}`,
-    '',
-    '📦 Sản phẩm:',
-    itemList,
-    '',
-    `💰 Tổng thanh toán: ${formatVnd(result.total_amount)}`,
-    `🚚 Hình thức: ${payLabel}`,
-  ]
-
-  if (input.notes?.trim()) lines.push(`📝 Ghi chú: ${input.notes.trim()}`)
-
-  lines.push('━━━━━━━━━━━━━━━━━━━━')
-  lines.push('✅ Lên đơn thành công!')
-
-  if (result.vietqr_url) {
-    lines.push('', '💳 Quét mã QR để chuyển khoản:', result.vietqr_url)
-  }
-
-  return lines.join('\n')
+/**
+ * Tin xác nhận đơn gửi khách — bố cục phiếu bán hàng, xem order-bill.ts.
+ * Tiền lấy từ kết quả CRM trả về (nguồn sự thật), không tự tính lại ở đây.
+ */
+async function buildOrderCard(
+  result: CrmCreateOrderResult,
+  input: CreateOrderInput,
+): Promise<string> {
+  const company = await loadCompanyInfo(input.orgId)
+  return buildOrderBill(
+    {
+      orderCode: result.order_code,
+      customerName: cleanCustomerName(input.customerName || '', input.customerPhone || ''),
+      customerPhone: input.customerPhone || '',
+      shippingAddress: input.shippingAddress || '',
+      sellerName: input.sellerName,
+      items: input.items.map((i) => ({
+        productName: i.productName,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        isGift: i.isGift,
+      })),
+      subtotal: result.subtotal,
+      discountAmount: result.discount_amount,
+      shippingFee: result.shipping_fee,
+      totalAmount: result.total_amount,
+      depositAmount: input.depositAmount,
+      paymentMethod: result.payment_method || input.paymentMethod,
+      notes: input.notes,
+      vietqrUrl: result.vietqr_url,
+    },
+    company,
+  )
 }
 
 /**
@@ -347,7 +348,7 @@ export async function createOrderAndSync(input: CreateOrderInput): Promise<Creat
           senderName: input.sellerName || 'Staff',
           repliedByUserId: input.createdUserId || null,
           contentType: 'text',
-          content: buildOrderCard(result, input),
+          content: await buildOrderCard(result, input),
           sentAt: new Date(),
         },
       })
