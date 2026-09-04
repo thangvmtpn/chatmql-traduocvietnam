@@ -543,8 +543,10 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
               {warehouses.map((w) => <SelectItem key={w.id} value={String(w.id)} className="text-xs">{w.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <ProductSearch catalog={catalog} loading={catalogQ.isLoading} onPick={addProduct} />
+          <ProductSearch mode="product" catalog={catalog} loading={catalogQ.isLoading} onPick={addProduct} />
         </div>
+        {/* Ô quà tặng tách riêng — khớp bản prod, tránh bấm nhầm khi lên đơn. */}
+        <ProductSearch mode="gift" catalog={catalog} loading={catalogQ.isLoading} onPick={addProduct} />
 
         {!catalogQ.isLoading && !catalog.length && (
           <p className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-2 text-[11px] text-foreground">
@@ -902,32 +904,50 @@ function MoneyInput({
   )
 }
 
-/** Ô tìm sản phẩm (không phân biệt dấu) + danh sách gợi ý thả xuống. */
+/**
+ * Ô tìm sản phẩm (không phân biệt dấu) + danh sách gợi ý thả xuống.
+ *
+ * Có HAI ô riêng như bản prod (`order-ui-bridge.js`): "Tìm sản phẩm" và
+ * "Tìm quà tặng". Cùng tra trên một danh mục kho, chỉ khác ở chỗ ô quà tặng
+ * thêm dòng với `isGift = true` (đơn giá về 0đ, không tính vào tiền hàng).
+ * Tách ô để nhân viên không bấm nhầm nút "Quà tặng" nằm lẫn trong kết quả.
+ */
 function ProductSearch({
-  catalog, loading, onPick,
+  catalog, loading, onPick, mode,
 }: {
   catalog: CatalogProduct[]
   loading: boolean
   onPick: (p: CatalogProduct, asGift?: boolean) => void
+  mode: 'product' | 'gift'
 }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
+  const isGift = mode === 'gift'
 
   const matched = useMemo(
     () => (q.trim() ? catalog.filter((p) => matchesQuery(p, q)).slice(0, 30) : []),
     [catalog, q],
   )
 
-  function pick(p: CatalogProduct, asGift = false) {
-    onPick(p, asGift)
+  function pick(p: CatalogProduct) {
+    onPick(p, isGift)
     setQ('')
     setOpen(false)
   }
 
   return (
     <div className="relative min-w-0 flex-1">
-      <div className="flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
-        {loading ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" /> : <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+      <div
+        className={cn(
+          'flex h-8 items-center gap-1.5 rounded-md border bg-background px-2 focus-within:ring-2 focus-within:ring-ring',
+          isGift ? 'border-warning/50' : 'border-input',
+        )}
+      >
+        {loading
+          ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+          : isGift
+            ? <Gift className="h-3.5 w-3.5 shrink-0 text-warning" />
+            : <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         <input
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true) }}
@@ -943,7 +963,7 @@ function ProductSearch({
               setOpen(false)
             }
           }}
-          placeholder={loading ? 'Đang tải danh mục…' : 'Tìm sản phẩm / quà tặng'}
+          placeholder={loading ? 'Đang tải danh mục…' : isGift ? 'Tìm quà tặng' : 'Tìm sản phẩm'}
           disabled={loading || !catalog.length}
           autoComplete="off"
           className="w-full min-w-0 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
@@ -953,40 +973,42 @@ function ProductSearch({
       {open && q.trim() && (
         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 shadow-lg">
           {!matched.length ? (
-            <p className="px-2 py-2 text-center text-[11px] text-muted-foreground">Không tìm thấy sản phẩm</p>
+            <p className="px-2 py-2 text-center text-[11px] text-muted-foreground">
+              {isGift ? 'Không tìm thấy quà tặng' : 'Không tìm thấy sản phẩm'}
+            </p>
           ) : (
             matched.map((p) => (
-              <div
+              <button
                 key={p.code}
-                className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); pick(p) }}
+                title={isGift ? 'Thêm làm quà tặng (0đ)' : 'Thêm vào đơn'}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left',
+                  isGift ? 'hover:bg-warning/10' : 'hover:bg-accent',
+                )}
               >
-                <button
-                  type="button"
-                  onMouseDown={(e) => { e.preventDefault(); pick(p) }}
-                  className="min-w-0 flex-1 text-left"
-                  title="Thêm vào đơn"
-                >
-                  <div className="truncate text-xs font-medium">{p.name}</div>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span className="rounded bg-muted px-1 font-mono">{p.code}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium">{p.name}</span>
+                  <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className={cn('rounded px-1 font-mono', isGift ? 'bg-warning/15 text-warning' : 'bg-muted')}>{p.code}</span>
                     {p.weight ? <span>{p.weight}g</span> : null}
                     {p.inventory > 0
                       ? <span className="font-semibold text-success">Tồn {formatNumber(p.inventory)}</span>
                       : <span className="font-bold text-destructive">HẾT HÀNG</span>}
-                  </div>
-                </button>
-                <div className="shrink-0 text-right">
-                  <div className="text-xs font-bold tabular-nums">{formatVnd(p.price)}</div>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); pick(p, true) }}
-                    className="flex items-center gap-0.5 text-[10px] font-medium text-warning hover:underline"
-                    title="Thêm làm quà tặng (0đ)"
-                  >
-                    <Gift className="h-3 w-3" /> Quà tặng
-                  </button>
-                </div>
-              </div>
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  {isGift ? (
+                    <>
+                      <span className="block text-xs font-bold tabular-nums text-warning">0 ₫</span>
+                      <span className="block text-[10px] font-medium text-warning">+ Thêm quà 🎁</span>
+                    </>
+                  ) : (
+                    <span className="block text-xs font-bold tabular-nums">{formatVnd(p.price)}</span>
+                  )}
+                </span>
+              </button>
             ))
           )}
         </div>
