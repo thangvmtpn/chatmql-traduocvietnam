@@ -9,9 +9,10 @@
  * theo cờ này chứ không chỉ nhắc trong prompt AI.
  */
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  ChevronDown, ChevronUp, FileText, Film, Folder, FolderPlus, Image as ImageIcon, Link2,
+  ArrowLeft, ChevronDown, ChevronUp, FileText, Film, Folder, FolderPlus, Image as ImageIcon, Link2,
   Package, Pencil, Plus, Search, Trash2, Type,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
@@ -103,6 +104,14 @@ export function DocLibraryPage() {
 
   return (
     <div className="space-y-5">
+      {/* Lối quay lại — thư viện là màn con của Tài liệu bán hàng, không phải mục menu riêng. */}
+      <Link
+        to="/sales-docs"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground hover:underline"
+      >
+        <ArrowLeft className="h-4 w-4" /> Về tổng quan Tài liệu bán hàng
+      </Link>
+
       <PageHeader
         title="Thư viện tài liệu"
         description="Kho tài nguyên bán hàng: ảnh, video, PDF, tài liệu, văn bản. Nhân viên tra cứu để gửi khách, AI đọc phần chữ khi tư vấn."
