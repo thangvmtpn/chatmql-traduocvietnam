@@ -21,9 +21,9 @@
   const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__ !== undefined)
     ? window.__API_BASE__
     : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'https://chatmql-dev.traduocvietnam.com'
+        ? 'https://chatmql.traduocvietnam.com'
         : (window.location.hostname.includes('traduoc')
-            ? 'https://chatmql-dev.traduocvietnam.com'
+            ? 'https://chatmql.traduocvietnam.com'
             : (window.location.hostname.includes('chatmql-dev')
                 ? 'https://chatmql-dev.traduocvietnam.com'
                 : '')));

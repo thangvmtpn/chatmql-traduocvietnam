@@ -12,9 +12,31 @@ import {
   refreshTikTokToken,
 } from './tiktok-client.js'
 
-function getAppCreds() {
-  const appKey = process.env.TIKTOK_APP_KEY
-  const appSecret = process.env.TIKTOK_APP_SECRET
+async function getAppCreds(orgId?: string) {
+  let appKey = process.env.TIKTOK_APP_KEY || ''
+  let appSecret = process.env.TIKTOK_APP_SECRET || ''
+
+  if (orgId && (!appKey || !appSecret)) {
+    try {
+      const settings = await prisma.appSetting.findMany({
+        where: {
+          orgId,
+          settingKey: { in: ['tiktok.app_key', 'tiktok.app_secret'] },
+        },
+      })
+      for (const s of settings) {
+        if (s.settingKey === 'tiktok.app_key' && !appKey && s.valuePlain) {
+          appKey = s.valuePlain.trim()
+        }
+        if (s.settingKey === 'tiktok.app_secret' && !appSecret && s.valuePlain) {
+          appSecret = s.valuePlain.trim()
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   if (!appKey || !appSecret) {
     throw new Error('TIKTOK_APP_KEY and TIKTOK_APP_SECRET must be configured')
   }
@@ -27,11 +49,13 @@ function getAppCreds() {
 export async function getValidTikTokToken(channelAccountId: string): Promise<{
   accessToken: string
   shopCipher: string
+  orgId: string
 } | null> {
   const account = await prisma.channelAccount.findUnique({
     where: { id: channelAccountId },
     select: {
       id: true,
+      orgId: true,
       accessTokenEnc: true,
       refreshTokenEnc: true,
       tokenExpiresAt: true,
@@ -45,7 +69,7 @@ export async function getValidTikTokToken(channelAccountId: string): Promise<{
     return null
   }
 
-  const { appKey, appSecret } = getAppCreds()
+  const { appKey, appSecret } = await getAppCreds(account.orgId)
   let accessToken: string
   try {
     accessToken = decryptToken(account.accessTokenEnc)
@@ -88,15 +112,16 @@ export async function getValidTikTokToken(channelAccountId: string): Promise<{
   return {
     accessToken,
     shopCipher: account.externalPageId || '',
+    orgId: account.orgId,
   }
 }
 
 /**
- * Send text message to customer via TikTok Shop API.
+ * Dispatch an outbound text message to TikTok Shop chat.
  */
-export async function sendTextViaTikTok(
+export async function sendTikTokText(
   channelAccountId: string,
-  externalThreadId: string | null,
+  externalThreadId: string,
   text: string,
 ): Promise<{
   sent: boolean
@@ -113,7 +138,7 @@ export async function sendTextViaTikTok(
     return { sent: false, error: 'Tài khoản TikTok Shop chưa kết nối hoặc token không hợp lệ' }
   }
 
-  const { appKey, appSecret } = getAppCreds()
+  const { appKey, appSecret } = await getAppCreds(session.orgId)
 
   try {
     const result = await sendTikTokTextMessage(
@@ -125,35 +150,29 @@ export async function sendTextViaTikTok(
       appSecret,
     )
 
-    if (result.code === 0) {
-      return {
-        sent: true,
-        messageId: result.data?.message_id,
-      }
+    if (result.code !== 0) {
+      logger.error({ result, externalThreadId }, '[tiktok-pool] Send text message failed')
+      return { sent: false, error: result.message || 'TikTok API error' }
     }
-
-    // Check if error is related to CS Window (e.g. 48h / 24h passed without customer reply)
-    const isWindowExpired = result.code === 36000001 || result.message?.toLowerCase().includes('window')
 
     return {
-      sent: false,
-      error: result.message || 'TikTok API returned error',
-      csWindowExpired: isWindowExpired,
+      sent: true,
+      messageId: result.data?.message_id,
     }
   } catch (err: any) {
-    logger.error({ err: err.message, channelAccountId }, '[tiktok-pool] sendTextViaTikTok failed')
+    logger.error({ err: err.message, externalThreadId }, '[tiktok-pool] Send text exception')
     return { sent: false, error: err.message }
   }
 }
 
 /**
- * Upload and send image message to customer via TikTok Shop API.
+ * Dispatch an outbound image message to TikTok Shop chat.
  */
-export async function sendImageViaTikTok(
+export async function sendTikTokImage(
   channelAccountId: string,
-  externalThreadId: string | null,
+  externalThreadId: string,
   imageBuffer: Buffer,
-  fileName: string,
+  fileName: string = 'image.jpg',
 ): Promise<{
   sent: boolean
   error?: string
@@ -168,7 +187,7 @@ export async function sendImageViaTikTok(
     return { sent: false, error: 'Tài khoản TikTok Shop chưa kết nối hoặc token không hợp lệ' }
   }
 
-  const { appKey, appSecret } = getAppCreds()
+  const { appKey, appSecret } = await getAppCreds(session.orgId)
 
   try {
     // 1. Upload image to TikTok Customer Service
@@ -208,3 +227,7 @@ export async function sendImageViaTikTok(
     return { sent: false, error: err.message }
   }
 }
+
+export const sendTextViaTikTok = sendTikTokText
+export const sendImageViaTikTok = sendTikTokImage
+
