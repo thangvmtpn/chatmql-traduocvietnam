@@ -67,6 +67,7 @@ import {
   type CreateOrderBody,
   type CreateOrderResult,
 } from '@/hooks/use-order-form'
+import { formatCombinedVip } from '@/hooks/use-orders'
 
 // ── Hằng số ───────────────────────────────────────────────────────────
 
@@ -415,9 +416,10 @@ function OrderFormInner({ convId, onCreated }: OrderFormProps) {
           <Badge variant={crm ? 'success' : 'secondary'} className="text-[10px]">
             {crmQ.isFetching ? 'ĐANG TRA CRM…' : crm ? 'ĐÃ CÓ TRÊN CRM' : 'CHƯA CÓ TRÊN CRM'}
           </Badge>
-          {crm?.cap_vip && <span className="font-semibold text-success">{crm.cap_vip}</span>}
-          {(crm?.priority_level || crm?.nhom_kh) && (
-            <span className="text-muted-foreground">Cấp: <b className="text-foreground">{crm?.priority_level || crm?.nhom_kh}</b></span>
+          {crm && (
+            <span className="text-muted-foreground">
+              Cấp: <b className="font-semibold text-success">{formatCombinedVip(crm)}</b>
+            </span>
           )}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
