@@ -11,6 +11,8 @@
 import { prisma } from '../../shared/prisma-client.js'
 
 export interface ProductDocInput {
+  /** Danh mục trong cây tài liệu bán hàng. */
+  folderId?: string | null
   name?: string | null
   description?: string | null
   images?: string[]
@@ -54,6 +56,7 @@ export async function upsertProductDoc(
   if (!productCode) throw new Error('Thiếu mã sản phẩm')
 
   const patch = {
+    folderId: data.folderId === undefined ? undefined : data.folderId,
     name: data.name ?? undefined,
     description: data.description ?? undefined,
     images: data.images ?? undefined,
@@ -66,6 +69,7 @@ export async function upsertProductDoc(
     create: {
       orgId,
       productCode,
+      folderId: data.folderId ?? null,
       name: data.name ?? null,
       description: data.description ?? null,
       images: data.images ?? [],

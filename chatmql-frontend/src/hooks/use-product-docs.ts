@@ -10,6 +10,8 @@ import { api } from '@/lib/api-client'
 export interface ProductDoc {
   id: string
   productCode: string
+  /** Danh mục trong cây tài liệu bán hàng (doc_folders). */
+  folderId: string | null
   name: string | null
   description: string | null
   images: string[]
@@ -21,6 +23,7 @@ export interface ProductDoc {
 }
 
 export interface ProductDocInput {
+  folderId?: string | null
   name?: string | null
   description?: string | null
   images?: string[]

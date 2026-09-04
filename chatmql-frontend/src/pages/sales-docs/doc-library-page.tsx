@@ -11,7 +11,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  FileText, Film, Folder, FolderPlus, Image as ImageIcon, Link2, Loader2,
+  ChevronDown, ChevronUp, FileText, Film, Folder, FolderPlus, Image as ImageIcon, Link2,
   Pencil, Plus, Search, Trash2, Type,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
@@ -29,6 +29,7 @@ import {
   type AssetKind, type DocAsset, type DocFolder,
 } from '@/hooks/use-doc-library'
 import { DocAssetDialog } from './doc-asset-dialog'
+import { DocFolderDialog } from './doc-folder-dialog'
 
 const ALL = '__all__'
 const UNFILED = '__unfiled__'
@@ -74,6 +75,9 @@ export function DocLibraryPage() {
   const [q, setQ] = useState('')
   const [assetOpen, setAssetOpen] = useState(false)
   const [editing, setEditing] = useState<DocAsset | null>(null)
+  const [folderOpen, setFolderOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<DocFolder | null>(null)
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
 
   const assetsQ = useDocAssets({
     folderId: folderId === ALL || folderId === UNFILED ? undefined : folderId,
@@ -89,6 +93,12 @@ export function DocLibraryPage() {
 
   const openNew = () => { setEditing(null); setAssetOpen(true) }
   const openEdit = (a: DocAsset) => { setEditing(a); setAssetOpen(true) }
+  const openNewFolder = (parentId: string | null) => {
+    setEditingFolder(null); setNewFolderParent(parentId); setFolderOpen(true)
+  }
+  const openEditFolder = (f: DocFolder) => {
+    setEditingFolder(f); setNewFolderParent(null); setFolderOpen(true)
+  }
 
   return (
     <div className="space-y-5">
@@ -97,7 +107,9 @@ export function DocLibraryPage() {
         description="Kho tài nguyên bán hàng: ảnh, video, PDF, tài liệu, văn bản. Nhân viên tra cứu để gửi khách, AI đọc phần chữ khi tư vấn."
         actions={canEdit ? (
           <div className="flex gap-2">
-            <NewFolderButton folders={foldersQ.data ?? []} />
+            <Button variant="outline" className="gap-1.5" onClick={() => openNewFolder(null)}>
+              <FolderPlus className="h-4 w-4" /> Thư mục mới
+            </Button>
             <Button className="gap-1.5" onClick={openNew}><Plus className="h-4 w-4" /> Thêm tài nguyên</Button>
           </div>
         ) : undefined}
@@ -125,7 +137,9 @@ export function DocLibraryPage() {
                 active={folderId === f.id}
                 onClick={() => setFolderId(f.id)}
                 folder={canEdit ? f : undefined}
-                allFolders={foldersQ.data ?? []}
+                siblings={folders.filter((x) => x.parentId === f.parentId)}
+                onEdit={() => openEditFolder(f)}
+                onAddChild={() => openNewFolder(f.id)}
               />
             ))
           )}
@@ -172,6 +186,14 @@ export function DocLibraryPage() {
         </section>
       </div>
 
+      <DocFolderDialog
+        folder={editingFolder}
+        folders={foldersQ.data ?? []}
+        defaultParentId={newFolderParent}
+        open={folderOpen}
+        onOpenChange={setFolderOpen}
+      />
+
       <DocAssetDialog
         asset={editing}
         folders={foldersQ.data ?? []}
@@ -184,7 +206,7 @@ export function DocLibraryPage() {
 }
 
 function FolderRow({
-  label, count, depth = 0, active, onClick, visibility, folder, allFolders,
+  label, count, depth = 0, active, onClick, visibility, folder, siblings, onEdit, onAddChild,
 }: {
   label: string
   count?: number
@@ -193,9 +215,37 @@ function FolderRow({
   onClick: () => void
   visibility?: string
   folder?: DocFolder
-  allFolders?: DocFolder[]
+  /** Các thư mục cùng cấp (cùng cha) — dùng để đổi thứ tự lên/xuống. */
+  siblings?: DocFolder[]
+  onEdit?: () => void
+  onAddChild?: () => void
 }) {
   const del = useDeleteDocFolder()
+  const save = useSaveDocFolder()
+
+  /**
+   * Đổi chỗ với thư mục liền kề CÙNG CẤP bằng cách hoán đổi `sortOrder`.
+   * Khi nhiều thư mục cùng sortOrder (đều 0 lúc mới tạo) thì gán lại số thứ tự
+   * theo vị trí hiện tại rồi mới hoán đổi, nếu không bấm sẽ không thấy đổi gì.
+   */
+  const move = (dir: -1 | 1) => {
+    if (!folder || !siblings) return
+    const ordered = [...siblings].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    const i = ordered.findIndex((f) => f.id === folder.id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= ordered.length) return
+
+    const me = ordered[i]
+    const other = ordered[j]
+    save.mutate({ id: me.id, data: { sortOrder: j } })
+    save.mutate({ id: other.id, data: { sortOrder: i } })
+  }
+
+  const ordered = siblings
+    ? [...siblings].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    : []
+  const idx = folder ? ordered.findIndex((f) => f.id === folder.id) : -1
+
   return (
     <div
       className={cn(
@@ -208,11 +258,42 @@ function FolderRow({
         <Folder className="h-3.5 w-3.5 shrink-0 opacity-70" />
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {visibility === 'internal' && <Badge variant="outline" className="shrink-0 text-[9px]">Nội bộ</Badge>}
+        {visibility === 'ai_only' && <Badge variant="outline" className="shrink-0 text-[9px]">AI</Badge>}
         {count != null && <span className="shrink-0 text-[11px] text-muted-foreground">{count}</span>}
       </button>
-      {folder && allFolders && (
-        <div className="hidden shrink-0 gap-0.5 group-hover:flex">
-          <EditFolderButton folder={folder} folders={allFolders} />
+
+      {folder && (
+        <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+          <button
+            type="button" title="Lên" aria-label="Di chuyển lên"
+            disabled={idx <= 0 || save.isPending}
+            onClick={() => move(-1)}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button" title="Xuống" aria-label="Di chuyển xuống"
+            disabled={idx < 0 || idx >= ordered.length - 1 || save.isPending}
+            onClick={() => move(1)}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button" title="Thêm thư mục con" aria-label="Thêm thư mục con"
+            onClick={onAddChild}
+            className="text-muted-foreground hover:text-primary"
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button" title="Sửa thư mục" aria-label="Sửa thư mục"
+            onClick={onEdit}
+            className="text-muted-foreground hover:text-primary"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             title="Xoá thư mục (tài nguyên bên trong vẫn giữ)"
@@ -298,71 +379,5 @@ function AssetCard({ a, canEdit, onEdit }: { a: DocAsset; canEdit: boolean; onEd
         </div>
       </div>
     </div>
-  )
-}
-
-// ── Tạo / sửa thư mục ───────────────────────────────────────────────
-
-function NewFolderButton({ folders }: { folders: DocFolder[] }) {
-  return <FolderFormButton folders={folders} trigger={<><FolderPlus className="h-4 w-4" /> Thư mục mới</>} variant="outline" />
-}
-
-function EditFolderButton({ folder, folders }: { folder: DocFolder; folders: DocFolder[] }) {
-  return (
-    <FolderFormButton
-      folders={folders}
-      folder={folder}
-      iconOnly
-      trigger={<Pencil className="h-3.5 w-3.5" />}
-    />
-  )
-}
-
-/**
- * Form thư mục dùng `prompt` thay vì dialog riêng: thư mục chỉ có tên + thư mục
- * cha + mức hiển thị, dựng cả một dialog cho 3 trường là thừa.
- */
-function FolderFormButton({
-  folders, folder, trigger, variant = 'ghost', iconOnly,
-}: {
-  folders: DocFolder[]
-  folder?: DocFolder
-  trigger: React.ReactNode
-  variant?: 'outline' | 'ghost'
-  iconOnly?: boolean
-}) {
-  const save = useSaveDocFolder()
-  const onClick = () => {
-    const name = window.prompt(folder ? 'Đổi tên thư mục:' : 'Tên thư mục mới:', folder?.name ?? '')
-    if (name === null) return
-    if (!name.trim()) { toast.error('Tên thư mục không được để trống'); return }
-
-    const vis = window.prompt(
-      'Mức hiển thị: gõ "sales" (gửi khách được), "internal" (chỉ nội bộ), hoặc "ai_only" (chỉ AI đọc)',
-      folder?.visibility ?? 'sales',
-    )
-    if (vis === null) return
-
-    save.mutate(
-      { id: folder?.id, data: { name: name.trim(), visibility: (vis.trim() || 'sales') as DocFolder['visibility'] } },
-      {
-        onSuccess: () => toast.success(folder ? 'Đã cập nhật thư mục' : 'Đã tạo thư mục'),
-        onError: (e) => toast.error(apiError(e)),
-      },
-    )
-  }
-  void folders
-  if (iconOnly) {
-    return (
-      <button type="button" onClick={onClick} aria-label="Sửa thư mục" className="text-muted-foreground hover:text-primary">
-        {trigger}
-      </button>
-    )
-  }
-  return (
-    <Button variant={variant} className="gap-1.5" onClick={onClick} disabled={save.isPending}>
-      {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-      {trigger}
-    </Button>
   )
 }

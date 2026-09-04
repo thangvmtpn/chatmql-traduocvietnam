@@ -2163,6 +2163,9 @@ model AiEvalResult {
 model ProductDoc {
   id          String   @id @default(uuid())
   orgId       String   @map("org_id")
+  /// Danh mục trong CÂY tài liệu bán hàng (doc_folders). Nhờ nó sản phẩm xếp
+  /// được nhiều cấp (Trà > Trà xanh), không phụ thuộc danh mục phẳng của CRM.
+  folderId    String?  @map("folder_id")
   /// Mã sản phẩm ở hệ thống nguồn. Khoá liên kết duy nhất.
   productCode String   @map("product_code")
   /// Tên tại thời điểm soạn — để hiện khi hệ thống nguồn lỗi/chậm.
@@ -2176,9 +2179,11 @@ model ProductDoc {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  folder DocFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, productCode])
+  @@index([orgId, folderId])
   @@index([orgId])
   @@map("product_docs")
 }
@@ -2206,6 +2211,7 @@ model DocFolder {
   parent   DocFolder?   @relation("DocFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
   children DocFolder[]  @relation("DocFolderTree")
   assets   DocAsset[]
+  productDocs ProductDoc[]
 
   @@index([orgId, parentId])
   @@map("doc_folders")

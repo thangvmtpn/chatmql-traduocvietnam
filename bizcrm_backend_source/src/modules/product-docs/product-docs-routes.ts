@@ -37,7 +37,7 @@ export async function productDocRoutes(app: FastifyInstance): Promise<void> {
 
   app.put<{
     Params: { code: string }
-    Body: { name?: string | null; description?: string | null; images?: string[]; videoUrls?: string[]; keywords?: string | null }
+    Body: { folderId?: string | null; name?: string | null; description?: string | null; images?: string[]; videoUrls?: string[]; keywords?: string | null }
   }>('/api/v1/product-docs/:code', async (request, reply) => {
     const user = request.user as { orgId: string; id: string; role: string }
     if (!canManage(user.role)) {

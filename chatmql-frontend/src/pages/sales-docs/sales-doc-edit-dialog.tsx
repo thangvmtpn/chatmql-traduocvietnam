@@ -19,6 +19,8 @@ import { Textarea } from '@/components/ui/misc'
 import { apiError } from '@/lib/api-client'
 import { resolveImageUrl, useUploadProductImage } from '@/hooks/use-products'
 import { useProductDoc, useSaveProductDoc } from '@/hooks/use-product-docs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDocFolders } from '@/hooks/use-doc-library'
 
 interface Props {
   /** Mã sản phẩm ở hệ thống nguồn — khoá của tài liệu. */
@@ -40,6 +42,8 @@ export function SalesDocEditDialog({ code, productName, open, onOpenChange }: Pr
   const [videoUrls, setVideoUrls] = useState<string[]>([])
   const [keywords, setKeywords] = useState('')
   const [newVideo, setNewVideo] = useState('')
+  const [folderId, setFolderId] = useState<string>('__none__')
+  const foldersQ = useDocFolders()
 
   // Nạp lại form mỗi lần mở cho mã khác, kể cả khi chưa có tài liệu (form trắng).
   useEffect(() => {
@@ -49,6 +53,7 @@ export function SalesDocEditDialog({ code, productName, open, onOpenChange }: Pr
     setImages(d?.images ?? [])
     setVideoUrls(d?.videoUrls ?? [])
     setKeywords(d?.keywords ?? '')
+    setFolderId(d?.folderId ?? '__none__')
     setNewVideo('')
   }, [open, code, docQ.data, docQ.isLoading])
 
@@ -89,6 +94,7 @@ export function SalesDocEditDialog({ code, productName, open, onOpenChange }: Pr
         code,
         data: {
           name: productName ?? null,
+          folderId: folderId === '__none__' ? null : folderId,
           description: description.trim() || null,
           images,
           videoUrls,
@@ -120,6 +126,23 @@ export function SalesDocEditDialog({ code, productName, open, onOpenChange }: Pr
             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : (
             <>
+              {/* Danh mục trong cây tài liệu — quyết định sản phẩm nằm nhánh nào. */}
+              <div className="grid gap-1.5">
+                <Label>Danh mục tài liệu</Label>
+                <Select value={folderId} onValueChange={setFolderId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Chưa phân loại</SelectItem>
+                    {(foldersQ.data ?? []).map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.icon ? `${f.icon} ` : ''}{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Quyết định sản phẩm nằm ở nhánh nào của cây danh mục ngoài trang chính.
+                </p>
+              </div>
+
               {/* Mô tả */}
               <div className="grid gap-1.5">
                 <Label>Mô tả sản phẩm</Label>

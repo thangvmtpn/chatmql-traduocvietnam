@@ -30,11 +30,19 @@ import { cn } from '@/lib/utils'
 import { useMyPermissions } from '@/hooks/use-settings'
 import { resolveImageUrl } from '@/hooks/use-products'
 import { useCrmProductList, type CrmProduct } from '@/hooks/use-crm-products'
-import { useProductDoc, useProductDocsByCodes } from '@/hooks/use-product-docs'
+import { useAllProductDocs, useProductDoc } from '@/hooks/use-product-docs'
+import { useDocFolders, type DocFolder } from '@/hooks/use-doc-library'
 import { SalesDocEditDialog } from './sales-doc-edit-dialog'
 
 const ROOT = '/sales-docs'
-const UNCATEGORIZED = 'Chưa phân loại'
+/** Phần tài liệu mà trang tổng quan cần — không cần cả bản ghi. */
+type ProductDocLite = {
+  productCode: string
+  folderId: string | null
+  description: string | null
+  images: string[]
+  videoUrls: string[]
+}
 
 /** Nhận diện YouTube → id để nhúng; link khác trả null. */
 function youtubeId(url: string): string | null {
@@ -80,38 +88,85 @@ export function SalesDocsPage() {
   // Lối tắt ?code= từ màn "Sản phẩm (CRM)".
   const code = productId ?? params.get('code') ?? undefined
   if (code) return <ProductDetailView code={decodeURIComponent(code)} />
-  if (catId) return <CategoryView category={decodeURIComponent(catId)} />
+  if (catId) return <CategoryView folderId={decodeURIComponent(catId)} />
   return <RootView />
 }
 
 // ── Cấp 1: Tổng quan ────────────────────────────────────────────────
 
+/**
+ * Trang đầu phải trả lời ngay 2 câu hỏi của người mở tài liệu bán hàng:
+ * "giá bao nhiêu" và "công ty bán những gì". Nên bố cục là:
+ *   1. Bảng giá tổng sản phẩm (thu gọn được)
+ *   2. Cây danh mục nhiều cấp (Trà > Trà xanh > sản phẩm)
+ *
+ * Cây danh mục lấy từ `doc_folders` — do admin tự dựng, lồng bao nhiêu cấp cũng
+ * được. Sản phẩm gắn vào một nhánh qua `product_docs.folderId`. Sản phẩm chưa
+ * gắn thì gom vào nhánh ảo "Chưa phân loại" để không biến mất.
+ */
 function RootView() {
   const q = useAllProducts()
+  const foldersQ = useDocFolders()
+  const docsQ = useAllProductDocs()
+  const [showPrices, setShowPrices] = useState(false)
+
   const products = q.data?.products ?? []
-  const codes = useMemo(() => products.map((p) => p.code).filter((c): c is string => !!c), [products])
-  const docsQ = useProductDocsByCodes(codes)
+  const folders = foldersQ.data ?? []
+  const docs = docsQ.data ?? []
 
-  const groups = useMemo(() => {
-    const byCat = new Map<string, CrmProduct[]>()
+  /** Mã sản phẩm → thư mục đang gắn. */
+  const folderOfCode = useMemo(() => {
+    const m = new Map<string, string | null>()
+    for (const d of docs) m.set(d.productCode.toUpperCase(), d.folderId)
+    return m
+  }, [docs])
+
+  /** Sản phẩm thuộc TRỰC TIẾP một thư mục (không tính thư mục con). */
+  const productsByFolder = useMemo(() => {
+    const m = new Map<string | null, CrmProduct[]>()
     for (const p of products) {
-      const key = p.categoryName || UNCATEGORIZED
-      const arr = byCat.get(key) ?? []
+      const fid = p.code ? folderOfCode.get(p.code.toUpperCase()) ?? null : null
+      const arr = m.get(fid) ?? []
       arr.push(p)
-      byCat.set(key, arr)
+      m.set(fid, arr)
     }
-    return [...byCat.entries()]
-      .sort(([a], [b]) => (a === UNCATEGORIZED ? 1 : b === UNCATEGORIZED ? -1 : a.localeCompare(b)))
-      .map(([name, items]) => ({ name, items }))
-  }, [products])
+    return m
+  }, [products, folderOfCode])
 
-  const docCount = docsQ.data?.size ?? 0
+  const childrenOf = useMemo(() => {
+    const m = new Map<string | null, DocFolder[]>()
+    for (const f of folders) {
+      const arr = m.get(f.parentId) ?? []
+      arr.push(f)
+      m.set(f.parentId, arr)
+    }
+    for (const [, arr] of m) arr.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    return m
+  }, [folders])
+
+  /** Tổng sản phẩm của một nhánh, tính cả cây con. */
+  const totalOf = useMemo(() => {
+    const memo = new Map<string, number>()
+    const walk = (id: string): number => {
+      if (memo.has(id)) return memo.get(id)!
+      let n = (productsByFolder.get(id) ?? []).length
+      for (const c of childrenOf.get(id) ?? []) n += walk(c.id)
+      memo.set(id, n)
+      return n
+    }
+    for (const f of folders) walk(f.id)
+    return memo
+  }, [folders, childrenOf, productsByFolder])
+
+  const unfiled = productsByFolder.get(null) ?? []
+  const roots = childrenOf.get(null) ?? []
+  const loading = q.isLoading || foldersQ.isLoading || docsQ.isLoading
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Tài liệu bán hàng"
-        description="Biểu giá và tư liệu từng sản phẩm (ảnh · mô tả · video) để nhân viên tra cứu và AI đọc khi tư vấn."
+        description="Bảng giá tổng và toàn bộ danh mục sản phẩm kèm mô tả, hình ảnh, video — nhân viên tra cứu, AI đọc khi tư vấn."
         actions={
           <Button variant="outline" className="gap-1.5" asChild>
             <Link to={`${ROOT}/library`}><FolderOpen className="h-4 w-4" /> Thư viện tài liệu</Link>
@@ -120,136 +175,233 @@ function RootView() {
       />
       <Crumbs items={[{ label: 'Tài liệu bán hàng' }]} />
 
-      {q.isLoading ? (
+      {loading ? (
         <Loading className="py-16" />
       ) : q.error ? (
         <ErrorState message={apiError(q.error)} />
       ) : (
         <>
+          {/* 1. Bảng giá tổng — thu gọn mặc định để cây danh mục nằm ngay tầm mắt. */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ReceiptText className="h-4 w-4 text-primary" /> Bảng giá tổng sản phẩm
+                  </CardTitle>
+                  <CardDescription>
+                    {products.length} sản phẩm · {docs.length} đã có tài liệu
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowPrices((v) => !v)}>
+                  {showPrices ? 'Thu gọn' : 'Xem bảng giá'}
+                </Button>
+              </div>
+            </CardHeader>
+            {showPrices && (
+              <CardContent className="p-0">
+                <div className="max-h-[420px] overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-muted/95 text-xs uppercase text-muted-foreground backdrop-blur">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
+                        <th className="px-4 py-2 text-left font-medium">Mã</th>
+                        <th className="px-4 py-2 text-right font-medium">Giá</th>
+                        <th className="px-4 py-2 text-center font-medium">Tài liệu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((p) => {
+                        const d = p.code ? docs.find((x) => x.productCode === p.code!.toUpperCase()) : undefined
+                        const has = !!(d && (d.description || d.images.length || d.videoUrls.length))
+                        return (
+                          <tr key={p.code ?? p.name} className="border-t hover:bg-accent/30">
+                            <td className="px-4 py-2">
+                              {p.code
+                                ? <Link to={`${ROOT}/p/${encodeURIComponent(p.code)}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
+                                : <span className="font-medium">{p.name}</span>}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{p.code || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-right font-medium">{priceText(p)}</td>
+                            <td className="px-4 py-2 text-center">
+                              {has ? <Badge variant="secondary">Đã có</Badge> : <span className="text-xs text-muted-foreground">Chưa soạn</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+
+          {/* 2. Cây danh mục nhiều cấp */}
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               <FolderOpen className="h-4 w-4" /> Danh mục sản phẩm
             </h2>
-            {groups.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Hệ thống nguồn chưa trả về sản phẩm nào.</p>
+
+            {roots.length === 0 && unfiled.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Chưa có danh mục nào. Tạo cây danh mục ở <Link to={`${ROOT}/library`} className="text-primary hover:underline">Thư viện tài liệu</Link>,
+                rồi gán sản phẩm vào danh mục khi soạn tài liệu.
+              </p>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {groups.map((g) => (
-                  <Link
-                    key={g.name}
-                    to={`${ROOT}/c/${encodeURIComponent(g.name)}`}
-                    className="group flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:border-primary/50 hover:bg-accent/40"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                      <Folder className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium group-hover:text-primary">{g.name}</span>
-                      <span className="block text-xs text-muted-foreground">{g.items.length} sản phẩm</span>
-                    </span>
-                  </Link>
+              <div className="space-y-1.5">
+                {roots.map((f) => (
+                  <CategoryNode
+                    key={f.id}
+                    folder={f}
+                    depth={0}
+                    childrenOf={childrenOf}
+                    productsByFolder={productsByFolder}
+                    totalOf={totalOf}
+                    docs={docs}
+                  />
                 ))}
+                {unfiled.length > 0 && (
+                  <details className="rounded-lg border">
+                    <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium">
+                      Chưa phân loại <span className="text-muted-foreground">({unfiled.length})</span>
+                    </summary>
+                    <div className="grid grid-cols-2 gap-3 border-t p-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {unfiled.map((p) => (
+                        <ProductCard key={p.code ?? p.name} p={p} doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined} />
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </section>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ReceiptText className="h-4 w-4 text-primary" /> Biểu giá sản phẩm
-              </CardTitle>
-              <CardDescription>
-                {products.length} sản phẩm · {docCount} đã có tài liệu · bấm tên để xem chi tiết
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium">Sản phẩm</th>
-                      <th className="px-4 py-2 text-left font-medium">Mã</th>
-                      <th className="px-4 py-2 text-right font-medium">Giá</th>
-                      <th className="px-4 py-2 text-center font-medium">Tài liệu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groups.map((g) => (
-                      <GroupRows key={g.name} group={g} docs={docsQ.data} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
   )
 }
 
-function GroupRows({
-  group, docs,
+/**
+ * Một nhánh của cây danh mục. Mở sẵn hai cấp đầu để người xem thấy ngay cấu
+ * trúc; sâu hơn thì phải bấm, tránh trang dài lê thê.
+ */
+function CategoryNode({
+  folder, depth, childrenOf, productsByFolder, totalOf, docs,
 }: {
-  group: { name: string; items: CrmProduct[] }
-  docs?: Map<string, { images: string[]; videoUrls: string[]; description: string | null }>
+  folder: DocFolder
+  depth: number
+  childrenOf: Map<string | null, DocFolder[]>
+  productsByFolder: Map<string | null, CrmProduct[]>
+  totalOf: Map<string, number>
+  docs: ProductDocLite[]
 }) {
+  const kids = childrenOf.get(folder.id) ?? []
+  const own = productsByFolder.get(folder.id) ?? []
+  const total = totalOf.get(folder.id) ?? 0
+
   return (
-    <>
-      <tr className="bg-muted/30">
-        <td colSpan={4} className="px-4 py-1.5 text-xs font-semibold">
-          <Link to={`${ROOT}/c/${encodeURIComponent(group.name)}`} className="hover:text-primary hover:underline">
-            📁 {group.name}
-          </Link>
-        </td>
-      </tr>
-      {group.items.map((p) => {
-        const doc = p.code ? docs?.get(p.code) : undefined
-        const has = !!(doc && (doc.description || doc.images.length || doc.videoUrls.length))
-        return (
-          <tr key={p.code ?? p.name} className="border-t hover:bg-accent/30">
-            <td className="px-4 py-2">
-              {p.code
-                ? <Link to={`${ROOT}/p/${encodeURIComponent(p.code)}`} className="font-medium hover:text-primary hover:underline">{p.name}</Link>
-                : <span className="font-medium">{p.name}</span>}
-            </td>
-            <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{p.code || '—'}</td>
-            <td className="whitespace-nowrap px-4 py-2 text-right font-medium">{priceText(p)}</td>
-            <td className="px-4 py-2 text-center">
-              {has
-                ? <Badge variant="secondary">Đã có</Badge>
-                : <span className="text-xs text-muted-foreground">Chưa soạn</span>}
-            </td>
-          </tr>
-        )
-      })}
-    </>
+    <details open={depth < 2} className={cn('rounded-lg border', depth > 0 && 'border-dashed')}>
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2.5 text-sm">
+        <Folder className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span className="font-medium">{folder.icon ? `${folder.icon} ` : ''}{folder.name}</span>
+        <span className="text-xs text-muted-foreground">({total} sản phẩm)</span>
+        {folder.description && (
+          <span className="ml-2 hidden truncate text-xs text-muted-foreground sm:inline">{folder.description}</span>
+        )}
+      </summary>
+
+      <div className="space-y-3 border-t p-3">
+        {kids.length > 0 && (
+          <div className="space-y-1.5">
+            {kids.map((k) => (
+              <CategoryNode
+                key={k.id}
+                folder={k}
+                depth={depth + 1}
+                childrenOf={childrenOf}
+                productsByFolder={productsByFolder}
+                totalOf={totalOf}
+                docs={docs}
+              />
+            ))}
+          </div>
+        )}
+
+        {own.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {own.map((p) => (
+              <ProductCard key={p.code ?? p.name} p={p} doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined} />
+            ))}
+          </div>
+        ) : kids.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Chưa có sản phẩm nào trong danh mục này.</p>
+        ) : null}
+      </div>
+    </details>
   )
 }
 
-// ── Cấp 2: Một danh mục ─────────────────────────────────────────────
+// ── Cấp 2: Một danh mục (folderId) ──────────────────────────────────
 
-function CategoryView({ category }: { category: string }) {
-  const q = useCrmProductList({ category, pageSize: 200 })
-  const products = q.data?.products ?? []
-  const codes = useMemo(() => products.map((p) => p.code).filter((c): c is string => !!c), [products])
-  const docsQ = useProductDocsByCodes(codes)
+/** Xem riêng một nhánh — gồm cả sản phẩm của các thư mục con. */
+function CategoryView({ folderId }: { folderId: string }) {
+  const q = useAllProducts()
+  const foldersQ = useDocFolders()
+  const docsQ = useAllProductDocs()
+
+  const folders = foldersQ.data ?? []
+  const docs = docsQ.data ?? []
+  const folder = folders.find((f) => f.id === folderId)
+
+  // Nhánh này gồm chính nó + toàn bộ thư mục con.
+  const branchIds = useMemo(() => {
+    const childrenOf = new Map<string | null, string[]>()
+    for (const f of folders) {
+      const arr = childrenOf.get(f.parentId) ?? []
+      arr.push(f.id)
+      childrenOf.set(f.parentId, arr)
+    }
+    const out = new Set<string>([folderId])
+    const stack = [folderId]
+    while (stack.length) {
+      const cur = stack.pop()!
+      for (const c of childrenOf.get(cur) ?? []) if (!out.has(c)) { out.add(c); stack.push(c) }
+    }
+    return out
+  }, [folders, folderId])
+
+  const products = useMemo(() => {
+    const codeToFolder = new Map(docs.map((d) => [d.productCode.toUpperCase(), d.folderId]))
+    return (q.data?.products ?? []).filter((p) => {
+      const fid = p.code ? codeToFolder.get(p.code.toUpperCase()) : null
+      return fid ? branchIds.has(fid) : false
+    })
+  }, [q.data, docs, branchIds])
+
+  const loading = q.isLoading || foldersQ.isLoading || docsQ.isLoading
 
   return (
     <div className="space-y-6">
-      <PageHeader title={category} description={`${products.length} sản phẩm trong danh mục này.`} />
-      <Crumbs items={[{ label: 'Tài liệu bán hàng', to: ROOT }, { label: category }]} />
+      <PageHeader
+        title={folder ? `${folder.icon ? `${folder.icon} ` : ''}${folder.name}` : 'Danh mục'}
+        description={folder?.description || `${products.length} sản phẩm trong nhánh này (tính cả danh mục con).`}
+      />
+      <Crumbs items={[{ label: 'Tài liệu bán hàng', to: ROOT }, { label: folder?.name ?? '…' }]} />
 
-      {q.isLoading ? (
+      {loading ? (
         <Loading className="py-16" />
       ) : q.error ? (
         <ErrorState message={apiError(q.error)} />
       ) : products.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Danh mục này chưa có sản phẩm.</p>
+        <p className="text-sm text-muted-foreground">Danh mục này chưa có sản phẩm nào được gán.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {products.map((p) => (
-            <ProductCard key={p.code ?? p.name} p={p} doc={p.code ? docsQ.data?.get(p.code) : undefined} />
+            <ProductCard
+              key={p.code ?? p.name}
+              p={p}
+              doc={p.code ? docs.find((d) => d.productCode === p.code!.toUpperCase()) : undefined}
+            />
           ))}
         </div>
       )}
