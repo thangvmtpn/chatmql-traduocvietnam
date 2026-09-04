@@ -93,11 +93,17 @@ async function loadThreadMemory(orgId: string, contactId: string, maxChars: numb
 
 // ── L3b: Staff notes (CRM internal notes) ────────────────────────────────────
 
-async function loadStaffNotes(orgId: string, convId: string, contactId?: string | null): Promise<StaffNoteSnippet[]> {
+async function loadStaffNotes(
+  orgId: string,
+  convId: string,
+  contactId?: string | null,
+  maxChars: number = 800,
+): Promise<StaffNoteSnippet[]> {
   try {
     const notes = await prisma.note.findMany({
       where: {
         orgId,
+        isDeleted: false,
         OR: [
           { conversationId: convId },
           ...(contactId ? [{ contactId }] : []),
@@ -114,7 +120,7 @@ async function loadStaffNotes(orgId: string, convId: string, contactId?: string 
       const text = n.content.trim()
       if (!text) continue
       total += text.length
-      if (total > BUDGET_L3B_CHARS) break
+      if (total > maxChars) break
       kept.push({
         content: text,
         status: n.status,
@@ -270,7 +276,7 @@ export async function assembleContext(
     loadScenarios(orgId, turnText, ragTopK, budgets.l0bScenarios, opts.minScore),          // L0b
     contactId ? loadContactProfile(contactId) : Promise.resolve(null),                    // L2
     contactId ? loadThreadMemory(orgId, contactId, budgets.l3Memory) : Promise.resolve([]), // L3
-    loadStaffNotes(orgId, convId, contactId),                                              // L3b
+    loadStaffNotes(orgId, convId, contactId, budgets.l3Memory),                            // L3b
     opts.skipRag ? Promise.resolve([] as KbSnippet[]) : loadKbSnippets(orgId, turnText, ragTopK, tools, budgets.l1Kb, opts.minScore),          // L1
     opts.skipRag ? Promise.resolve([] as ProductSnippet[]) : loadProductSnippets(orgId, turnText, ragTopK, tools.search_products, budgets.products, opts.minScore), // L1b
     loadRecentMessages(convId, budgets.l5Messages, opts.historyBefore),                   // L5
