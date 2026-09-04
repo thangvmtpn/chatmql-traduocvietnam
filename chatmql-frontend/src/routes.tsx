@@ -14,9 +14,6 @@ import { DuplicateContactsPage } from '@/pages/customers/duplicate-contacts-page
 import { PhoneExtractPage } from '@/pages/customers/phone-extract-page'
 // CDP
 import { CdpPage } from '@/pages/cdp/cdp-page'
-// Phân tích
-import { AnalyticsPage } from '@/pages/analytics/analytics-page'
-import { SavedReportsPage } from '@/pages/analytics/saved-reports-page'
 // AI
 import { AiWorkspacePage } from '@/pages/ai/ai-workspace-page'
 import { AiScenariosPage } from '@/pages/ai/ai-scenarios-page'
@@ -35,14 +32,6 @@ import { AutomationFlowPage } from '@/pages/automation/automation-flow-page'
 import { ProductsPage } from '@/pages/knowledge/products-page'
 // Tài liệu bán hàng (thư mục: biểu giá → danh mục → sản phẩm → chi tiết)
 import { SalesDocsPage } from '@/pages/sales-docs/sales-docs-page'
-// ZNS
-import { ZnsCampaignsPage } from '@/pages/zns/zns-campaigns-page'
-import { ZnsCampaignDetailPage } from '@/pages/zns/zns-campaign-detail-page'
-// Báo giá
-import { QuotesPage } from '@/pages/quotes/quotes-page'
-import { PublicQuotePage } from '@/pages/quotes/public-quote-page'
-// Ưu đãi (TDVN)
-import { PromotionsAdminPage } from '@/pages/promotions/promotions-admin-page'
 // Tích hợp
 import { IntegrationsPage } from '@/pages/integrations/integrations-page'
 // Platform (super-admin) — auth & layout riêng
@@ -55,8 +44,6 @@ import { PlatformBrandingPage } from '@/pages/platform/platform-branding-page'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
-  // Trang báo giá công khai (không cần đăng nhập, ngoài AppLayout)
-  { path: '/q/:token', element: <PublicQuotePage /> },
 
   // Khu vực Platform super-admin (auth + layout riêng, guard nằm trong PlatformLayout)
   { path: '/platform/login', element: <PlatformLoginPage /> },
@@ -90,14 +77,10 @@ export const router = createBrowserRouter([
       { path: 'customers/extract-phones', element: <ProtectedRoute permission={'contacts.view'}><PhoneExtractPage /></ProtectedRoute> },
       { path: 'customers/:id', element: <ProtectedRoute permission={'contacts.view'}><ContactDetailPage /></ProtectedRoute> },
 
-
       { path: 'cdp', element: <ProtectedRoute permission={'cdp.view'} roles={['owner', 'admin', 'manager']}><CdpPage /></ProtectedRoute> },
 
       { path: 'automation', element: <ProtectedRoute permission={'automation.view'} roles={['owner', 'admin', 'manager']}><AutomationPage /></ProtectedRoute> },
       { path: 'automation/flow/:ruleId', element: <ProtectedRoute permission={'automation.view'} roles={['owner', 'admin', 'manager']}><AutomationFlowPage /></ProtectedRoute> },
-
-      { path: 'analytics', element: <ProtectedRoute permission={'analytics.view'} roles={['owner', 'admin', 'manager']}><AnalyticsPage /></ProtectedRoute> },
-      { path: 'analytics/saved-reports', element: <ProtectedRoute permission={'analytics.view'} roles={['owner', 'admin', 'manager']}><SavedReportsPage /></ProtectedRoute> },
 
       { path: 'knowledge-base', element: <ProtectedRoute permission={'products.view'}><ProductsPage /></ProtectedRoute> },
 
@@ -105,18 +88,12 @@ export const router = createBrowserRouter([
       { path: 'sales-docs/c/:catId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
       { path: 'sales-docs/p/:productId', element: <ProtectedRoute permission={'products.view'}><SalesDocsPage /></ProtectedRoute> },
 
-      { path: 'quotes', element: <ProtectedRoute permission={'quotes.view'}><QuotesPage /></ProtectedRoute> },
-      { path: 'promotions', element: <ProtectedRoute permission={'promotions.view'} roles={['owner', 'admin', 'manager']}><PromotionsAdminPage /></ProtectedRoute> },
-
       { path: 'ai', element: <ProtectedRoute permission={'ai.view'}><AiWorkspacePage /></ProtectedRoute> },
       { path: 'ai/logic-docs', element: <ProtectedRoute permission={'ai.view'}><TrainAiPage /></ProtectedRoute> },
       { path: 'ai/train/:botId', element: <ProtectedRoute permission={'ai.view'}><AiTrainPage /></ProtectedRoute> },
       { path: 'ai/scenarios', element: <ProtectedRoute permission={'ai.view'}><AiScenariosPage /></ProtectedRoute> },
       { path: 'ai/knowledge-gaps', element: <ProtectedRoute permission={'ai.view'}><KnowledgeGapsPage /></ProtectedRoute> },
       { path: 'ai/improve', element: <ProtectedRoute permission={'ai.view'} roles={['owner', 'admin']}><AiImprovePage /></ProtectedRoute> },
-
-      { path: 'zns-campaigns', element: <ProtectedRoute permission={'zns.view'}><ZnsCampaignsPage /></ProtectedRoute> },
-      { path: 'zns-campaigns/:id', element: <ProtectedRoute permission={'zns.view'}><ZnsCampaignDetailPage /></ProtectedRoute> },
 
       { path: 'integrations', element: <ProtectedRoute permission={'integrations.view'}><IntegrationsPage /></ProtectedRoute> },
 
