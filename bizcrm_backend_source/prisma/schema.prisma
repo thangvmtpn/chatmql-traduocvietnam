@@ -2223,7 +2223,9 @@ model DocAsset {
   id          String   @id @default(uuid())
   orgId       String   @map("org_id")
   folderId    String?  @map("folder_id")
-  /// image | video | pdf | doc | text | link
+  /// product | image | video | pdf | doc | text | link
+  /// `product` là tài liệu bán hàng của một mặt hàng: có bộ ảnh + nhiều video,
+  /// nên dùng `images`/`videoUrls` thay vì một `fileUrl` đơn lẻ.
   kind        String
   title       String
   description String?
@@ -2232,6 +2234,10 @@ model DocAsset {
   /// Đường dẫn file đã tải lên máy chủ (tương đối, ví dụ /uploads/doc-assets/...).
   fileUrl     String?  @map("file_url")
   thumbUrl    String?  @map("thumb_url")
+  /// Bộ ảnh (loại `product`). Ảnh đầu tiên là ảnh đại diện.
+  images      String[] @default([])
+  /// Danh sách link video (YouTube/mp4).
+  videoUrls   String[] @default([]) @map("video_urls")
   fileSize    Int?     @map("file_size")
   mimeType    String?  @map("mime_type")
   /// Link ngoài (Drive, YouTube...) khi không tải file về.

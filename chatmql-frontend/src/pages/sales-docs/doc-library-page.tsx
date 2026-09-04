@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import {
   ChevronDown, ChevronUp, FileText, Film, Folder, FolderPlus, Image as ImageIcon, Link2,
-  Pencil, Plus, Search, Trash2, Type,
+  Package, Pencil, Plus, Search, Trash2, Type,
 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { ErrorState, Loading } from '@/components/shared/feedback'
@@ -35,6 +35,7 @@ const ALL = '__all__'
 const UNFILED = '__unfiled__'
 
 const KIND_ICON: Record<AssetKind, typeof ImageIcon> = {
+  product: Package,
   image: ImageIcon, video: Film, pdf: FileText, doc: FileText, text: Type, link: Link2,
 }
 
@@ -318,7 +319,9 @@ function FolderRow({
 function AssetCard({ a, canEdit, onEdit }: { a: DocAsset; canEdit: boolean; onEdit: () => void }) {
   const del = useDeleteDocAsset()
   const Icon = KIND_ICON[a.kind] ?? FileText
-  const src = a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
+  const src = a.kind === 'product'
+    ? assetUrl(a.images?.[0])
+    : a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
   const href = assetUrl(a.fileUrl) ?? a.sourceUrl ?? undefined
 
   return (

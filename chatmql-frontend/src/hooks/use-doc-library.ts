@@ -6,10 +6,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import { API_ORIGIN } from '@/lib/config'
 
-export type AssetKind = 'image' | 'video' | 'pdf' | 'doc' | 'text' | 'link'
+export type AssetKind = 'product' | 'image' | 'video' | 'pdf' | 'doc' | 'text' | 'link'
 export type Visibility = 'sales' | 'internal' | 'ai_only'
 
 export const KIND_LABELS: Record<AssetKind, string> = {
+  product: 'Sản phẩm',
   image: 'Hình ảnh',
   video: 'Video',
   pdf: 'PDF',
@@ -46,6 +47,9 @@ export interface DocAsset {
   textContent: string | null
   fileUrl: string | null
   thumbUrl: string | null
+  /** Bộ ảnh (loại `product`). Ảnh đầu là ảnh đại diện. */
+  images: string[]
+  videoUrls: string[]
   fileSize: number | null
   mimeType: string | null
   sourceUrl: string | null

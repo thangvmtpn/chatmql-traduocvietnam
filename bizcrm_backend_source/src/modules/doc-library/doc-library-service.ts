@@ -10,7 +10,7 @@
  */
 import { prisma } from '../../shared/prisma-client.js'
 
-export const ASSET_KINDS = ['image', 'video', 'pdf', 'doc', 'text', 'link'] as const
+export const ASSET_KINDS = ['product', 'image', 'video', 'pdf', 'doc', 'text', 'link'] as const
 export type AssetKind = (typeof ASSET_KINDS)[number]
 
 export const VISIBILITIES = ['sales', 'internal', 'ai_only'] as const
@@ -124,6 +124,8 @@ export interface AssetInput {
   textContent?: string | null
   fileUrl?: string | null
   thumbUrl?: string | null
+  images?: string[]
+  videoUrls?: string[]
   fileSize?: number | null
   mimeType?: string | null
   sourceUrl?: string | null
@@ -181,9 +183,14 @@ export async function createAsset(orgId: string, input: AssetInput, createdById?
   const title = input.title?.trim()
   if (!title) throw new Error('Tiêu đề không được để trống')
   const kind = input.kind && isAssetKind(input.kind) ? input.kind : 'image'
-  // Phải có ít nhất một "nội dung": file đã tải, link ngoài, hoặc chữ.
-  if (!input.fileUrl && !input.sourceUrl && !input.textContent?.trim()) {
-    throw new Error('Cần tải tệp, dán link, hoặc nhập nội dung chữ')
+  // Phải có ít nhất một "nội dung". Loại `product` là tài liệu mô tả mặt hàng
+  // nên bộ ảnh / video / mô tả đã đủ, không bắt buộc tệp đính kèm.
+  const hasBody = !!(
+    input.fileUrl || input.sourceUrl || input.textContent?.trim() ||
+    input.images?.length || input.videoUrls?.length || input.description?.trim()
+  )
+  if (!hasBody) {
+    throw new Error('Cần tải tệp, dán link, thêm ảnh/video, hoặc nhập nội dung')
   }
   if (input.folderId) await assertSameOrgFolder(orgId, input.folderId)
 
@@ -197,6 +204,8 @@ export async function createAsset(orgId: string, input: AssetInput, createdById?
       textContent: input.textContent ?? null,
       fileUrl: input.fileUrl ?? null,
       thumbUrl: input.thumbUrl ?? null,
+      images: input.images ?? [],
+      videoUrls: input.videoUrls ?? [],
       fileSize: input.fileSize ?? null,
       mimeType: input.mimeType ?? null,
       sourceUrl: input.sourceUrl ?? null,
@@ -224,6 +233,8 @@ export async function updateAsset(orgId: string, id: string, input: AssetInput) 
       textContent: input.textContent === undefined ? undefined : input.textContent,
       fileUrl: input.fileUrl === undefined ? undefined : input.fileUrl,
       thumbUrl: input.thumbUrl === undefined ? undefined : input.thumbUrl,
+      images: input.images ?? undefined,
+      videoUrls: input.videoUrls ?? undefined,
       sourceUrl: input.sourceUrl === undefined ? undefined : input.sourceUrl,
       productCodes: input.productCodes ? input.productCodes.map(normCode).filter(Boolean) : undefined,
       tags: input.tags ?? undefined,
@@ -287,6 +298,6 @@ export async function retrieveDocAssets(
     // Chỉ đưa chữ vào prompt; ảnh/video chỉ cần biết là CÓ để đề nghị gửi.
     textContent: r.textContent ? r.textContent.slice(0, 1500) : null,
     productCodes: r.productCodes,
-    sendable: r.visibility === 'sales' && !!(r.fileUrl || r.sourceUrl),
+    sendable: r.visibility === 'sales' && !!(r.fileUrl || r.sourceUrl || r.images.length || r.videoUrls.length),
   }))
 }

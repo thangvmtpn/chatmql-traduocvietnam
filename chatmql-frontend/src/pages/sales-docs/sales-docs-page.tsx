@@ -265,7 +265,9 @@ function FolderNode({
  * chi tiết sản phẩm — nơi dữ liệu thật (giá, tồn) được nạp từ hệ thống nguồn.
  */
 function AssetTile({ a }: { a: DocAsset }) {
-  const src = a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
+  const src = a.kind === 'product'
+    ? assetUrl(a.images?.[0])
+    : a.kind === 'image' ? assetUrl(a.thumbUrl || a.fileUrl) : undefined
   const href = assetUrl(a.fileUrl) ?? a.sourceUrl ?? undefined
 
   return (
