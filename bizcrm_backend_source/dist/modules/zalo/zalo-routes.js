@@ -184,6 +184,10 @@ export async function zaloRoutes(app) {
                 isDisabled: true,
             },
         });
+        // Clean up employee access assignments so soft-deleted accounts don't linger in team tables
+        await prisma.channelAccountAccess.deleteMany({
+            where: { channelAccountId: request.params.id },
+        }).catch(() => { });
         // Then stop the live listener + clean up the in-memory pool entry.
         await poolDisconnect(request.params.id).catch(() => { });
         return reply.status(204).send();

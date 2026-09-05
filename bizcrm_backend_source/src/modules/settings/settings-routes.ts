@@ -365,10 +365,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       select: {
         id: true, fullName: true, email: true, role: true, avatarUrl: true, isActive: true,
         channelAccounts: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, isDisabled: false },
           select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true, avatarUrl: true },
         },
         channelAccess: {
+          where: {
+            channelAccount: {
+              deletedAt: null,
+              isDisabled: false,
+            },
+          },
           select: {
             channelAccount: {
               select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true, avatarUrl: true },
@@ -386,7 +392,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       // Merge owned + accessible accounts, dedupe by id
       const accountMap = new Map<string, any>()
       for (const a of u.channelAccounts) accountMap.set(a.id, a)
-      for (const ac of u.channelAccess) accountMap.set(ac.channelAccount.id, ac.channelAccount)
+      for (const ac of u.channelAccess) {
+        if (ac.channelAccount) accountMap.set(ac.channelAccount.id, ac.channelAccount)
+      }
       return [u.id, {
         id: u.id, fullName: u.fullName, email: u.email, role: u.role,
         avatarUrl: u.avatarUrl, isActive: u.isActive,
@@ -430,10 +438,16 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           select: {
             id: true, fullName: true, email: true, avatarUrl: true, role: true,
             channelAccounts: {
-              where: { deletedAt: null },
+              where: { deletedAt: null, isDisabled: false },
               select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true },
             },
             channelAccess: {
+              where: {
+                channelAccount: {
+                  deletedAt: null,
+                  isDisabled: false,
+                },
+              },
               select: {
                 channelAccount: {
                   select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true },
@@ -448,7 +462,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     const subordinates = relations.map(r => {
       const accountMap = new Map<string, any>()
       for (const a of r.member.channelAccounts) accountMap.set(a.id, a)
-      for (const ac of r.member.channelAccess) accountMap.set(ac.channelAccount.id, ac.channelAccount)
+      for (const ac of r.member.channelAccess) {
+        if (ac.channelAccount) accountMap.set(ac.channelAccount.id, ac.channelAccount)
+      }
       return {
         id: r.member.id,
         fullName: r.member.fullName,
