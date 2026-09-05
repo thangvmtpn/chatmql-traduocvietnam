@@ -35,6 +35,8 @@ export async function zaloRoutes(app) {
                 displayName: true,
                 avatarUrl: true,
                 phone: true,
+                isBusiness: true,
+                businessTier: true,
                 status: true,
                 isDisabled: true,
                 lastConnectedAt: true,
@@ -94,10 +96,10 @@ export async function zaloRoutes(app) {
             accountId: account.id,
         });
     });
-    // PATCH /api/v1/zalo-accounts/:id — update account display name or toggle disabled
+    // PATCH /api/v1/zalo-accounts/:id — update account display name, disabled state, or business status/tier
     app.patch('/api/v1/zalo-accounts/:id', async (request, reply) => {
         const user = request.user;
-        const { displayName, isDisabled } = request.body ?? {};
+        const { displayName, isDisabled, isBusiness, businessTier } = request.body ?? {};
         const account = await prisma.channelAccount.findFirst({
             where: { id: request.params.id, orgId: user.orgId },
         });
@@ -108,6 +110,8 @@ export async function zaloRoutes(app) {
             data: {
                 ...(displayName !== undefined ? { displayName } : {}),
                 ...(isDisabled !== undefined ? { isDisabled } : {}),
+                ...(isBusiness !== undefined ? { isBusiness } : {}),
+                ...(businessTier !== undefined ? { businessTier } : {}),
             },
         });
         if (isDisabled === true) {

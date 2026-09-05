@@ -45,6 +45,8 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
         displayName: true,
         avatarUrl: true,
         phone: true,
+        isBusiness: true,
+        businessTier: true,
         status: true,
         isDisabled: true,
         lastConnectedAt: true,
@@ -107,10 +109,18 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
     })
   })
 
-  // PATCH /api/v1/zalo-accounts/:id — update account display name or toggle disabled
-  app.patch<{ Params: { id: string }; Body: { displayName?: string; isDisabled?: boolean } }>('/api/v1/zalo-accounts/:id', async (request, reply) => {
+  // PATCH /api/v1/zalo-accounts/:id — update account display name, disabled state, or business status/tier
+  app.patch<{
+    Params: { id: string }
+    Body: {
+      displayName?: string
+      isDisabled?: boolean
+      isBusiness?: boolean
+      businessTier?: string | null
+    }
+  }>('/api/v1/zalo-accounts/:id', async (request, reply) => {
     const user = request.user as { orgId: string }
-    const { displayName, isDisabled } = request.body ?? {}
+    const { displayName, isDisabled, isBusiness, businessTier } = request.body ?? {}
 
     const account = await prisma.channelAccount.findFirst({
       where: { id: request.params.id, orgId: user.orgId },
@@ -122,6 +132,8 @@ export async function zaloRoutes(app: FastifyInstance): Promise<void> {
       data: {
         ...(displayName !== undefined ? { displayName } : {}),
         ...(isDisabled !== undefined ? { isDisabled } : {}),
+        ...(isBusiness !== undefined ? { isBusiness } : {}),
+        ...(businessTier !== undefined ? { businessTier } : {}),
       },
     })
 

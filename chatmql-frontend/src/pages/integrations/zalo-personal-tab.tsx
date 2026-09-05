@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import dayjs from 'dayjs'
-import { MessageCircle, Plus, RefreshCw, LogIn, Unplug, Loader2 } from 'lucide-react'
+import { MessageCircle, Plus, RefreshCw, LogIn, Unplug, Loader2, Briefcase, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -13,15 +21,18 @@ import {
 } from '@/components/ui/dialog'
 import { Loading, ErrorState, EmptyState } from '@/components/shared/feedback'
 import { apiError } from '@/lib/api-client'
+import { cn } from '@/lib/utils'
 import {
   useZaloAccounts,
   useConnectZalo,
   useZaloLogin,
   useZaloReconnect,
   useDeleteZaloAccount,
+  useUpdateZaloAccount,
   statusMeta,
   type ChannelAccount,
 } from '@/hooks/use-integrations'
+import { BusinessBadge } from '@/components/business-badge'
 import { ChannelCard } from './channel-card'
 import { QrLoginDialog } from './qr-login-dialog'
 
@@ -31,6 +42,7 @@ export function ZaloPersonalTab() {
   const login = useZaloLogin()
   const reconnect = useZaloReconnect()
   const remove = useDeleteZaloAccount()
+  const updateAccount = useUpdateZaloAccount()
 
   const [qrAccountId, setQrAccountId] = useState<string | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
@@ -73,6 +85,23 @@ export function ZaloPersonalTab() {
     })
   }
 
+  const handleSetBusiness = async (acc: ChannelAccount, isBusiness: boolean, tier: string | null) => {
+    try {
+      await updateAccount.mutateAsync({
+        id: acc.id,
+        isBusiness,
+        businessTier: isBusiness ? tier : null,
+      })
+      toast.success(
+        isBusiness
+          ? `Đã gắn nhãn Business${tier ? ` (${tier.toUpperCase()})` : ''} cho "${acc.displayName || acc.phone || 'tài khoản'}"`
+          : `Đã chuyển "${acc.displayName || acc.phone || 'tài khoản'}" về tài khoản cá nhân thường`,
+      )
+    } catch (err) {
+      toast.error(apiError(err) || 'Không thể cập nhật loại tài khoản')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -104,6 +133,9 @@ export function ZaloPersonalTab() {
           {data.map((acc) => {
             const st = acc.liveStatus
             const isConnected = st === 'connected' && !acc.isDisabled
+            const isUpdating = updateAccount.isPending && updateAccount.variables?.id === acc.id
+            const currentTier = acc.businessTier?.toLowerCase()
+
             return (
               <ChannelCard
                 key={acc.id}
@@ -118,9 +150,82 @@ export function ZaloPersonalTab() {
                       : 'Chưa từng kết nối'}
                   </>
                 }
+                badge={<BusinessBadge isBusiness={acc.isBusiness} tier={acc.businessTier} />}
                 status={statusMeta(st, acc.isDisabled)}
                 actions={
                   <>
+                    {/* Menu cấu hình nhãn Business */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant={acc.isBusiness ? 'outline' : 'ghost'}
+                          size="sm"
+                          disabled={isUpdating}
+                          className={cn(
+                            'h-8 gap-1.5 text-xs',
+                            acc.isBusiness &&
+                              'border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-800 dark:text-amber-300',
+                          )}
+                          title="Gắn nhãn hoặc đổi gói Zalo Business"
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Briefcase className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                          )}
+                          <span>
+                            {acc.isBusiness
+                              ? acc.businessTier
+                                ? `Biz: ${acc.businessTier.toUpperCase()}`
+                                : 'Business'
+                              : 'Gắn Business'}
+                          </span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel className="text-xs">Loại tài khoản Zalo</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleSetBusiness(acc, false, null)}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span>Cá nhân thông thường</span>
+                          {!acc.isBusiness && <Check className="h-4 w-4 text-primary" />}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground">
+                          Gói Zalo Business (zBiz)
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => handleSetBusiness(acc, true, 'standard')}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span>Gói Standard (Chuẩn)</span>
+                          {acc.isBusiness && currentTier === 'standard' && (
+                            <Check className="h-4 w-4 text-amber-600" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSetBusiness(acc, true, 'pro')}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span>Gói Pro (Nâng cao)</span>
+                          {acc.isBusiness && (!currentTier || currentTier === 'pro') && (
+                            <Check className="h-4 w-4 text-amber-600" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleSetBusiness(acc, true, 'elite')}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span>Gói Elite (Cao cấp)</span>
+                          {acc.isBusiness && currentTier === 'elite' && (
+                            <Check className="h-4 w-4 text-amber-600" />
+                          )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
                     {!isConnected && (
                       <>
                         <Button

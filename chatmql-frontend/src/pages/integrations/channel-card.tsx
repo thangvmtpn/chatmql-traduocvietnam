@@ -14,6 +14,7 @@ export function ChannelCard({
   avatarUrl,
   title,
   subtitle,
+  badge,
   status,
   actions,
 }: {
@@ -23,6 +24,7 @@ export function ChannelCard({
   avatarUrl?: string | null
   title: string
   subtitle?: ReactNode
+  badge?: ReactNode
   status?: StatusMeta
   actions?: ReactNode
 }) {
@@ -50,7 +52,10 @@ export function ChannelCard({
             </Avatar>
           )}
           <div className="min-w-0">
-            <p className="truncate font-medium">{title}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate font-medium">{title}</p>
+              {badge}
+            </div>
             {subtitle && (
               <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
             )}

@@ -257,6 +257,8 @@ model ChannelAccount {
   displayName     String?   @map("display_name")
   avatarUrl       String?   @map("avatar_url")
   phone           String?
+  isBusiness      Boolean   @default(false) @map("is_business")
+  businessTier    String?   @map("business_tier") // standard, pro, elite
   status          String    @default("disconnected") // connected, disconnected, qr_pending
   isDisabled      Boolean   @default(false) @map("is_disabled")
   sessionData     Json?     @map("session_data") // Zalo personal: zca-js session

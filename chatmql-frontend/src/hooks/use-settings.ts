@@ -26,7 +26,15 @@ export interface TeamMember {
   roleId?: string | null
   roleName?: string | null
   /** Tài khoản giao tiếp nhân viên này phụ trách (sở hữu + được cấp quyền, đã gộp). */
-  accounts: { id: string; displayName: string | null; platform: number; status: string }[]
+  accounts: {
+    id: string
+    displayName: string | null
+    phone?: string | null
+    isBusiness?: boolean
+    businessTier?: string | null
+    platform: number
+    status: string
+  }[]
 }
 
 export interface TagDef {
@@ -121,7 +129,7 @@ export function useTeam(enabled = true) {
           accountsByUser.set(
             n.id,
             (n.accounts ?? []).map((a) => ({
-              id: a.id, displayName: a.displayName, platform: a.platform, status: a.status,
+              id: a.id, displayName: a.displayName, phone: a.phone, platform: a.platform, status: a.status,
             })),
           )
           walk(n.subordinates)
@@ -414,6 +422,9 @@ export function useMarkAllNotificationsRead() {
 export interface OrgAccount {
   id: string
   displayName: string
+  phone?: string | null
+  isBusiness?: boolean
+  businessTier?: string | null
   platform: number
   status: string
   avatarUrl?: string | null

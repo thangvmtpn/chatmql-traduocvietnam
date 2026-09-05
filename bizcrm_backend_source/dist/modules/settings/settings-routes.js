@@ -317,12 +317,12 @@ export async function settingsRoutes(app) {
                 id: true, fullName: true, email: true, role: true, avatarUrl: true, isActive: true,
                 channelAccounts: {
                     where: { deletedAt: null },
-                    select: { id: true, displayName: true, platform: true, status: true, avatarUrl: true },
+                    select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true, avatarUrl: true },
                 },
                 channelAccess: {
                     select: {
                         channelAccount: {
-                            select: { id: true, displayName: true, platform: true, status: true, avatarUrl: true },
+                            select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true, avatarUrl: true },
                         },
                     },
                 },
@@ -379,12 +379,12 @@ export async function settingsRoutes(app) {
                         id: true, fullName: true, email: true, avatarUrl: true, role: true,
                         channelAccounts: {
                             where: { deletedAt: null },
-                            select: { id: true, displayName: true, platform: true, status: true },
+                            select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true },
                         },
                         channelAccess: {
                             select: {
                                 channelAccount: {
-                                    select: { id: true, displayName: true, platform: true, status: true },
+                                    select: { id: true, displayName: true, phone: true, isBusiness: true, businessTier: true, platform: true, status: true },
                                 },
                             },
                         },

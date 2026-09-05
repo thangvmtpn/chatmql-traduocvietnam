@@ -20,11 +20,13 @@ import {
   useTeam, useZaloAccess, useGrantZaloAccess, useRevokeZaloAccess,
 } from '@/hooks/use-settings'
 import { useZaloAccounts } from '@/hooks/use-integrations'
+import { formatAccountWithPhone } from './settings-utils'
+import { BusinessBadge } from '@/components/business-badge'
 import { apiError } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 
 export function PermissionsSection() {
-  const { data: accounts, isLoading: loadingAccounts, isError } = useZaloAccounts(undefined, true)
+  const { data: accounts, isLoading: loadingAccounts, isError } = useZaloAccounts()
   const { data: team } = useTeam()
   const [accountId, setAccountId] = useState<string | undefined>()
 
@@ -90,7 +92,12 @@ export function PermissionsSection() {
                     {online
                       ? <Wifi className="h-3.5 w-3.5 shrink-0 text-success" />
                       : <WifiOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                    <span className="min-w-0 flex-1 truncate" title={a.displayName ?? ''}>{a.displayName || 'Không tên'}</span>
+                    <span className="min-w-0 flex-1 truncate" title={formatAccountWithPhone(a.displayName, a.phone)}>
+                      {formatAccountWithPhone(a.displayName, a.phone)}
+                    </span>
+                    {a.isBusiness && (
+                      <BusinessBadge tier={a.businessTier} showIcon={false} className="px-1 py-0 text-[9px]" />
+                    )}
                   </button>
                 </li>
               )
@@ -104,8 +111,9 @@ export function PermissionsSection() {
         <CardContent className="p-4">
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {selected?.displayName || 'Chọn một tài khoản'}
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold flex items-center gap-1.5">
+              <span>{formatAccountWithPhone(selected?.displayName, selected?.phone) || 'Chọn một tài khoản'}</span>
+              {selected?.isBusiness && <BusinessBadge tier={selected.businessTier} />}
             </p>
             <Badge variant="secondary" className="text-[10px]">{grantedIds.size} người</Badge>
           </div>

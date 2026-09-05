@@ -13,6 +13,7 @@ import {
 import { Separator, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/misc'
 import { statusMeta, useZaloAccounts, type ChannelAccount } from '@/hooks/use-integrations'
 import { CHANNEL_GROUPS, groupOfPlatform, type ChannelGroupId } from '@/lib/channel-groups'
+import { BusinessBadge } from '@/components/business-badge'
 import { FEATURES } from '@/lib/features'
 import { cn, initials } from '@/lib/utils'
 
@@ -69,7 +70,11 @@ export function FilterRail({
   const { data: accounts, isLoading } = useZaloAccounts()
   const list: ChannelAccount[] = accounts ?? []
   const selected = accountId ? list.find((a) => a.id === accountId) : undefined
+  const selectedPhone = selected?.phone ? (selected.phone.startsWith('+84') ? '0' + selected.phone.slice(3) : selected.phone) : null
   const selectedName = selected?.displayName ?? 'Không tên'
+  const selectedFullName = selectedPhone && !selectedName.includes(selectedPhone) && !selectedName.replace(/\D/g, '').includes(selectedPhone.replace(/\D/g, ''))
+    ? `${selectedName} (${selectedPhone})`
+    : selectedName
 
   // Tab loại kênh trong bảng chọn tài khoản. `null` = "Tất cả".
   const [group, setGroup] = useState<ChannelGroupId | null>(null)
@@ -130,47 +135,69 @@ export function FilterRail({
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="right">
-              {selected ? selectedName : 'Tất cả tài khoản'}
+              {selected
+                ? `${selectedFullName}${selected.isBusiness ? ` [Business${selected.businessTier ? ` - ${selected.businessTier.toUpperCase()}` : ''}]` : ''}`
+                : 'Tất cả tài khoản'}
             </TooltipContent>
           </Tooltip>
 
-          <DropdownMenuContent align="start" side="right" className="w-72">
-            <DropdownMenuLabel>Tài khoản kênh</DropdownMenuLabel>
+          <DropdownMenuContent side="right" align="start" className="w-64">
+            <div className="flex items-center justify-between px-2 py-1.5">
+              <span className="text-xs font-semibold">Tài khoản kênh</span>
+              {selected && (
+                <button
+                  type="button"
+                  onClick={() => onAccountChange(undefined)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  Bỏ lọc
+                </button>
+              )}
+            </div>
 
-            {/* Tab theo loại kênh — bấm để lọc, KHÔNG dùng DropdownMenuItem vì
-                Radix đóng cả bảng ngay khi chọn một item. */}
+            {/* Tab phân loại kênh */}
             {groupTabs.length > 1 && (
-              <div className="flex flex-wrap gap-1 px-2 pb-2">
-                <GroupTab label="Tất cả" count={list.length} active={!activeGroup} onClick={() => setGroup(null)} />
-                {groupTabs.map((g) => (
-                  <GroupTab
-                    key={g.id}
-                    label={g.label}
-                    count={g.count}
-                    active={activeGroup === g.id}
-                    onClick={() => setGroup(g.id)}
-                  />
-                ))}
+              <div className="px-1.5 pb-1">
+                <div className="grid grid-cols-4 gap-0.5 rounded-md bg-muted/60 p-0.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setGroup(null)}
+                    className={cn(
+                      'rounded px-1.5 py-1 font-medium transition-colors',
+                      !activeGroup ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    Tất cả
+                  </button>
+                  {groupTabs.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setGroup(g.id)}
+                      className={cn(
+                        'truncate rounded px-1.5 py-1 font-medium transition-colors',
+                        activeGroup === g.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {g.label} ({g.count})
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem
-              onSelect={() => onAccountChange(undefined)}
-              className={cn('gap-2', !accountId && 'bg-accent text-accent-foreground')}
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border">
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </span>
-              <span className="truncate">Tất cả tài khoản</span>
-            </DropdownMenuItem>
-
-            {visible.length > 0 && <DropdownMenuSeparator />}
-
             {visible.map((acc) => {
               const meta = statusMeta(acc.liveStatus, acc.isDisabled)
               const name = acc.displayName ?? 'Không tên'
+              const phoneLabel = acc.phone ? (acc.phone.startsWith('+84') ? '0' + acc.phone.slice(3) : acc.phone) : null
+              const hasPhoneInName = phoneLabel && (
+                name.includes(phoneLabel) ||
+                name.replace(/\D/g, '').includes(phoneLabel.replace(/\D/g, ''))
+              )
+              const fullName = phoneLabel && !hasPhoneInName ? `${name} (${phoneLabel})` : name
+
               return (
                 <DropdownMenuItem
                   key={acc.id}
@@ -178,10 +205,13 @@ export function FilterRail({
                   className={cn('gap-2', accountId === acc.id && 'bg-accent text-accent-foreground')}
                 >
                   <Avatar className="h-7 w-7 shrink-0">
-                    <AvatarImage src={acc.avatarUrl ?? undefined} alt={name} />
+                    <AvatarImage src={acc.avatarUrl ?? undefined} alt={fullName} />
                     <AvatarFallback className="text-xs">{initials(acc.displayName)}</AvatarFallback>
                   </Avatar>
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  <span className="min-w-0 flex-1 truncate" title={fullName}>{fullName}</span>
+                  {acc.isBusiness && (
+                    <BusinessBadge tier={acc.businessTier} showIcon={false} className="px-1 py-0 text-[9px]" />
+                  )}
                   <Badge variant={meta.variant} className="shrink-0 px-1.5 py-0 text-[10px]">
                     {meta.label}
                   </Badge>

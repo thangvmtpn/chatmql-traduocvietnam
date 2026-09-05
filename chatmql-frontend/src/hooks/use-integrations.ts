@@ -38,6 +38,8 @@ export interface ChannelAccount {
   displayName: string | null
   avatarUrl: string | null
   phone: string | null
+  isBusiness?: boolean
+  businessTier?: string | null
   status: ChannelStatus | null
   isDisabled: boolean
   lastConnectedAt: string | null
@@ -148,6 +150,31 @@ export function useDeleteZaloAccount() {
       await api.delete(`/zalo-accounts/${id}`)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations', 'zalo-accounts'] }),
+  })
+}
+
+/** Cập nhật thông tin tài khoản kênh (tên hiển thị, ẩn/tắt, nhãn Business). */
+export function useUpdateZaloAccount() {
+  const qc = useQueryClient()
+  return useMutation<
+    ChannelAccount,
+    unknown,
+    {
+      id: string
+      displayName?: string
+      isDisabled?: boolean
+      isBusiness?: boolean
+      businessTier?: string | null
+    }
+  >({
+    mutationFn: async ({ id, ...body }) => {
+      const { data } = await api.patch<ChannelAccount>(`/zalo-accounts/${id}`, body)
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['integrations', 'zalo-accounts'] })
+      qc.invalidateQueries({ queryKey: ['settings', 'team'] })
+    },
   })
 }
 

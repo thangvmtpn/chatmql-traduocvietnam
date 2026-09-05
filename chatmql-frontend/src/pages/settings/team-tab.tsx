@@ -38,7 +38,8 @@ import {
   type TeamMember,
 } from '@/hooks/use-settings'
 import { ASSIGNABLE_ROLES, ROLE_LABELS, avatarSrc } from './settings-utils'
-import { PLATFORM_LABEL } from './settings-utils'
+import { PLATFORM_LABEL, formatAccountWithPhone } from './settings-utils'
+import { BusinessBadge } from '@/components/business-badge'
 import { EmployeeAccountsDialog } from './employee-accounts-dialog'
 import { RolesDialog } from './roles-dialog'
 
@@ -213,15 +214,21 @@ export function TeamTab() {
             {m.accounts.length === 0 ? (
               <span className="text-xs text-muted-foreground">Chưa giao tài khoản nào</span>
             ) : (
-              m.accounts.map((a) => (
-                <span
-                  key={a.id}
-                  title={PLATFORM_LABEL[a.platform] ?? ''}
-                  className="max-w-[11rem] truncate rounded-full border bg-muted/60 px-2 py-0.5 text-[11px]"
-                >
-                  {a.displayName || 'Không tên'}
-                </span>
-              ))
+              m.accounts.map((a) => {
+                const label = formatAccountWithPhone(a.displayName, a.phone)
+                return (
+                  <span
+                    key={a.id}
+                    title={`${PLATFORM_LABEL[a.platform] ?? ''}${a.phone ? ` · ${a.phone}` : ''}${a.isBusiness ? ` · Business (${a.businessTier ? a.businessTier.toUpperCase() : 'Standard'})` : ''}`}
+                    className="inline-flex max-w-[16rem] items-center gap-1 truncate rounded-full border bg-muted/60 px-2 py-0.5 text-[11px]"
+                  >
+                    <span className="truncate">{label}</span>
+                    {a.isBusiness && (
+                      <BusinessBadge tier={a.businessTier} showIcon={false} className="px-1 py-0 text-[9px]" />
+                    )}
+                  </span>
+                )
+              })
             )}
             <span className="rounded-full border border-dashed px-1.5 py-0.5 text-[11px] text-primary">+</span>
           </button>

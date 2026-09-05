@@ -33,6 +33,7 @@ export const COMPANY_FIELDS: { key: string; label: string; placeholder: string; 
 export const PLATFORM_LABEL: Record<number, string> = {
   1: 'Zalo OA',
   2: 'Zalo Cá nhân',
+  3: 'Shopee Chat',
   10: 'Facebook Messenger',
   11: 'Instagram',
   12: 'Telegram',
@@ -41,4 +42,30 @@ export const PLATFORM_LABEL: Record<number, string> = {
   31: 'Pancake (Instagram)',
   32: 'Pancake (TikTok)',
   39: 'Pancake',
+  40: 'TikTok Shop',
 }
+
+/** Chuẩn hóa số điện thoại hiển thị (+84... -> 0...). */
+export function cleanPhoneNumber(phone?: string | null): string | null {
+  if (!phone) return null
+  const trimmed = phone.trim()
+  if (!trimmed) return null
+  return trimmed.startsWith('+84') ? '0' + trimmed.slice(3) : trimmed
+}
+
+/** Hiển thị tên tài khoản kèm số điện thoại nếu có và chưa nằm trong displayName. */
+export function formatAccountWithPhone(displayName?: string | null, phone?: string | null): string {
+  const cleanPhone = cleanPhoneNumber(phone)
+  const name = displayName?.trim() || ''
+  if (!name) return cleanPhone || 'Không tên'
+  if (!cleanPhone) return name
+
+  // Tránh lặp số điện thoại nếu displayName đã có sẵn
+  const rawDigits = cleanPhone.replace(/\D/g, '')
+  const nameDigits = name.replace(/\D/g, '')
+  if (name.includes(cleanPhone) || (rawDigits.length >= 8 && nameDigits.includes(rawDigits))) {
+    return name
+  }
+  return `${name} (${cleanPhone})`
+}
+
