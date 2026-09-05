@@ -1,0 +1,103 @@
+/**
+ * use-crm-products.ts — Sản phẩm đọc THẲNG từ CRM (không lưu ở ChatMQL).
+ * Backend: GET /crm-products/search, /crm-products/source (crm-products-routes.ts).
+ */
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api-client'
+
+/**
+ * Cấu trúc dữ liệu sản phẩm CHUẨN (khớp `CrmProduct` ở backend).
+ * `code` là khoá nghiệp vụ — tài liệu bán hàng gắn vào sản phẩm theo mã này.
+ */
+export interface CrmProduct {
+  id: string | number | null
+  code: string | null
+  name: string
+  price: number | null
+  priceMax: number | null
+  currency: string
+  unit: string | null
+  vatNote: string | null
+  inventory: number | null
+  weight: number | null
+  warehouseId: number | null
+  warehouseName: string | null
+  categoryId: string | number | null
+  categoryName: string | null
+  brand: string | null
+  status: string | null
+  /** Ảnh đại diện để dựng thẻ sản phẩm; thiếu thì vẽ ô trống. */
+  imageUrl: string | null
+  /** Bản ghi gốc CRM — dùng khi cần cột chưa được chuẩn hoá. */
+  raw: Record<string, unknown>
+}
+
+export interface CrmProductListParams {
+  q?: string
+  warehouseId?: number
+  category?: string
+  inStock?: boolean
+  page?: number
+  pageSize?: number
+}
+
+export interface CrmProductListResult {
+  source: CrmProductSource
+  products: CrmProduct[]
+  categories: string[]
+  meta: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export type CrmProductSource = 'bridge' | 'dashboard' | 'local'
+
+export const SOURCE_LABELS: Record<CrmProductSource, string> = {
+  bridge: 'Cầu nối ChatMQL ↔ CRM (service key)',
+  dashboard: 'API dashboard CRM (Bearer token)',
+  local: 'Bảng sản phẩm nội bộ (tạm, chờ API chính thức)',
+}
+
+export function useCrmProductSource() {
+  return useQuery<{
+    source: CrmProductSource
+    dashboardConfigured: boolean
+    /** Mẫu link Mini App, chứa {code}/{id}. Rỗng = chưa cấu hình. */
+    miniAppUrlTemplate: string
+  }>({
+    queryKey: ['crm-products', 'source'],
+    queryFn: async () => (await api.get('/crm-products/source')).data,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** Danh sách sản phẩm để duyệt — không cần gõ từ khoá. */
+export function useCrmProductList(params: CrmProductListParams) {
+  const query: Record<string, unknown> = {
+    page: params.page ?? 1,
+    pageSize: params.pageSize ?? 50,
+  }
+  if (params.q?.trim()) query.q = params.q.trim()
+  if (params.warehouseId != null) query.warehouseId = params.warehouseId
+  if (params.category) query.category = params.category
+  if (params.inStock) query.inStock = 'true'
+
+  return useQuery<CrmProductListResult>({
+    queryKey: ['crm-products', 'list', query],
+    // Giá và tồn kho đổi liên tục bên hệ thống nguồn — cache ngắn.
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    queryFn: async () => (await api.get('/crm-products', { params: query })).data,
+  })
+}
+
+/** Tìm sản phẩm trên CRM. `enabled=false` khi ô tìm còn trống. */
+export function useCrmProductSearch(q: string, limit = 20) {
+  const term = q.trim()
+  return useQuery<{ source: CrmProductSource; products: CrmProduct[] }>({
+    queryKey: ['crm-products', 'search', term, limit],
+    enabled: term.length > 0,
+    // Giá và tồn kho đổi liên tục bên CRM — giữ cache ngắn thôi.
+    staleTime: 30_000,
+    queryFn: async () =>
+      (await api.get('/crm-products/search', { params: { q: term, limit } })).data,
+  })
+}
